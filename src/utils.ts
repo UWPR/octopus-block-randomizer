@@ -1,6 +1,41 @@
 import { SearchData } from './types';
 import Papa from 'papaparse';
 
+// Bright color palette with 24 distinct colors in 4 randomized subgroups
+export const BRIGHT_COLOR_PALETTE = [
+  // Subgroup 1
+  '#FF69B4', // Hot Pink
+  '#0000FF', // Pure Blue
+  '#FF8000', // Pure Orange
+  '#9370DB', // Medium Purple
+  '#006400', // Dark Forest Green
+  '#008B8B', // Dark Cyan
+
+  // Subgroup 2
+  '#FF0000', // Pure Red
+  '#87CEEB', // Sky Blue
+  '#800080', // Purple
+  '#FFA500', // Orange
+  '#32CD32', // Lime Green
+  '#C0C0C0', // Silver
+
+  // Subgroup 3
+  '#F08080', // Light Coral
+  '#4169E1', // Royal Blue
+  '#FF1493', // Deep Pink
+  '#FFFF00', // Pure Yellow
+  '#98FB98', // Pale Green
+  '#40E0D0', // Turquoise
+
+  // Subgroup 4
+  '#FF4500', // Orange Red
+  '#8000FF', // Pure Purple
+  '#BA55D3', // Medium Orchid
+  '#B8860B', // Dark Gold
+  '#20B2AA', // Light Sea Green
+  '#DDA0DD'  // Plum
+];
+
 function generatePermutations(array: SearchData[]): (SearchData | undefined)[][] {
     if (array.length <= 1) return [array];
     const perms: (SearchData | undefined)[][] = [];
@@ -128,10 +163,11 @@ function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedC
   }
 
 
-export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchData | undefined)[][][]) {
+// Updated to accept referenceColumn parameter instead of hardcoding "search name"
+export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchData | undefined)[][][], referenceColumn: string) {
     const csv = Papa.unparse(
       searches.map((search) => ({
-        'search name': search.name,
+        [referenceColumn]: search.name, // Use the selected reference column name
         ...search.metadata,
         plate: getPlateNumber(search.name, randomizedPlates),
         row: getRowName(search.name, randomizedPlates),

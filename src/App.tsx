@@ -1,8 +1,8 @@
-import React, { useState, useEffect, DragEvent, useCallback  } from 'react';
+import React, { useState, useCallback, DragEvent } from 'react';
 import Papa from 'papaparse';
 import Plate from './components/Plate';
 import { SearchData } from './types';
-import { randomizeSearches, downloadCSV } from './utils';
+import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE } from './utils';
 
 const App: React.FC = () => {
   const [searches, setSearches] = useState<SearchData[]>([]);
@@ -10,39 +10,91 @@ const App: React.FC = () => {
   const [covariateColors, setCovariateColors] = useState<{ [key: string]: string }>({});
   const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
   const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
+  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+  const [selectedReferenceColumn, setSelectedReferenceColumn] = useState<string>('');
+  const [rawCsvData, setRawCsvData] = useState<string>('');
+  const [isProcessed, setIsProcessed] = useState<boolean>(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Read file as text for re-parsing capability
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setRawCsvData(e.target?.result as string);
+      };
+      reader.readAsText(file);
+
+      // Parse file to get headers and initial data
       Papa.parse(file, {
         header: true,
         complete: (results) => {
+          const headers = results.meta.fields || [];
+          setAvailableColumns(headers);
+          
+          // Auto-select reference column
+          let defaultColumn = headers[0];
+          if (headers.includes('search name')) {
+            defaultColumn = 'search name';
+          } else if (headers.includes('UW_Sample_ID')) {
+            defaultColumn = 'UW_Sample_ID';
+          }
+          setSelectedReferenceColumn(defaultColumn);
+
+          // Parse data with selected reference column
           const parsedSearches: SearchData[] = results.data
-            .filter((row: any) => row['search name'])
+            .filter((row: any) => row[defaultColumn])
             .map((row: any) => ({
-              name: row['search name'],
+              name: row[defaultColumn],
               metadata: Object.keys(row)
-                .filter((key) => key !== 'search name')
+                .filter((key) => key !== defaultColumn)
                 .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
             }));
+          
           setSearches(parsedSearches);
+          setIsProcessed(false);
+          setSelectedCovariates([]);
+          setRandomizedPlates([]);
+          setCovariateColors({});
         },
       });
     }
   };
 
-  const handleDownloadCSV = () => {
-    downloadCSV(searches, randomizedPlates);
+  const handleReferenceColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newReferenceColumn = event.target.value;
+    setSelectedReferenceColumn(newReferenceColumn);
+    setIsProcessed(false);
+    
+    // Re-parse data with new reference column
+    if (rawCsvData) {
+      Papa.parse(rawCsvData, {
+        header: true,
+        complete: (results) => {
+          const parsedSearches: SearchData[] = results.data
+            .filter((row: any) => row[newReferenceColumn])
+            .map((row: any) => ({
+              name: row[newReferenceColumn],
+              metadata: Object.keys(row)
+                .filter((key) => key !== newReferenceColumn)
+                .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
+            }));
+          setSearches(parsedSearches);
+          setSelectedCovariates([]);
+          setRandomizedPlates([]);
+          setCovariateColors({});
+        },
+      });
+    }
   };
 
   const handleCovariateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedOptions = Array.from(event.target.selectedOptions, (option) => option.value);
     setSelectedCovariates(selectedOptions);
+    setIsProcessed(false);
+    setRandomizedPlates([]);
+    setCovariateColors({});
   };
-
-  useEffect(() => {
-    setRandomizedPlates(randomizeSearches(searches, selectedCovariates));
-  }, [selectedCovariates, searches]);
 
   const generateCovariateColors = useCallback(() => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
@@ -51,23 +103,33 @@ const App: React.FC = () => {
           searches.map((search) => search.metadata[covariate])
         )
       );
-      const colors = ['#FFE4E1', '#E0FFFF', '#F0FFF0', '#FFF0F5', '#F5F5DC', '#F0E68C', '#E6E6FA', '#FFE4B5'];
 
       const covariateColorsMap: { [key: string]: string } = {};
       let colorIndex = 0;
 
       covariateValues.forEach((value) => {
-        covariateColorsMap[value] = colors[colorIndex % colors.length];
+        covariateColorsMap[value] = BRIGHT_COLOR_PALETTE[colorIndex % BRIGHT_COLOR_PALETTE.length];
         colorIndex += 1;
       });
 
       setCovariateColors(covariateColorsMap);
     }
-  }, [selectedCovariates, searches]); // Dependencies for useCallback
+  }, [selectedCovariates, searches]);
 
-  useEffect(() => {
-    generateCovariateColors();
-  }, [generateCovariateColors]); // generateCovariateColors is now a dependency
+  const handleProcessRandomization = () => {
+    if (selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      const plates = randomizeSearches(searches, selectedCovariates);
+      setRandomizedPlates(plates);
+      generateCovariateColors();
+      setIsProcessed(true);
+    }
+  };
+
+  const handleDownloadCSV = () => {
+    if (selectedReferenceColumn) {
+      downloadCSV(searches, randomizedPlates, selectedReferenceColumn);
+    }
+  };
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>, searchName: string) => {
     setDraggedSearch(searchName);
@@ -114,38 +176,82 @@ const App: React.FC = () => {
     }
   };
 
+  const canProcess = selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0;
+
   return (
     <div style={styles.container}>
       <div style={styles.content}>
         <h1 style={styles.heading}>Block Randomization</h1>
-        <input type="file" accept=".csv" onChange={handleFileUpload} style={styles.fileInput} />
-        <div style={styles.covariateSelection}>
-          <label htmlFor="covariates">Select Covariates:</label>
-          <select id="covariates" multiple value={selectedCovariates} onChange={handleCovariateChange}>
-            {searches.length > 0 &&
-              Object.keys(searches[0].metadata).map((covariate) => (
+        
+        <input 
+          type="file" 
+          accept=".csv" 
+          onChange={handleFileUpload} 
+          style={styles.fileInput} 
+        />
+        
+        {availableColumns.length > 0 && (
+          <div style={styles.selectionGroup}>
+            <label htmlFor="referenceColumn">Select Reference/ID Column:</label>
+            <select 
+              id="referenceColumn" 
+              value={selectedReferenceColumn} 
+              onChange={handleReferenceColumnChange}
+              style={styles.select}
+            >
+              {availableColumns.map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        
+        {searches.length > 0 && (
+          <div style={styles.selectionGroup}>
+            <label htmlFor="covariates">Select Covariates:</label>
+            <select 
+              id="covariates" 
+              multiple 
+              value={selectedCovariates} 
+              onChange={handleCovariateChange}
+              style={styles.multiSelect}
+            >
+              {Object.keys(searches[0].metadata).map((covariate) => (
                 <option key={covariate} value={covariate}>
                   {covariate}
                 </option>
               ))}
-          </select>
-        </div>
-        <div style={styles.platesContainer}>
-          {randomizedPlates.map((plate, plateIndex) => (
-            <div key={plateIndex} style={styles.plateWrapper}>
-              <Plate
-                plateIndex={plateIndex}
-                rows={plate}
-                covariateColors={covariateColors}
-                selectedCovariates={selectedCovariates}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
-              />
-            </div>
-          ))}
-        </div>
-        {selectedCovariates.length > 0 && randomizedPlates.length > 0 && (
+            </select>
+          </div>
+        )}
+        
+        {canProcess && !isProcessed && (
+          <button onClick={handleProcessRandomization} style={styles.processButton}>
+            Generate Randomized Plates
+          </button>
+        )}
+        
+        {isProcessed && (
+          <div style={styles.platesContainer}>
+            {randomizedPlates.map((plate, plateIndex) => (
+              <div key={plateIndex} style={styles.plateWrapper}>
+                <Plate
+                  plateIndex={plateIndex}
+                  rows={plate}
+                  covariateColors={covariateColors}
+                  selectedCovariates={selectedCovariates}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {isProcessed && randomizedPlates.length > 0 && (
           <button onClick={handleDownloadCSV} style={styles.downloadButton}>
             Download CSV
           </button>
@@ -181,12 +287,47 @@ const styles = {
     fontSize: '24px',
     fontWeight: 'bold',
     marginBottom: '20px',
+    color: '#333',
   },
   fileInput: {
     marginBottom: '20px',
+    padding: '8px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
   },
-  covariateSelection: {
+  selectionGroup: {
     marginBottom: '20px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '8px',
+  },
+  select: {
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    fontSize: '14px',
+    minWidth: '200px',
+  },
+  multiSelect: {
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    fontSize: '14px',
+    minWidth: '200px',
+    minHeight: '120px',
+  },
+  processButton: {
+    marginBottom: '20px',
+    padding: '12px 24px',
+    fontSize: '16px',
+    backgroundColor: '#2196f3',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'background-color 0.3s',
   },
   platesContainer: {
     display: 'flex',
@@ -194,12 +335,12 @@ const styles = {
     justifyContent: 'center',
     gap: '20px',
     width: '100%',
+    marginBottom: '20px',
   },
   plateWrapper: {
     margin: '10px',
   },
   downloadButton: {
-    marginTop: '20px',
     padding: '10px 20px',
     fontSize: '16px',
     backgroundColor: '#4caf50',
@@ -207,6 +348,8 @@ const styles = {
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'background-color 0.3s',
   },
 };
 

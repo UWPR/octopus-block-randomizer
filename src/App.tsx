@@ -213,6 +213,15 @@ const App: React.FC = () => {
     }
   };
 
+  // Re-randomization handler
+  const handleReRandomize = () => {
+    if (selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Generate new randomized plates with existing colors
+      const plates = randomizeSearches(searches, selectedCovariates);
+      setRandomizedPlates(plates);
+    }
+  };
+
   // Drag and drop handlers
   const handleDragStart = (event: DragEvent<HTMLDivElement>, searchName: string) => {
     setDraggedSearch(searchName);
@@ -370,6 +379,10 @@ const App: React.FC = () => {
                 style={styles.controlButton}
               >
                 {compactView ? 'Full Size View' : 'Compact View'}
+              </button>
+              
+              <button onClick={handleReRandomize} style={styles.controlButton}>
+                Re-randomize
               </button>
               
               <button onClick={handleDownloadCSV} style={styles.downloadButton}>

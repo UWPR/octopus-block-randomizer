@@ -10,9 +10,19 @@ interface PlateProps {
   onDragStart: (event: DragEvent<HTMLDivElement>, searchName: string) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>, rowIndex: number, columnIndex: number) => void;
+  compact?: boolean;
 }
 
-const Plate: React.FC<PlateProps> = ({ plateIndex, rows, covariateColors, selectedCovariates, onDragStart, onDragOver, onDrop }) => {
+const Plate: React.FC<PlateProps> = ({ 
+  plateIndex, 
+  rows, 
+  covariateColors, 
+  selectedCovariates, 
+  onDragStart, 
+  onDragOver, 
+  onDrop,
+  compact = true 
+}) => {
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     onDragOver(event);
@@ -25,42 +35,78 @@ const Plate: React.FC<PlateProps> = ({ plateIndex, rows, covariateColors, select
 
   const columns = Array.from({ length: 12 }, (_, index) => (index + 1).toString().padStart(2, '0'));
 
+  // Get styles based on compact mode
+  const getStyles = () => {
+    if (compact) {
+      return compactStyles;
+    }
+    return styles;
+  };
+
+  const currentStyles = getStyles();
+
   return (
-    <div style={styles.plate}>
-      <h2 style={styles.plateHeading}>Plate {plateIndex + 1}</h2>
-      <div style={styles.grid}>
-        <div style={styles.columnLabels}>
-          <div style={styles.emptyCell} />
+    <div style={currentStyles.plate}>
+      <h2 style={currentStyles.plateHeading}>Plate {plateIndex + 1}</h2>
+      <div style={currentStyles.grid}>
+        <div style={currentStyles.columnLabels}>
+          <div style={currentStyles.emptyCell} />
           {columns.map((column) => (
-            <div key={column} style={styles.columnLabel}>
-              {column}
+            <div key={column} style={currentStyles.columnLabel}>
+              {compact ? column.slice(-1) : column}
             </div>
           ))}
         </div>
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} style={styles.row}>
-            <div style={styles.rowLabel}>{String.fromCharCode(65 + rowIndex)}</div>
+          <div key={rowIndex} style={currentStyles.row}>
+            <div style={currentStyles.rowLabel}>{String.fromCharCode(65 + rowIndex)}</div>
             {columns.map((_, columnIndex) => {
               const search = row[columnIndex];
               return (
                 <div
                   key={columnIndex}
-                  style={search ? styles.searchWell : styles.emptyWell}
+                  style={search ? currentStyles.searchWell : currentStyles.emptyWell}
                   onDragOver={handleDragOver}
                   onDrop={(event) => handleDrop(event, rowIndex, columnIndex)}
+                  title={
+                    compact && search 
+                      ? `${search.name} (${String.fromCharCode(65 + rowIndex)}${columnIndex + 1})${
+                          selectedCovariates.length > 0 
+                            ? '\n' + selectedCovariates
+                                .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
+                                .join(', ') 
+                            : ''
+                        }` 
+                      : undefined
+                  }
                 >
                   {search ? (
-                    <Search
-                      name={search.name}
-                      metadata={search.metadata}
-                      backgroundColor={
-                        selectedCovariates
-                          .map(covariate => covariateColors[search.metadata[covariate]])
-                          .find(color => color !== undefined) || 'defaultColor'
-                      }
-                      onDragStart={onDragStart}
-                      selectedCovariates={selectedCovariates}
-                    />
+                    compact ? (
+                      // Compact view: just colored square
+                      <div
+                        style={{
+                          ...currentStyles.compactSearchIndicator,
+                          backgroundColor: selectedCovariates
+                            .map(covariate => covariateColors[search.metadata[covariate]])
+                            .find(color => color !== undefined) || '#cccccc'
+                        }}
+                        draggable={true}
+                        onDragStart={(event) => onDragStart(event, search.name)}
+                      />
+                    ) : (
+                      // Full view: Search component
+                      <Search
+                        name={search.name}
+                        metadata={search.metadata}
+                        backgroundColor={
+                          selectedCovariates
+                            .map(covariate => covariateColors[search.metadata[covariate]])
+                            .find(color => color !== undefined) || 'defaultColor'
+                        }
+                        onDragStart={onDragStart}
+                        selectedCovariates={selectedCovariates}
+                      />
+                    )
                   ) : null}
                 </div>
               );
@@ -74,6 +120,8 @@ const Plate: React.FC<PlateProps> = ({ plateIndex, rows, covariateColors, select
 
 const cellWidth = 150;
 const rowLabelWidth = 30;
+const compactCellWidth = 18;
+const compactRowLabelWidth = 15;
 
 const styles = {
   plate: {
@@ -133,6 +181,86 @@ const styles = {
   emptyCell: {
     width: `${rowLabelWidth}px`,
     padding: '5px',
+  },
+  compactSearchIndicator: {
+    width: '100%',
+    height: '100%',
+    borderRadius: '2px',
+    cursor: 'move',
+    border: '1px solid rgba(0,0,0,0.2)',
+  },
+};
+
+const compactStyles = {
+  plate: {
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    padding: '8px',
+    backgroundColor: '#f5f5f5',
+    fontSize: '10px',
+  },
+  plateHeading: {
+    fontSize: '12px',
+    fontWeight: 'bold',
+    marginBottom: '4px',
+    textAlign: 'center' as const,
+  },
+  grid: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  columnLabels: {
+    display: 'flex',
+    gap: '2px',
+  },
+  columnLabel: {
+    fontWeight: 'bold',
+    textAlign: 'center' as const,
+    width: `${compactCellWidth}px`,
+    padding: '1px',
+    fontSize: '8px',
+  },
+  row: {
+    display: 'flex',
+    gap: '2px',
+  },
+  rowLabel: {
+    fontWeight: 'bold',
+    textAlign: 'center' as const,
+    width: `${compactRowLabelWidth}px`,
+    padding: '1px',
+    fontSize: '8px',
+  },
+  searchWell: {
+    width: `${compactCellWidth}px`,
+    height: '16px',
+    border: '1px solid #ddd',
+    borderRadius: '2px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '1px',
+    cursor: 'pointer',
+  },
+  emptyWell: {
+    width: `${compactCellWidth}px`,
+    height: '16px',
+    backgroundColor: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: '2px',
+    padding: '1px',
+  },
+  emptyCell: {
+    width: `${compactRowLabelWidth}px`,
+    padding: '1px',
+  },
+  compactSearchIndicator: {
+    width: '100%',
+    height: '100%',
+    borderRadius: '2px',
+    cursor: 'move',
+    border: '1px solid rgba(0,0,0,0.2)',
   },
 };
 

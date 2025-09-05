@@ -28,6 +28,7 @@ const App: React.FC = () => {
   // UI states
   const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState<boolean>(false);
+  const [compactView, setCompactView] = useState<boolean>(true);
 
   // Helper functions
   const processSearchData = (data: any[], referenceColumn: string): SearchData[] => {
@@ -362,28 +363,37 @@ const App: React.FC = () => {
         
         {/* Plates Visualization */}
         {isProcessed && randomizedPlates.length > 0 && (
-          <div style={styles.platesContainer}>
-            {randomizedPlates.map((plate, plateIndex) => (
-              <div key={plateIndex} style={styles.plateWrapper}>
-                <Plate
-                  plateIndex={plateIndex}
-                  rows={plate}
-                  covariateColors={covariateColors}
-                  selectedCovariates={selectedCovariates}
-                  onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Download Button */}
-        {isProcessed && randomizedPlates.length > 0 && (
-          <button onClick={handleDownloadCSV} style={styles.downloadButton}>
-            Download CSV
-          </button>
+          <>
+            <div style={styles.viewControls}>
+              <button 
+                onClick={() => setCompactView(!compactView)}
+                style={styles.controlButton}
+              >
+                {compactView ? 'Full Size View' : 'Compact View'}
+              </button>
+              
+              <button onClick={handleDownloadCSV} style={styles.downloadButton}>
+                Download CSV
+              </button>
+            </div>
+            
+            <div style={compactView ? styles.compactPlatesContainer : styles.platesContainer}>
+              {randomizedPlates.map((plate, plateIndex) => (
+                <div key={plateIndex} style={compactView ? styles.compactPlateWrapper : styles.plateWrapper}>
+                  <Plate
+                    plateIndex={plateIndex}
+                    rows={plate}
+                    covariateColors={covariateColors}
+                    selectedCovariates={selectedCovariates}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
+                    compact={compactView}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -540,6 +550,24 @@ const styles = {
   covariateDetail: {
     marginBottom: '2px',
   },
+  viewControls: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '15px',
+    marginBottom: '20px',
+  },
+  controlButton: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    backgroundColor: '#f0f0f0',
+    color: '#333',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'background-color 0.3s ease',
+  },
   platesContainer: {
     display: 'flex',
     flexWrap: 'wrap' as const,
@@ -550,6 +578,21 @@ const styles = {
   },
   plateWrapper: {
     margin: '0',
+  },
+  compactPlatesContainer: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    gap: '15px',
+    width: '100%',
+    marginBottom: '30px',
+    padding: '0 10px',
+  },
+  compactPlateWrapper: {
+    margin: '0',
+    display: 'flex',
+    justifyContent: 'center',
   },
   downloadButton: {
     padding: '12px 25px',

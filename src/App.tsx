@@ -12,25 +12,36 @@ const App: React.FC = () => {
   const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [selectedReferenceColumn, setSelectedReferenceColumn] = useState<string>('');
-  const [rawCsvData, setRawCsvData] = useState<string>('');
+  const [parsedData, setParsedData] = useState<any[]>([]);
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
+
+  const processSearchData = (data: any[], referenceColumn: string): SearchData[] => {
+    return data
+      .filter((row: any) => row[referenceColumn])
+      .map((row: any) => ({
+        name: row[referenceColumn],
+        metadata: Object.keys(row)
+          .filter((key) => key !== referenceColumn)
+          .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
+      }));
+  };
+
+  const resetProcessingState = () => {
+    setIsProcessed(false);
+    setSelectedCovariates([]);
+    setRandomizedPlates([]);
+    setCovariateColors({});
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Read file as text for re-parsing capability
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setRawCsvData(e.target?.result as string);
-      };
-      reader.readAsText(file);
-
-      // Parse file to get headers and initial data
       Papa.parse(file, {
         header: true,
         complete: (results) => {
           const headers = results.meta.fields || [];
           setAvailableColumns(headers);
+          setParsedData(results.data);
           
           // Auto-select reference column
           let defaultColumn = headers[0];
@@ -41,21 +52,10 @@ const App: React.FC = () => {
           }
           setSelectedReferenceColumn(defaultColumn);
 
-          // Parse data with selected reference column
-          const parsedSearches: SearchData[] = results.data
-            .filter((row: any) => row[defaultColumn])
-            .map((row: any) => ({
-              name: row[defaultColumn],
-              metadata: Object.keys(row)
-                .filter((key) => key !== defaultColumn)
-                .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
-            }));
-          
-          setSearches(parsedSearches);
-          setIsProcessed(false);
-          setSelectedCovariates([]);
-          setRandomizedPlates([]);
-          setCovariateColors({});
+          // Process data with selected reference column
+          const processedSearches = processSearchData(results.data, defaultColumn);
+          setSearches(processedSearches);
+          resetProcessingState();
         },
       });
     }
@@ -64,27 +64,11 @@ const App: React.FC = () => {
   const handleReferenceColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newReferenceColumn = event.target.value;
     setSelectedReferenceColumn(newReferenceColumn);
-    setIsProcessed(false);
     
-    // Re-parse data with new reference column
-    if (rawCsvData) {
-      Papa.parse(rawCsvData, {
-        header: true,
-        complete: (results) => {
-          const parsedSearches: SearchData[] = results.data
-            .filter((row: any) => row[newReferenceColumn])
-            .map((row: any) => ({
-              name: row[newReferenceColumn],
-              metadata: Object.keys(row)
-                .filter((key) => key !== newReferenceColumn)
-                .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
-            }));
-          setSearches(parsedSearches);
-          setSelectedCovariates([]);
-          setRandomizedPlates([]);
-          setCovariateColors({});
-        },
-      });
+    if (parsedData.length > 0) {
+      const processedSearches = processSearchData(parsedData, newReferenceColumn);
+      setSearches(processedSearches);
+      resetProcessingState();
     }
   };
 

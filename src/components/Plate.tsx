@@ -11,6 +11,7 @@ interface PlateProps {
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>, rowIndex: number, columnIndex: number) => void;
   compact?: boolean;
+  highlightFunction?: (search: SearchData) => boolean;
 }
 
 const Plate: React.FC<PlateProps> = ({ 
@@ -21,7 +22,8 @@ const Plate: React.FC<PlateProps> = ({
   onDragStart, 
   onDragOver, 
   onDrop,
-  compact = true 
+  compact = true,
+  highlightFunction
 }) => {
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -62,10 +64,15 @@ const Plate: React.FC<PlateProps> = ({
             <div style={currentStyles.rowLabel}>{String.fromCharCode(65 + rowIndex)}</div>
             {columns.map((_, columnIndex) => {
               const search = row[columnIndex];
+              const isHighlighted = search && highlightFunction?.(search);
+              
               return (
                 <div
                   key={columnIndex}
-                  style={search ? currentStyles.searchWell : currentStyles.emptyWell}
+                  style={{
+                    ...(search ? currentStyles.searchWell : currentStyles.emptyWell),
+                    ...(isHighlighted ? currentStyles.highlightedWell : {})
+                  }}
                   onDragOver={handleDragOver}
                   onDrop={(event) => handleDrop(event, rowIndex, columnIndex)}
                   title={
@@ -88,7 +95,8 @@ const Plate: React.FC<PlateProps> = ({
                           ...currentStyles.compactSearchIndicator,
                           backgroundColor: selectedCovariates
                             .map(covariate => covariateColors[search.metadata[covariate]])
-                            .find(color => color !== undefined) || '#cccccc'
+                            .find(color => color !== undefined) || '#cccccc',
+                          ...(isHighlighted ? currentStyles.highlightedIndicator : {})
                         }}
                         draggable={true}
                         onDragStart={(event) => onDragStart(event, search.name)}
@@ -169,6 +177,7 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     padding: '5px',
+    transition: 'all 0.2s ease',
   },
   emptyWell: {
     width: `${cellWidth}px`,
@@ -188,6 +197,15 @@ const styles = {
     borderRadius: '2px',
     cursor: 'move',
     border: '1px solid rgba(0,0,0,0.2)',
+    transition: 'all 0.2s ease',
+  },
+  highlightedWell: {
+    border: '3px solid #2196f3',
+    boxShadow: '0 0 8px rgba(33, 150, 243, 0.5)',
+  },
+  highlightedIndicator: {
+    border: '2px solid #2196f3',
+    boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)',
   },
 };
 
@@ -242,6 +260,7 @@ const compactStyles = {
     alignItems: 'center',
     padding: '1px',
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   emptyWell: {
     width: `${compactCellWidth}px`,
@@ -261,6 +280,15 @@ const compactStyles = {
     borderRadius: '2px',
     cursor: 'move',
     border: '1px solid rgba(0,0,0,0.2)',
+    transition: 'all 0.2s ease',
+  },
+  highlightedWell: {
+    border: '3px solid #2196f3',
+	boxShadow: '0 0 8px rgba(33, 150, 243, 0.5)',
+  },
+  highlightedIndicator: {
+    border: '2px solid #ffffff',
+    boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)',
   },
 };
 

@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState<boolean>(false);
   const [compactView, setCompactView] = useState<boolean>(true);
+  const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
 
   // Helper functions
   const processSearchData = (data: any[], referenceColumn: string): SearchData[] => {
@@ -49,6 +50,7 @@ const App: React.FC = () => {
     setCovariateColors({});
     setSummaryData([]);
     setShowSummary(false);
+    setSelectedCombination(null);
   };
 
   const resetCovariateState = () => {
@@ -57,6 +59,7 @@ const App: React.FC = () => {
     setCovariateColors({});
     setSummaryData([]);
     setShowSummary(false);
+    setSelectedCombination(null);
   };
 
   // File upload handler
@@ -222,6 +225,26 @@ const App: React.FC = () => {
     }
   };
 
+  // Handle clicking on summary items for highlighting
+  const handleSummaryItemClick = (combination: string) => {
+    if (selectedCombination === combination) {
+      setSelectedCombination(null); // Deselect if already selected
+    } else {
+      setSelectedCombination(combination);
+    }
+  };
+
+  // Check if a search matches the selected combination
+  const isSearchHighlighted = (search: SearchData): boolean => {
+    if (!selectedCombination) return false;
+    
+    const searchCombination = selectedCovariates
+      .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
+      .join(', ');
+    
+    return searchCombination === selectedCombination;
+  };
+
   // Drag and drop handlers
   const handleDragStart = (event: DragEvent<HTMLDivElement>, searchName: string) => {
     setDraggedSearch(searchName);
@@ -343,7 +366,15 @@ const App: React.FC = () => {
               <div style={styles.summaryPanel}>
                 <div style={styles.summaryGrid}>
                   {summaryData.map((item, index) => (
-                    <div key={index} style={styles.summaryItem}>
+                    <div 
+                      key={index} 
+                      style={{
+                        ...styles.summaryItem,
+                        ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleSummaryItemClick(item.combination)}
+                    >
                       <div style={styles.summaryHeader}>
                         <div 
                           style={{
@@ -402,6 +433,7 @@ const App: React.FC = () => {
                     onDragOver={handleDragOver}
                     onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
                     compact={compactView}
+                    highlightFunction={isSearchHighlighted}
                   />
                 </div>
               ))}
@@ -537,6 +569,12 @@ const styles = {
     borderRadius: '4px',
     padding: '10px',
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+    transition: 'all 0.2s ease',
+  },
+  summaryItemSelected: {
+    backgroundColor: '#e3f2fd',
+    border: '2px solid #2196f3',
+    boxShadow: '0 2px 4px rgba(33, 150, 243, 0.3)',
   },
   summaryHeader: {
     display: 'flex',

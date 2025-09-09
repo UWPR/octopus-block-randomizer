@@ -55,7 +55,7 @@ const Plate: React.FC<PlateProps> = ({
           <div style={currentStyles.emptyCell} />
           {columns.map((column) => (
             <div key={column} style={currentStyles.columnLabel}>
-              {compact ? column.slice(-1) : column}
+              {column}
             </div>
           ))}
         </div>
@@ -235,9 +235,12 @@ const compactStyles = {
   columnLabel: {
     fontWeight: 'bold',
     textAlign: 'center' as const,
-    width: `${compactCellWidth}px`,
+    width: `${compactCellWidth + 2}px`, // Add 2px to account for cell borders (1px each side)
     padding: '1px',
     fontSize: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   row: {
     display: 'flex',

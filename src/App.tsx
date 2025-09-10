@@ -1,8 +1,8 @@
 import React, { useState, useCallback, DragEvent } from 'react';
 import Papa from 'papaparse';
 import Plate from './components/Plate';
-import { SearchData } from './types';
-import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE } from './utils';
+import { SearchData, RandomizationAlgorithm } from './types';
+import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE, ALGORITHM_DESCRIPTIONS } from './utils';
 
 interface SummaryItem {
   combination: string;
@@ -18,6 +18,9 @@ const App: React.FC = () => {
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [selectedReferenceColumn, setSelectedReferenceColumn] = useState<string>('');
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
+  
+  // Algorithm selection
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('greedy');
   
   // Processing states
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
@@ -101,6 +104,13 @@ const App: React.FC = () => {
       setSearches(processedSearches);
       resetProcessingState();
     }
+  };
+
+  // Algorithm selection handler
+  const handleAlgorithmChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newAlgorithm = event.target.value as RandomizationAlgorithm;
+    setSelectedAlgorithm(newAlgorithm);
+    resetCovariateState(); // Reset processing state when algorithm changes
   };
 
   // Covariate selection handler
@@ -193,8 +203,8 @@ const App: React.FC = () => {
   // Main processing handler
   const handleProcessRandomization = () => {
     if (selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Generate randomized plates
-      const plates = randomizeSearches(searches, selectedCovariates);
+      // Generate randomized plates using selected algorithm
+      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm);
       setRandomizedPlates(plates);
       
       // Generate colors
@@ -219,8 +229,8 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Generate new randomized plates with existing colors
-      const plates = randomizeSearches(searches, selectedCovariates);
+      // Generate new randomized plates with existing colors using selected algorithm
+      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm);
       setRandomizedPlates(plates);
     }
   };
@@ -302,44 +312,66 @@ const App: React.FC = () => {
           style={styles.fileInput} 
         />
         
-        {/* Reference Column and Covariate Selection */}
+        {/* Reference Column, Algorithm, and Covariate Selection */}
         {availableColumns.length > 0 && (
-          <div style={styles.selectionRow}>
-            {/* Reference Column Selection */}
-            <div style={styles.selectionGroup}>
-              <label htmlFor="referenceColumn">Select Reference/ID Column:</label>
-              <select 
-                id="referenceColumn" 
-                value={selectedReferenceColumn} 
-                onChange={handleReferenceColumnChange}
-                style={styles.select}
-              >
-                {availableColumns.map((column) => (
-                  <option key={column} value={column}>
-                    {column}
-                  </option>
-                ))}
-              </select>
+          <div style={styles.selectionContainer}>
+            <div style={styles.selectionRow}>
+              {/* Reference Column Selection */}
+              <div style={styles.selectionGroup}>
+                <label htmlFor="referenceColumn">Select Reference/ID Column:</label>
+                <select 
+                  id="referenceColumn" 
+                  value={selectedReferenceColumn} 
+                  onChange={handleReferenceColumnChange}
+                  style={styles.select}
+                >
+                  {availableColumns.map((column) => (
+                    <option key={column} value={column}>
+                      {column}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Algorithm Selection */}
+              <div style={styles.selectionGroup}>
+                <label htmlFor="algorithm">Randomization Algorithm:</label>
+                <select 
+                  id="algorithm" 
+                  value={selectedAlgorithm} 
+                  onChange={handleAlgorithmChange}
+                  style={styles.select}
+                >
+                  <option value="greedy">Greedy Randomization</option>
+                  <option value="optimized">Optimized Block Randomization</option>
+                  <option value="latin_square">Latin Square Design</option>
+                </select>
+                <small style={styles.algorithmDescription}>
+                  {ALGORITHM_DESCRIPTIONS[selectedAlgorithm]}
+                </small>
+              </div>
             </div>
             
             {/* Covariate Selection */}
             {searches.length > 0 && (
-              <div style={styles.selectionGroup}>
-                <label htmlFor="covariates">Select Covariates:</label>
-                <select 
-                  id="covariates" 
-                  multiple 
-                  value={selectedCovariates} 
-                  onChange={handleCovariateChange}
-                  style={styles.multiSelect}
-                >
-                  {Object.keys(searches[0].metadata).map((covariate) => (
-                    <option key={covariate} value={covariate}>
-                      {covariate}
-                    </option>
-                  ))}
-                </select>
-                <small style={styles.hint}>Hold Ctrl/Cmd to select multiple options</small>
+              <div style={styles.covariateSection}>
+                <div style={styles.selectionGroup}>
+                  <label htmlFor="covariates">Select Covariates:</label>
+                  <select 
+                    id="covariates" 
+                    multiple 
+                    value={selectedCovariates} 
+                    onChange={handleCovariateChange}
+                    style={styles.multiSelect}
+                  >
+                    {Object.keys(searches[0].metadata).map((covariate) => (
+                      <option key={covariate} value={covariate}>
+                        {covariate}
+                      </option>
+                    ))}
+                  </select>
+                  <small style={styles.hint}>Hold Ctrl/Cmd to select multiple options</small>
+                </div>
               </div>
             )}
           </div>
@@ -482,6 +514,11 @@ const styles = {
     backgroundColor: '#fafafa',
     cursor: 'pointer',
   },
+  selectionContainer: {
+    width: '100%',
+    maxWidth: '900px',
+    marginBottom: '25px',
+  },
   selectionRow: {
     display: 'flex',
     flexDirection: 'row' as const,
@@ -489,8 +526,7 @@ const styles = {
     alignItems: 'flex-start',
     gap: '30px',
     width: '100%',
-    maxWidth: '700px',
-    marginBottom: '25px',
+    marginBottom: '20px',
     flexWrap: 'wrap' as const,
   },
   selectionGroup: {
@@ -500,6 +536,11 @@ const styles = {
     gap: '10px',
     flex: '1',
     minWidth: '250px',
+  },
+  covariateSection: {
+    display: 'flex',
+    justifyContent: 'center',
+    width: '100%',
   },
   select: {
     padding: '10px',
@@ -522,6 +563,14 @@ const styles = {
     color: '#666',
     fontSize: '12px',
     fontStyle: 'italic',
+  },
+  algorithmDescription: {
+    color: '#666',
+    fontSize: '11px',
+    fontStyle: 'italic',
+    textAlign: 'center' as const,
+    lineHeight: '1.3',
+    marginTop: '5px',
   },
   processButton: {
     marginBottom: '30px',

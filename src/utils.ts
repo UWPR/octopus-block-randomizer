@@ -1,4 +1,4 @@
-import { SearchData } from './types';
+import { SearchData, RandomizationAlgorithm } from './types';
 import Papa from 'papaparse';
 
 // Bright color palette with 24 distinct colors in 4 randomized subgroups
@@ -36,50 +36,167 @@ export const BRIGHT_COLOR_PALETTE = [
   '#DDA0DD'  // Plum
 ];
 
-function generatePermutations(array: SearchData[]): (SearchData | undefined)[][] {
-    if (array.length <= 1) return [array];
-    const perms: (SearchData | undefined)[][] = [];
-    const [first, ...rest] = array;
-    for (const perm of generatePermutations(rest)) {
-      for (let i = 0; i <= perm.length; i++) {
-        const start = perm.slice(0, i);
-        const end = perm.slice(i);
-        perms.push([...start, first, ...end]);
-      }
-    }
-    return perms;
-  }
-  
-  function calculateDissimilarityScore(row: (SearchData | undefined)[], orderedRows: (SearchData | undefined)[][], selectedCovariates: string[]): number {
-    let score = 0;
-    for (let i = 0; i < row.length; i++) {
-      orderedRows.forEach((orderedRow: (SearchData | undefined)[]) => {
-        if (i < orderedRow.length && row[i] && orderedRow[i]) {
-          const dissimilarity = selectedCovariates.some(covariate => 
-            row[i]!.metadata[covariate] !== orderedRow[i]!.metadata[covariate]);
-          if (dissimilarity) score++;
-        }
-      });
-    }
-    return score;
-  }
+// Algorithm descriptions for UI
+export const ALGORITHM_DESCRIPTIONS = {
+  greedy: 'Greedy Randomization - Fast assignment with basic covariate balancing',
+  optimized: 'Optimized Block Randomization - Proportional distribution with within-row balancing',
+  latin_square: 'Latin Square Design - Systematic positional balance (works best with fewer groups)'
+};
 
-  export function randomizeSearches(searches: SearchData[], selectedCovariates: string[]): (SearchData | undefined)[][][] {
+// Utility functions
+function shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+function getCovariateKey(search: SearchData, selectedCovariates: string[]): string {
+    return selectedCovariates
+        .map(cov => search.metadata[cov] || 'N/A')
+        .join('|');
+}
+
+function groupByCovariates(searches: SearchData[], selectedCovariates: string[]): Map<string, SearchData[]> {
+    const groups = new Map<string, SearchData[]>();
+    
+    searches.forEach(search => {
+        const key = getCovariateKey(search, selectedCovariates);
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key)!.push(search);
+    });
+    
+    return groups;
+}
+
+function distributeToBlocks(
+    covariateGroups: Map<string, SearchData[]>,
+    numBlocks: number,
+    blockCapacity: number
+): Map<number, SearchData[]> {
+    const blockAssignments = new Map<number, SearchData[]>();
+    const blockCounts = new Array(numBlocks).fill(0);
+    
+    // Initialize block assignments
+    for (let i = 0; i < numBlocks; i++) {
+        blockAssignments.set(i, []);
+    }
+    
+    // Calculate total samples and verify we have enough capacity
+    const totalSamples = Array.from(covariateGroups.values()).reduce((sum, samples) => sum + samples.length, 0);
+    const totalCapacity = numBlocks * blockCapacity;
+    
+    if (totalSamples > totalCapacity) {
+        console.error(`Not enough capacity: ${totalSamples} samples > ${totalCapacity} total capacity`);
+        return blockAssignments;
+    }
+    
+    // Track remaining samples for each group
+    const remainingSamples = new Map<string, SearchData[]>();
+    
+    // PHASE 1: Place all baseSamplesPerBlock for each covariate group
+    covariateGroups.forEach((samples, groupKey) => {
+        const shuffledSamples = shuffleArray([...samples]);
+        const totalSamples = shuffledSamples.length;
+        const baseSamplesPerBlock = Math.floor(totalSamples / numBlocks);
+        
+        let sampleIndex = 0;
+        
+        // Place base samples in each block
+        for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+            for (let i = 0; i < baseSamplesPerBlock && sampleIndex < shuffledSamples.length; i++) {
+                blockAssignments.get(blockIdx)!.push(shuffledSamples[sampleIndex++]);
+                blockCounts[blockIdx]++;
+            }
+        }
+        
+        // Store remaining samples for phase 2
+        if (sampleIndex < shuffledSamples.length) {
+            remainingSamples.set(groupKey, shuffledSamples.slice(sampleIndex));
+        }
+    });
+    
+    // PHASE 2: Iterate over each covariate group again and place leftover samples with capacity check
+    remainingSamples.forEach((samples, groupKey) => {
+        // Get available blocks and calculate total available capacity
+        const availableBlocks = [];
+        let totalAvailableCapacity = 0;
+        for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+            if (blockCounts[blockIdx] < blockCapacity) {
+                availableBlocks.push(blockIdx);
+                totalAvailableCapacity += (blockCapacity - blockCounts[blockIdx]);
+            }
+        }
+        
+        // Check that we have enough available capacity for the samples to be placed
+        if (totalAvailableCapacity < samples.length) {
+            console.error(`Not enough available capacity for group ${groupKey}: ${totalAvailableCapacity} available capacity across ${availableBlocks.length} blocks (block capacity ${blockCapacity}) < ${samples.length} samples to place`);
+            return; // Skip this group
+        }
+        
+        // Shuffle available blocks for random starting order
+        const shuffledAvailableBlocks = shuffleArray(availableBlocks);
+        
+        let startingBlockIndex = 0;
+        
+        // Place samples with rotating starting position
+        samples.forEach(sample => {
+            let placed = false;
+            
+            // Try to place starting from the current starting position
+            for (let i = 0; i < shuffledAvailableBlocks.length; i++) {
+                const blockIndex = (startingBlockIndex + i) % shuffledAvailableBlocks.length;
+                const blockIdx = shuffledAvailableBlocks[blockIndex];
+                
+                if (blockCounts[blockIdx] < blockCapacity) {
+                    blockAssignments.get(blockIdx)!.push(sample);
+                    blockCounts[blockIdx]++;
+                    
+                    // Next sample starts from the next position
+                    startingBlockIndex = (blockIndex + 1) % shuffledAvailableBlocks.length;
+                    placed = true;
+                    break;
+                }
+            }
+            
+            if (!placed) {
+                console.error(`Could not place remaining sample from group ${groupKey} - all blocks at capacity`);
+            }
+        });
+    });
+    
+    return blockAssignments;
+}
+
+// Main randomization function with algorithm selection
+export function randomizeSearches(
+    searches: SearchData[], 
+    selectedCovariates: string[], 
+    algorithm: RandomizationAlgorithm = 'greedy'
+): (SearchData | undefined)[][][] {
+    switch (algorithm) {
+        case 'optimized':
+            return optimizedBlockRandomization(searches, selectedCovariates);
+        case 'latin_square':
+            return latinSquareRandomization(searches, selectedCovariates);
+        case 'greedy':
+        default:
+            return greedyRandomization(searches, selectedCovariates);
+    }
+}
+
+// Original greedy algorithm (refactored)
+function greedyRandomization(searches: SearchData[], selectedCovariates: string[]): (SearchData | undefined)[][][] {
     const platesNeeded = Math.ceil(searches.length / 96);
     let plates = Array.from({ length: platesNeeded }, () =>
         Array.from({ length: 8 }, () => new Array(12).fill(undefined))
     );
 
     let shuffledSearches = shuffleArray([...searches]);
-
-    // Shuffle an array in-place and return it
-    function shuffleArray<T>(array: T[]): T[] {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    }
 
     function searchCanBePlaced(search: SearchData, row: (SearchData | undefined)[], tolerance: number): boolean {
         const searchCovariates = selectedCovariates.map(cov => search.metadata[cov]);
@@ -128,6 +245,218 @@ function generatePermutations(array: SearchData[]): (SearchData | undefined)[][]
     return plates;
 }
 
+// New optimized block randomization algorithm
+function optimizedBlockRandomization(searches: SearchData[], selectedCovariates: string[]): (SearchData | undefined)[][][] {
+    const platesNeeded = Math.ceil(searches.length / 96);
+    const plates = Array.from({ length: platesNeeded }, () =>
+        Array.from({ length: 8 }, () => new Array(12).fill(undefined))
+    );
+
+    // STEP 1: Group samples by covariate combinations
+    const covariateGroups = groupByCovariates(searches, selectedCovariates);
+    
+    // STEP 2: Distribute samples across plates using utility function
+    const plateAssignments = distributeToBlocks(covariateGroups, platesNeeded, 96);
+    
+    // STEP 3: Verify complete assignment
+    let totalAssigned = 0;
+    plateAssignments.forEach(samples => totalAssigned += samples.length);
+    
+    if (totalAssigned !== searches.length) {
+        console.error(`Sample assignment error: ${totalAssigned} assigned vs ${searches.length} total`);
+        console.log('Plate counts:', Array.from(plateAssignments.values()).map(samples => samples.length));
+    }
+
+    // STEP 4: For each plate, distribute samples across rows using the same utility function
+    plateAssignments.forEach((plateSamples, plateIdx) => {
+        // Group samples by covariates for this plate
+        const plateGroups = groupByCovariates(plateSamples, selectedCovariates);
+        
+        // Calculate how many rows we need for this plate
+        const totalPlateSamples = plateSamples.length;
+        const rowsNeeded = Math.ceil(totalPlateSamples / 12);
+        const actualRowsToUse = Math.min(rowsNeeded, 8); // Max 8 rows available
+        
+        // Distribute samples across rows using utility function
+        const rowAssignments = distributeToBlocks(plateGroups, actualRowsToUse, 12);
+        
+        // STEP 5: Fill the actual plate positions and shuffle within rows
+        rowAssignments.forEach((rowSamples, rowIdx) => {
+            if (rowIdx < 8) { // Only fill the 8 available rows
+                // Shuffle samples within this row for final randomization
+                const shuffledRowSamples = shuffleArray([...rowSamples]);
+                
+                // Place samples in the row
+                for (let colIdx = 0; colIdx < Math.min(12, shuffledRowSamples.length); colIdx++) {
+                    plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
+                }
+            }
+        });
+    });
+
+    return plates;
+}
+
+// Latin Square-inspired randomization
+function latinSquareRandomization(searches: SearchData[], selectedCovariates: string[]): (SearchData | undefined)[][][] {
+    const platesNeeded = Math.ceil(searches.length / 96);
+    const plates = Array.from({ length: platesNeeded }, () =>
+        Array.from({ length: 8 }, () => new Array(12).fill(undefined))
+    );
+
+    // Group samples by covariate combinations
+    const covariateGroups = groupByCovariates(searches, selectedCovariates);
+    const groupKeys = Array.from(covariateGroups.keys());
+    const numGroups = groupKeys.length;
+
+    // If we have 8 or fewer groups, we can use a true Latin square approach for rows
+    // If we have 12 or fewer groups, we can use it for columns
+    const useRowLatinSquare = numGroups <= 8;
+    const useColLatinSquare = numGroups <= 12;
+
+    for (let plateIdx = 0; plateIdx < platesNeeded; plateIdx++) {
+        if (useRowLatinSquare && useColLatinSquare) {
+            // Perfect Latin square: each group appears once per row and column
+            assignWithFullLatinSquare(plates[plateIdx], covariateGroups, groupKeys, plateIdx);
+        } else if (useRowLatinSquare) {
+            // Row-based Latin square: each group appears once per row
+            assignWithRowLatinSquare(plates[plateIdx], covariateGroups, groupKeys, plateIdx);
+        } else {
+            // Fallback to systematic distribution with position cycling
+            assignWithSystematicDistribution(plates[plateIdx], covariateGroups, groupKeys, plateIdx);
+        }
+    }
+
+    return plates;
+}
+
+function assignWithFullLatinSquare(
+    plate: (SearchData | undefined)[][],
+    covariateGroups: Map<string, SearchData[]>,
+    groupKeys: string[],
+    plateIdx: number
+): void {
+    const numGroups = groupKeys.length;
+    
+    // Create Latin square pattern
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 12; col++) {
+            if (row < numGroups && col < numGroups) {
+                // Latin square assignment
+                const groupIndex = (row + col * plateIdx) % numGroups;
+                const groupKey = groupKeys[groupIndex];
+                const groupSamples = covariateGroups.get(groupKey) || [];
+                
+                if (groupSamples.length > 0) {
+                    const sampleIndex = Math.floor(Math.random() * groupSamples.length);
+                    plate[row][col] = groupSamples.splice(sampleIndex, 1)[0];
+                }
+            }
+        }
+    }
+    
+    // Fill remaining positions with available samples
+    fillRemainingPositions(plate, covariateGroups);
+}
+
+function assignWithRowLatinSquare(
+    plate: (SearchData | undefined)[][],
+    covariateGroups: Map<string, SearchData[]>,
+    groupKeys: string[],
+    plateIdx: number
+): void {
+    const numGroups = groupKeys.length;
+    
+    // Ensure each group appears once per row
+    for (let row = 0; row < 8; row++) {
+        const shuffledGroups = shuffleArray([...groupKeys]);
+        
+        for (let i = 0; i < Math.min(12, numGroups); i++) {
+            const groupKey = shuffledGroups[i];
+            const groupSamples = covariateGroups.get(groupKey) || [];
+            
+            if (groupSamples.length > 0) {
+                const sampleIndex = Math.floor(Math.random() * groupSamples.length);
+                plate[row][i] = groupSamples.splice(sampleIndex, 1)[0];
+            }
+        }
+    }
+    
+    fillRemainingPositions(plate, covariateGroups);
+}
+
+function assignWithSystematicDistribution(
+    plate: (SearchData | undefined)[][],
+    covariateGroups: Map<string, SearchData[]>,
+    groupKeys: string[],
+    plateIdx: number
+): void {
+    const allSamples: SearchData[] = [];
+    covariateGroups.forEach(samples => allSamples.push(...samples));
+    
+    const shuffledSamples = shuffleArray(allSamples);
+    let sampleIndex = 0;
+    
+    // Systematic distribution across positions
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 12; col++) {
+            if (sampleIndex < shuffledSamples.length) {
+                plate[row][col] = shuffledSamples[sampleIndex++];
+            }
+        }
+    }
+}
+
+function fillRemainingPositions(
+    plate: (SearchData | undefined)[][],
+    covariateGroups: Map<string, SearchData[]>
+): void {
+    // Collect all remaining samples
+    const remainingSamples: SearchData[] = [];
+    covariateGroups.forEach(samples => remainingSamples.push(...samples));
+    
+    const shuffledRemaining = shuffleArray(remainingSamples);
+    let sampleIndex = 0;
+    
+    // Fill empty positions
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 12; col++) {
+            if (plate[row][col] === undefined && sampleIndex < shuffledRemaining.length) {
+                plate[row][col] = shuffledRemaining[sampleIndex++];
+            }
+        }
+    }
+}
+
+// Legacy functions for backward compatibility
+function generatePermutations(array: SearchData[]): (SearchData | undefined)[][] {
+    if (array.length <= 1) return [array];
+    const perms: (SearchData | undefined)[][] = [];
+    const [first, ...rest] = array;
+    for (const perm of generatePermutations(rest)) {
+      for (let i = 0; i <= perm.length; i++) {
+        const start = perm.slice(0, i);
+        const end = perm.slice(i);
+        perms.push([...start, first, ...end]);
+      }
+    }
+    return perms;
+}
+  
+function calculateDissimilarityScore(row: (SearchData | undefined)[], orderedRows: (SearchData | undefined)[][], selectedCovariates: string[]): number {
+    let score = 0;
+    for (let i = 0; i < row.length; i++) {
+      orderedRows.forEach((orderedRow: (SearchData | undefined)[]) => {
+        if (i < orderedRow.length && row[i] && orderedRow[i]) {
+          const dissimilarity = selectedCovariates.some(covariate => 
+            row[i]!.metadata[covariate] !== orderedRow[i]!.metadata[covariate]);
+          if (dissimilarity) score++;
+        }
+      });
+    }
+    return score;
+}
+
 function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedCovariates: string[]): void {
     plates.forEach((plate: (SearchData | undefined)[][]) => {
       let orderedRows: (SearchData | undefined)[][] = [];
@@ -160,8 +489,7 @@ function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedC
   
       plate.push(...orderedRows.map(row => [...row, ...Array(12 - row.length).fill(undefined)]));
     });
-  }
-
+}
 
 // Updated to accept referenceColumn parameter instead of hardcoding "search name"
 export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchData | undefined)[][][], referenceColumn: string) {
@@ -185,9 +513,9 @@ export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchDat
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }
+}
 
-  export function getPlateNumber(searchName: string, randomizedPlates: (SearchData | undefined)[][][]) {
+export function getPlateNumber(searchName: string, randomizedPlates: (SearchData | undefined)[][][]) {
     for (let plateIndex = 0; plateIndex < randomizedPlates.length; plateIndex++) {
       const plate = randomizedPlates[plateIndex];
       for (let rowIndex = 0; rowIndex < plate.length; rowIndex++) {
@@ -198,9 +526,9 @@ export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchDat
       }
     }
     return '';
-  };
+}
 
-  export function getRowName(searchName: string, randomizedPlates: (SearchData | undefined)[][][]) {
+export function getRowName(searchName: string, randomizedPlates: (SearchData | undefined)[][][]) {
     for (let plateIndex = 0; plateIndex < randomizedPlates.length; plateIndex++) {
       const plate = randomizedPlates[plateIndex];
       for (let rowIndex = 0; rowIndex < plate.length; rowIndex++) {
@@ -211,9 +539,9 @@ export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchDat
       }
     }
     return '';
-  };
+}
 
-  export function getColumnNumber(searchName: string, randomizedPlates: (SearchData | undefined)[][][]) {
+export function getColumnNumber(searchName: string, randomizedPlates: (SearchData | undefined)[][][]) {
     for (let plateIndex = 0; plateIndex < randomizedPlates.length; plateIndex++) {
       const plate = randomizedPlates[plateIndex];
       for (let rowIndex = 0; rowIndex < plate.length; rowIndex++) {
@@ -226,4 +554,4 @@ export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchDat
       }
     }
     return '';
-  };
+}

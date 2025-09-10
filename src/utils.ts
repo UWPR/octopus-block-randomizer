@@ -15,14 +15,14 @@ export const BRIGHT_COLOR_PALETTE = [
   '#FF0000', // Pure Red
   '#87CEEB', // Sky Blue
   '#800080', // Purple
-  '#FFA500', // Orange
+  '#FF1493', // Deep Pink
   '#32CD32', // Lime Green
   '#C0C0C0', // Silver
 
   // Subgroup 3
   '#F08080', // Light Coral
   '#4169E1', // Royal Blue
-  '#FF1493', // Deep Pink
+  '#FFA500', // Orange
   '#FFFF00', // Pure Yellow
   '#98FB98', // Pale Green
   '#40E0D0', // Turquoise
@@ -90,83 +90,102 @@ function distributeToBlocks(
     const totalSamples = Array.from(covariateGroups.values()).reduce((sum, samples) => sum + samples.length, 0);
     const totalCapacity = numBlocks * blockCapacity;
     
+    console.log(`Block size: ${blockCapacity}; Number of blocks: ${numBlocks}; Sample count: ${totalSamples}`);
+
     if (totalSamples > totalCapacity) {
         console.error(`Not enough capacity: ${totalSamples} samples > ${totalCapacity} total capacity`);
         return blockAssignments;
     }
     
-    // Track remaining samples for each group
-    const remainingSamples = new Map<string, SearchData[]>();
+    // Store remaining samples for Phase 2
+    const remainingSamplesMap = new Map<string, SearchData[]>();
     
-    // PHASE 1: Place all baseSamplesPerBlock for each covariate group
+    // PHASE 1: Place minimum required samples from ALL covariate groups
     covariateGroups.forEach((samples, groupKey) => {
         const shuffledSamples = shuffleArray([...samples]);
-        const totalSamples = shuffledSamples.length;
-        const baseSamplesPerBlock = Math.floor(totalSamples / numBlocks);
+        const totalGroupSamples = shuffledSamples.length;
+        const baseSamplesPerBlock = Math.floor(totalGroupSamples / numBlocks);
         
         let sampleIndex = 0;
         
-        // Place base samples in each block
-        for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-            for (let i = 0; i < baseSamplesPerBlock && sampleIndex < shuffledSamples.length; i++) {
-                blockAssignments.get(blockIdx)!.push(shuffledSamples[sampleIndex++]);
-                blockCounts[blockIdx]++;
+        console.log(`Phase 1: Minimum required samples for group ${groupKey} (${totalGroupSamples}/${numBlocks}): ${baseSamplesPerBlock}`); 
+
+        // Place minimum required samples in each block for this group
+        if (baseSamplesPerBlock > 0) {
+            for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+                console.log(`  Placing minimum required samples in block index ${blockIdx}`);
+
+                // Check if we have capacity for the minimum required samples
+                const availableCapacity = blockCapacity - blockCounts[blockIdx];
+                const samplesToPlace = Math.min(baseSamplesPerBlock, availableCapacity);
+                
+                if (samplesToPlace < baseSamplesPerBlock) {
+                    console.error(`Phase 1 (Blocks): Block ${blockIdx} cannot accommodate minimum ${baseSamplesPerBlock} samples for group ${groupKey}. Only ${samplesToPlace} can be placed.`);
+                }
+                
+                // Place the guaranteed minimum samples
+                for (let i = 0; i < samplesToPlace && sampleIndex < shuffledSamples.length; i++) {
+                    blockAssignments.get(blockIdx)!.push(shuffledSamples[sampleIndex++]);
+                    blockCounts[blockIdx]++;
+                }
             }
         }
         
-        // Store remaining samples for phase 2
+        // Store any remaining samples for Phase 2
         if (sampleIndex < shuffledSamples.length) {
-            remainingSamples.set(groupKey, shuffledSamples.slice(sampleIndex));
+            const remainingSamples = shuffledSamples.slice(sampleIndex);
+            remainingSamplesMap.set(groupKey, remainingSamples);
         }
     });
     
-    // PHASE 2: Iterate over each covariate group again and place leftover samples with capacity check
-    remainingSamples.forEach((samples, groupKey) => {
-        // Get available blocks and calculate total available capacity
+    // PHASE 2: Distribute remaining samples one covariate group at a time
+    remainingSamplesMap.forEach((remainingSamples, groupKey) => {
+        console.log(`Phase 2: Remaining samples for group ${groupKey}: ${remainingSamples.length}`);
+        
+        // Get blocks with available capacity
         const availableBlocks = [];
-        let totalAvailableCapacity = 0;
         for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-            if (blockCounts[blockIdx] < blockCapacity) {
+            const availableCapacity = blockCapacity - blockCounts[blockIdx];
+            if (availableCapacity > 0) {
+                console.log(`  Block is available. Index: ${blockIdx}; Capacity: ${availableCapacity}`);
                 availableBlocks.push(blockIdx);
-                totalAvailableCapacity += (blockCapacity - blockCounts[blockIdx]);
             }
         }
         
-        // Check that we have enough available capacity for the samples to be placed
-        if (totalAvailableCapacity < samples.length) {
-            console.error(`Not enough available capacity for group ${groupKey}: ${totalAvailableCapacity} available capacity across ${availableBlocks.length} blocks (block capacity ${blockCapacity}) < ${samples.length} samples to place`);
-            return; // Skip this group
+        if (availableBlocks.length === 0) {
+            console.error(`Phase 2 (Blocks): No available capacity for remaining samples from group ${groupKey}`);
+            return;
         }
         
-        // Shuffle available blocks for random starting order
-        const shuffledAvailableBlocks = shuffleArray(availableBlocks);
+        // Shuffle available blocks for random distribution
+        const shuffledAvailableBlocks = shuffleArray([...availableBlocks]);
         
-        let startingBlockIndex = 0;
+        // Distribute remaining samples from this group across available blocks
+        let sampleIndex = 0;
+        let blockIndex = 0;
         
-        // Place samples with rotating starting position
-        samples.forEach(sample => {
-            let placed = false;
+        while (sampleIndex < remainingSamples.length && shuffledAvailableBlocks.length > 0) {
+            const blockIdx = shuffledAvailableBlocks[blockIndex % shuffledAvailableBlocks.length];
             
-            // Try to place starting from the current starting position
-            for (let i = 0; i < shuffledAvailableBlocks.length; i++) {
-                const blockIndex = (startingBlockIndex + i) % shuffledAvailableBlocks.length;
-                const blockIdx = shuffledAvailableBlocks[blockIndex];
-                
-                if (blockCounts[blockIdx] < blockCapacity) {
-                    blockAssignments.get(blockIdx)!.push(sample);
-                    blockCounts[blockIdx]++;
-                    
-                    // Next sample starts from the next position
-                    startingBlockIndex = (blockIndex + 1) % shuffledAvailableBlocks.length;
-                    placed = true;
-                    break;
-                }
+            if (blockCounts[blockIdx] < blockCapacity) {
+                console.log(`  Placing 1 remaining sample in block index: ${blockIdx}`);
+                blockAssignments.get(blockIdx)!.push(remainingSamples[sampleIndex]);
+                blockCounts[blockIdx]++;
+                sampleIndex++;
+            } else {
+                // Remove this block from available blocks if it's at capacity
+                shuffledAvailableBlocks.splice(blockIndex % shuffledAvailableBlocks.length, 1);
+                if (shuffledAvailableBlocks.length === 0) break;
+                blockIndex = blockIndex % shuffledAvailableBlocks.length;
+                continue;
             }
             
-            if (!placed) {
-                console.error(`Could not place remaining sample from group ${groupKey} - all blocks at capacity`);
-            }
-        });
+            blockIndex = (blockIndex + 1) % shuffledAvailableBlocks.length;
+        }
+        
+        if (sampleIndex < remainingSamples.length) {
+            console.error(`Phase 2 (Blocks): Failed to place ${remainingSamples.length - sampleIndex} remaining samples from group ${groupKey}`);
+        }
     });
     
     return blockAssignments;
@@ -180,7 +199,7 @@ export function randomizeSearches(
 ): (SearchData | undefined)[][][] {
     switch (algorithm) {
         case 'optimized':
-            return optimizedBlockRandomization(searches, selectedCovariates);
+            return optimizedBlockRandomizationWithValidation(searches, selectedCovariates);
         case 'latin_square':
             return latinSquareRandomization(searches, selectedCovariates);
         case 'greedy':
@@ -295,6 +314,151 @@ function optimizedBlockRandomization(searches: SearchData[], selectedCovariates:
     });
 
     return plates;
+}
+
+// Enhanced optimized block randomization with validation
+function optimizedBlockRandomizationWithValidation(
+    searches: SearchData[], 
+    selectedCovariates: string[]
+): (SearchData | undefined)[][][] {
+    const platesNeeded = Math.ceil(searches.length / 96);
+    const plates = Array.from({ length: platesNeeded }, () =>
+        Array.from({ length: 8 }, () => new Array(12).fill(undefined))
+    );
+
+    // STEP 1: Group samples by covariate combinations
+    const covariateGroups = groupByCovariates(searches, selectedCovariates);
+    
+    // STEP 2: Calculate expected minimums for validation
+    const expectedMinimums: { [groupKey: string]: number } = {};
+    covariateGroups.forEach((samples, groupKey) => {
+        expectedMinimums[groupKey] = Math.floor(samples.length / platesNeeded);
+    });
+    
+    // STEP 3: Distribute samples across plates using fixed utility function
+    const plateAssignments = distributeToBlocks(covariateGroups, platesNeeded, 96);
+    
+    // STEP 4: Validate plate-level distribution
+    const plateDistributionValid = validateDistribution(plateAssignments, selectedCovariates, expectedMinimums, "plate");
+    if (!plateDistributionValid) {
+        console.error("Plate-level distribution validation failed");
+    }
+    
+    // STEP 5: For each plate, distribute samples across rows with validation
+    plateAssignments.forEach((plateSamples, plateIdx) => {
+        // Group samples by covariates for this plate
+        const plateGroups = groupByCovariates(plateSamples, selectedCovariates);
+        
+        // Calculate expected minimums for rows
+        const rowMinimums: { [groupKey: string]: number } = {};
+        plateGroups.forEach((samples, groupKey) => {
+            // Always use all 8 rows for minimum calculation
+            // This gives the true minimum guaranteed samples per row
+            rowMinimums[groupKey] = Math.floor(samples.length / 8);
+        });
+        
+        // Distribute samples across rows using fixed utility function
+        const totalPlateSamples = plateSamples.length;
+        const rowsNeeded = Math.ceil(totalPlateSamples / 12);
+        const actualRowsToUse = Math.min(rowsNeeded, 8);
+        
+        const rowAssignments = distributeToBlocks(plateGroups, actualRowsToUse, 12);
+        
+        // Validate row-level distribution
+        const rowDistributionValid = validateDistribution(rowAssignments, selectedCovariates, rowMinimums, 'plate ${plateIdx + 1} row');
+        if (!rowDistributionValid) {
+            console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
+        }
+        
+        // STEP 6: Fill the actual plate positions and shuffle within rows
+        rowAssignments.forEach((rowSamples, rowIdx) => {
+            if (rowIdx < 8) {
+                // Shuffle samples within this row for final randomization
+                const shuffledRowSamples = shuffleArray([...rowSamples]);
+                
+                // Place samples in the row
+                for (let colIdx = 0; colIdx < Math.min(12, shuffledRowSamples.length); colIdx++) {
+                    plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
+                }
+            }
+        });
+    });
+
+    return plates;
+}
+
+// Additional validation function to verify distribution
+function validateDistribution(
+    blockAssignments: Map<number, SearchData[]>,
+    selectedCovariates: string[],
+    expectedMinimum: { [groupKey: string]: number },
+    blockType: string = "block"
+): boolean {
+    let isValid = true;
+    
+    blockAssignments.forEach((samples, blockIdx) => {
+        const groupCounts = new Map<string, number>();
+        
+        // Count samples by group in this block
+        samples.forEach(sample => {
+            const groupKey = getCovariateKey(sample, selectedCovariates);
+            groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
+        });
+        
+        // Check if each group meets minimum requirements
+        Object.entries(expectedMinimum).forEach(([groupKey, minCount]) => {
+            const actualCount = groupCounts.get(groupKey) || 0;
+            if (actualCount < minCount) {
+                console.error(`Validation: ${blockType} ${blockIdx} has only ${actualCount} samples for group ${groupKey}, expected minimum ${minCount}`);
+                isValid = false;
+            }
+        });
+    });
+    
+    return isValid;
+}
+
+// Debug function to analyze distribution
+function analyzeDistribution(
+    plates: (SearchData | undefined)[][][],
+    selectedCovariates: string[]
+): void {
+    console.log("=== DISTRIBUTION ANALYSIS ===");
+    
+    plates.forEach((plate, plateIdx) => {
+        console.log(`\nPlate ${plateIdx + 1}:`);
+        
+        // Count by covariate groups for this plate
+        const plateGroupCounts = new Map<string, number>();
+        
+        plate.forEach((row, rowIdx) => {
+            const rowGroupCounts = new Map<string, number>();
+            
+            row.forEach(sample => {
+                if (sample) {
+                    const groupKey = getCovariateKey(sample, selectedCovariates);
+                    
+                    // Update plate counts
+                    plateGroupCounts.set(groupKey, (plateGroupCounts.get(groupKey) || 0) + 1);
+                    
+                    // Update row counts
+                    rowGroupCounts.set(groupKey, (rowGroupCounts.get(groupKey) || 0) + 1);
+                }
+            });
+            
+            // Log row distribution
+            const rowCounts = Array.from(rowGroupCounts.entries())
+                .map(([group, count]) => `${group}: ${count}`)
+                .join(", ");
+            console.log(`  Row ${String.fromCharCode(65 + rowIdx)}: ${rowCounts}`);
+        });
+        
+        // Log plate totals
+        const plateCounts = Array.from(plateGroupCounts.entries())
+            .map(([group, count]) => `${group}: ${count}`)
+            .join(", ");
+        console.log(`  Plate total: ${plateCounts}`);
+    });
 }
 
 // Latin Square-inspired randomization

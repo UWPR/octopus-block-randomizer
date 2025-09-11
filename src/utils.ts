@@ -39,7 +39,7 @@ export const BRIGHT_COLOR_PALETTE = [
 // Algorithm descriptions for UI
 export const ALGORITHM_DESCRIPTIONS = {
   greedy: 'Greedy Randomization - Fast assignment with basic covariate balancing',
-  optimized: 'Optimized Block Randomization - Proportional distribution with within-row balancing',
+  optimized: 'Block Randomization - Proportional distribution with within-row balancing',
   latin_square: 'Latin Square Design - Systematic positional balance (works best with fewer groups)'
 };
 

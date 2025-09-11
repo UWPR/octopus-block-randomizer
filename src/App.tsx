@@ -289,7 +289,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        <h1 style={styles.heading}>Block Randomization</h1>
+        <h1 style={styles.heading}>Octopus Block Randomization</h1>
         
         {/* File Upload */}
         <input 
@@ -330,8 +330,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
                   style={styles.select}
                 >
                   <option value="greedy">Greedy Randomization</option>
-                  <option value="optimized">Optimized Block Randomization</option>
-                  <option value="latin_square">Latin Square Design</option>
+                  <option value="optimized">Block Randomization</option>
                 </select>
                 <small style={styles.algorithmDescription}>
                   {ALGORITHM_DESCRIPTIONS[selectedAlgorithm]}

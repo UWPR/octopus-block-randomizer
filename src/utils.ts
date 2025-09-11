@@ -53,7 +53,7 @@ function shuffleArray<T>(array: T[]): T[] {
     return shuffled;
 }
 
-function getCovariateKey(search: SearchData, selectedCovariates: string[]): string {
+export function getCovariateKey(search: SearchData, selectedCovariates: string[]): string {
     return selectedCovariates
         .map(cov => search.metadata[cov] || 'N/A')
         .join('|');

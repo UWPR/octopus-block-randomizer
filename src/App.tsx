@@ -2,7 +2,7 @@ import React, { useState, useCallback, DragEvent } from 'react';
 import Papa from 'papaparse';
 import Plate from './components/Plate';
 import { SearchData, RandomizationAlgorithm } from './types';
-import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE, ALGORITHM_DESCRIPTIONS } from './utils';
+import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE, ALGORITHM_DESCRIPTIONS, getCovariateKey } from './utils';
 
 interface SummaryItem {
   combination: string;
@@ -122,83 +122,72 @@ const App: React.FC = () => {
 
   const generateCovariateColors = useCallback(() => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
+      // Create unique combinations of covariate values using the utility function
       const covariateValues = new Set(
-        selectedCovariates.flatMap((covariate) =>
-          searches.map((search) => search.metadata[covariate])
-        )
+        searches.map((search) => getCovariateKey(search, selectedCovariates))
       );
 
       const covariateColorsMap: { [key: string]: string } = {};
       let colorIndex = 0;
 
-      covariateValues.forEach((value) => {
-        covariateColorsMap[value] = BRIGHT_COLOR_PALETTE[colorIndex % BRIGHT_COLOR_PALETTE.length];
+      covariateValues.forEach((combination) => {
+        covariateColorsMap[combination] = BRIGHT_COLOR_PALETTE[colorIndex % BRIGHT_COLOR_PALETTE.length];
         colorIndex += 1;
       });
 
       return covariateColorsMap;
     }
     return {};
-  }, [selectedCovariates, searches]);
+}, [selectedCovariates, searches]);
 
   // Generate summary data for the panel
-  const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
-    if (selectedCovariates.length > 0 && searches.length > 0) {
-      // Group searches by their covariate combinations
-      const combinationsMap = new Map<string, {
-        values: { [key: string]: string };
-        count: number;
-      }>();
+const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
+  if (selectedCovariates.length > 0 && searches.length > 0) {
+    // Group searches by their covariate combinations using getCovariateKey
+    const combinationsMap = new Map<string, {
+      values: { [key: string]: string };
+      count: number;
+    }>();
 
-      searches.forEach((search) => {
-        const covariateValues: { [key: string]: string } = {};
-        selectedCovariates.forEach((covariate) => {
-          covariateValues[covariate] = search.metadata[covariate] || 'N/A';
+    searches.forEach((search) => {
+      const covariateValues: { [key: string]: string } = {};
+      selectedCovariates.forEach((covariate) => {
+        covariateValues[covariate] = search.metadata[covariate] || 'N/A';
+      });
+      
+      const combinationKey = getCovariateKey(search, selectedCovariates);
+      
+      if (combinationsMap.has(combinationKey)) {
+        const existing = combinationsMap.get(combinationKey)!;
+        existing.count++;
+      } else {
+        combinationsMap.set(combinationKey, {
+          values: covariateValues,
+          count: 1
         });
-        
-        const combinationKey = JSON.stringify(covariateValues);
-        
-        if (combinationsMap.has(combinationKey)) {
-          const existing = combinationsMap.get(combinationKey)!;
-          existing.count++;
-        } else {
-          combinationsMap.set(combinationKey, {
-            values: covariateValues,
-            count: 1
-          });
-        }
-      });
+      }
+    });
 
-      // Convert to summary data with colors
-      const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([key, data]) => {
-        // Get color from the first covariate value that has a color assigned
-        let assignedColor = '#cccccc'; // default gray
-        for (const covariate of selectedCovariates) {
-          const value = data.values[covariate];
-          if (colors[value]) {
-            assignedColor = colors[value];
-            break;
-          }
-        }
+    // Convert to summary data with colors
+    const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([combinationKey, data]) => {
+      return {
+        combination: combinationKey, // Use the same key format as colors
+        values: data.values,
+        count: data.count,
+        color: colors[combinationKey] || '#cccccc'
+      };
+    });
 
-        return {
-          combination: selectedCovariates.map(cov => `${cov}: ${data.values[cov]}`).join(', '),
-          values: data.values,
-          count: data.count,
-          color: assignedColor
-        };
-      });
+    // Sort by count (descending) then by combination name
+    summary.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.combination.localeCompare(b.combination);
+    });
 
-      // Sort by count (descending) then by combination name
-      summary.sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return a.combination.localeCompare(b.combination);
-      });
-
-      return summary;
-    }
-    return [];
-  }, [selectedCovariates, searches]);
+    return summary;
+  }
+  return [];
+}, [selectedCovariates, searches]);
 
   // Main processing handler
   const handleProcessRandomization = () => {
@@ -248,9 +237,7 @@ const App: React.FC = () => {
   const isSearchHighlighted = (search: SearchData): boolean => {
     if (!selectedCombination) return false;
     
-    const searchCombination = selectedCovariates
-      .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
-      .join(', ');
+    const searchCombination = getCovariateKey(search, selectedCovariates);
     
     return searchCombination === selectedCombination;
   };

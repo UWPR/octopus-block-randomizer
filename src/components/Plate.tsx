@@ -1,6 +1,7 @@
 import React, { DragEvent } from 'react';
 import Search from './Search';
 import { SearchData } from '../types';
+import { getCovariateKey } from '../utils';
 
 interface PlateProps {
   plateIndex: number;
@@ -93,9 +94,7 @@ const Plate: React.FC<PlateProps> = ({
                       <div
                         style={{
                           ...currentStyles.compactSearchIndicator,
-                          backgroundColor: selectedCovariates
-                            .map(covariate => covariateColors[search.metadata[covariate]])
-                            .find(color => color !== undefined) || '#cccccc',
+                          backgroundColor: covariateColors[getCovariateKey(search, selectedCovariates)] || '#cccccc',
                           ...(isHighlighted ? currentStyles.highlightedIndicator : {})
                         }}
                         draggable={true}
@@ -106,11 +105,7 @@ const Plate: React.FC<PlateProps> = ({
                       <Search
                         name={search.name}
                         metadata={search.metadata}
-                        backgroundColor={
-                          selectedCovariates
-                            .map(covariate => covariateColors[search.metadata[covariate]])
-                            .find(color => color !== undefined) || 'defaultColor'
-                        }
+                        backgroundColor={covariateColors[getCovariateKey(search, selectedCovariates)] || 'defaultColor'}
                         onDragStart={onDragStart}
                         selectedCovariates={selectedCovariates}
                       />

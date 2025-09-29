@@ -661,11 +661,11 @@ function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedC
     });
 }
 
-// Updated to accept referenceColumn parameter instead of hardcoding "search name"
-export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchData | undefined)[][][], referenceColumn: string) {
+// Updated to accept idColumn parameter instead of hardcoding "search name"
+export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchData | undefined)[][][], idColumn: string) {
     const csv = Papa.unparse(
       searches.map((search) => ({
-        [referenceColumn]: search.name, // Use the selected reference column name
+        [idColumn]: search.name, // Use the selected ID column name
         ...search.metadata,
         plate: getPlateNumber(search.name, randomizedPlates),
         row: getRowName(search.name, randomizedPlates),

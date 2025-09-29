@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [searches, setSearches] = useState<SearchData[]>([]);
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
-  const [selectedReferenceColumn, setSelectedReferenceColumn] = useState<string>('');
+  const [selectedIdColumn, setSelectedIdColumn] = useState<string>('');
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
   
   // Algorithm selection
@@ -37,13 +37,13 @@ const App: React.FC = () => {
   const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
 
   // Helper functions
-  const processSearchData = (data: any[], referenceColumn: string): SearchData[] => {
+  const processSearchData = (data: any[], idColumn: string): SearchData[] => {
     return data
-      .filter((row: any) => row[referenceColumn])
+      .filter((row: any) => row[idColumn])
       .map((row: any) => ({
-        name: row[referenceColumn],
+        name: row[idColumn],
         metadata: Object.keys(row)
-          .filter((key) => key !== referenceColumn)
+          .filter((key) => key !== idColumn)
           .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
       }));
   };
@@ -85,9 +85,9 @@ const App: React.FC = () => {
           } else if (headers.includes('UW_Sample_ID')) {
             defaultColumn = 'UW_Sample_ID';
           }
-          setSelectedReferenceColumn(defaultColumn);
+          setSelectedIdColumn(defaultColumn);
 
-          // Process data with selected reference column
+          // Process data with selected ID column
           const processedSearches = processSearchData(results.data, defaultColumn);
           setSearches(processedSearches);
           resetProcessingState();
@@ -96,13 +96,13 @@ const App: React.FC = () => {
     }
   };
 
-  // Reference column change handler
-  const handleReferenceColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newReferenceColumn = event.target.value;
-    setSelectedReferenceColumn(newReferenceColumn);
+  // ID column change handler
+  const handleIdColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newIdColumn = event.target.value;
+    setSelectedIdColumn(newIdColumn);
     
     if (parsedData.length > 0) {
-      const processedSearches = processSearchData(parsedData, newReferenceColumn);
+      const processedSearches = processSearchData(parsedData, newIdColumn);
       setSearches(processedSearches);
       resetProcessingState();
     }
@@ -203,7 +203,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
 
   // Main processing handler
   const handleProcessRandomization = () => {
-    if (selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0) {
+    if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate randomized plates using selected algorithm
       const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm);
       setRandomizedPlates(plates);
@@ -222,14 +222,14 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
 
   // Download CSV handler
   const handleDownloadCSV = () => {
-    if (selectedReferenceColumn) {
-      downloadCSV(searches, randomizedPlates, selectedReferenceColumn);
+    if (selectedIdColumn) {
+      downloadCSV(searches, randomizedPlates, selectedIdColumn);
     }
   };
 
   // Re-randomization handler
   const handleReRandomize = () => {
-    if (selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0) {
+    if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate new randomized plates with existing colors using selected algorithm
       const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm);
       setRandomizedPlates(plates);
@@ -296,7 +296,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
     }
   };
 
-  const canProcess = selectedReferenceColumn && selectedCovariates.length > 0 && searches.length > 0;
+  const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0;
 
   return (
     <div style={styles.container}>
@@ -311,17 +311,17 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
           style={styles.fileInput} 
         />
         
-        {/* Reference Column, Algorithm, and Covariate Selection */}
+        {/* ID Column, Algorithm, and Covariate Selection */}
         {availableColumns.length > 0 && (
           <div style={styles.selectionContainer}>
             <div style={styles.selectionRow}>
-              {/* Reference Column Selection */}
+              {/* ID Column Selection */}
               <div style={styles.selectionGroup}>
-                <label htmlFor="referenceColumn">Select Reference/ID Column:</label>
+                <label htmlFor="idColumn">Select ID Column:</label>
                 <select 
-                  id="referenceColumn" 
-                  value={selectedReferenceColumn} 
-                  onChange={handleReferenceColumnChange}
+                  id="idColumn" 
+                  value={selectedIdColumn} 
+                  onChange={handleIdColumnChange}
                   style={styles.select}
                 >
                   {availableColumns.map((column) => (

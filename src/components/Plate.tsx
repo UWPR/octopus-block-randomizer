@@ -1,12 +1,12 @@
 import React, { DragEvent } from 'react';
 import Search from './Search';
 import { SearchData } from '../types';
-import { getCovariateKey } from '../utils';
+import { getCovariateKey, CovariateColorInfo } from '../utils';
 
 interface PlateProps {
   plateIndex: number;
   rows: (SearchData | undefined)[][];
-  covariateColors: { [key: string]: string };
+  covariateColors: { [key: string]: CovariateColorInfo };
   selectedCovariates: string[];
   onDragStart: (event: DragEvent<HTMLDivElement>, searchName: string) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
@@ -90,24 +90,43 @@ const Plate: React.FC<PlateProps> = ({
                 >
                   {search ? (
                     compact ? (
-                      // Compact view: just colored square
-                      <div
-                        style={{
+                      // Compact view: colored square or outline or stripes
+                      (() => {
+                        const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || { color: '#cccccc', useOutline: false, useStripes: false };
+                        const baseStyle: React.CSSProperties = {
                           ...currentStyles.compactSearchIndicator,
-                          backgroundColor: covariateColors[getCovariateKey(search, selectedCovariates)] || '#cccccc',
-                          ...(isHighlighted ? currentStyles.highlightedIndicator : {})
-                        }}
-                        draggable={true}
-                        onDragStart={(event) => onDragStart(event, search.name)}
-                      />
+                          backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
+                          ...(colorInfo.useStripes && { background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)` }),
+                          border: colorInfo.useOutline ? `5px solid ${colorInfo.color}` : currentStyles.compactSearchIndicator.border,
+                          boxSizing: 'border-box'
+                        };
+                        
+                        const highlightStyle: React.CSSProperties = isHighlighted ? {
+                          outline: '2px solid #2196f3',
+                          outlineOffset: '1px',
+                          boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)'
+                        } : {};
+                        
+                        return (
+                          <div
+                            style={{
+                              ...baseStyle,
+                              ...highlightStyle
+                            }}
+                            draggable={true}
+                            onDragStart={(event) => onDragStart(event, search.name)}
+                          />
+                        );
+                      })()
                     ) : (
                       // Full view: Search component
                       <Search
                         name={search.name}
                         metadata={search.metadata}
-                        backgroundColor={covariateColors[getCovariateKey(search, selectedCovariates)] || 'defaultColor'}
+                        colorInfo={covariateColors[getCovariateKey(search, selectedCovariates)] || { color: '#cccccc', useOutline: false, useStripes: false }}
                         onDragStart={onDragStart}
                         selectedCovariates={selectedCovariates}
+                        isHighlighted={isHighlighted}
                       />
                     )
                   ) : null}
@@ -193,6 +212,7 @@ const styles = {
     cursor: 'move',
     border: '1px solid rgba(0,0,0,0.2)',
     transition: 'all 0.2s ease',
+    boxSizing: 'border-box' as const,
   },
   highlightedWell: {
     border: '3px solid #2196f3',
@@ -279,6 +299,7 @@ const compactStyles = {
     cursor: 'move',
     border: '1px solid rgba(0,0,0,0.2)',
     transition: 'all 0.2s ease',
+    boxSizing: 'border-box' as const,
   },
   highlightedWell: {
     border: '3px solid #2196f3',

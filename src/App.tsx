@@ -2,13 +2,15 @@ import React, { useState, useCallback, DragEvent } from 'react';
 import Papa from 'papaparse';
 import Plate from './components/Plate';
 import { SearchData, RandomizationAlgorithm } from './types';
-import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE, ALGORITHM_DESCRIPTIONS, getCovariateKey } from './utils';
+import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE, ALGORITHM_DESCRIPTIONS, getCovariateKey, CovariateColorInfo } from './utils';
 
 interface SummaryItem {
   combination: string;
   values: { [key: string]: string };
   count: number;
   color: string;
+  useOutline: boolean;
+  useStripes: boolean;
 }
 
 const App: React.FC = () => {
@@ -25,7 +27,7 @@ const App: React.FC = () => {
   // Processing states
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
   const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
-  const [covariateColors, setCovariateColors] = useState<{ [key: string]: string }>({});
+  const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});
   const [summaryData, setSummaryData] = useState<SummaryItem[]>([]);
   
   // UI states
@@ -127,11 +129,18 @@ const App: React.FC = () => {
         searches.map((search) => getCovariateKey(search, selectedCovariates))
       );
 
-      const covariateColorsMap: { [key: string]: string } = {};
+      const covariateColorsMap: { [key: string]: CovariateColorInfo } = {};
       let colorIndex = 0;
 
       covariateValues.forEach((combination) => {
-        covariateColorsMap[combination] = BRIGHT_COLOR_PALETTE[colorIndex % BRIGHT_COLOR_PALETTE.length];
+        const paletteIndex = colorIndex % BRIGHT_COLOR_PALETTE.length;
+        const cycle = Math.floor(colorIndex / BRIGHT_COLOR_PALETTE.length);
+        
+        covariateColorsMap[combination] = {
+          color: BRIGHT_COLOR_PALETTE[paletteIndex],
+          useOutline: cycle === 1, // Second cycle (25-48)
+          useStripes: cycle === 2   // Third cycle (49-72)
+        };
         colorIndex += 1;
       });
 
@@ -141,7 +150,7 @@ const App: React.FC = () => {
 }, [selectedCovariates, searches]);
 
   // Generate summary data for the panel
-const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
+const generateSummaryData = useCallback((colors: { [key: string]: CovariateColorInfo }) => {
   if (selectedCovariates.length > 0 && searches.length > 0) {
     // Group searches by their covariate combinations using getCovariateKey
     const combinationsMap = new Map<string, {
@@ -170,11 +179,14 @@ const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
 
     // Convert to summary data with colors
     const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([combinationKey, data]) => {
+      const colorInfo = colors[combinationKey] || { color: '#cccccc', useOutline: false, useStripes: false };
       return {
         combination: combinationKey, // Use the same key format as colors
         values: data.values,
         count: data.count,
-        color: colors[combinationKey] || '#cccccc'
+        color: colorInfo.color,
+        useOutline: colorInfo.useOutline,
+        useStripes: colorInfo.useStripes
       };
     });
 
@@ -397,7 +409,9 @@ const generateSummaryData = useCallback((colors: { [key: string]: string }) => {
                         <div 
                           style={{
                             ...styles.colorIndicator,
-                            backgroundColor: item.color
+                            backgroundColor: item.useOutline ? 'transparent' : item.color,
+                            ...(item.useStripes && { background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)` }),
+                            border: item.useOutline ? `3px solid ${item.color}` : styles.colorIndicator.border
                           }}
                         />
                         <span style={styles.summaryCount}>

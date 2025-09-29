@@ -5,34 +5,36 @@ import Papa from 'papaparse';
 export const BRIGHT_COLOR_PALETTE = [
     // Subgroup 1
     '#FF0000', // Pure Red
-    '#FF00FF', // Magenta
     '#0000FF', // Pure Blue
-    '#FF8000', // Pure Orange
-    '#9370DB', // Medium Purple
     '#32CD32', // Lime Green
-
+    '#FF8000', // Pure Orange
+    '#FFFF00', // Pure Yellow
+    '#FF00FF', // Magenta
+    
     // Subgroup 2 
     '#87CEEB', // Sky Blue
     '#800080', // Purple
     '#FF1493', // Deep Pink
     '#006400', // Dark Forest Green
-    '#C0C0C0', // Silver
-    '#008B8B', // Dark Cyan
+    '#4169E1', // Royal Blue
+    '#20B2AA', // Light Sea Green
+    
 
     // Subgroup 3
     '#F08080', // Light Coral
-    '#4169E1', // Royal Blue
-    '#FFA500', // Orange
-    '#FFFF00', // Pure Yellow
-    '#98FB98', // Pale Green
     '#40E0D0', // Turquoise
+    '#FFA500', // Orange
+    '#9370DB', // Medium Purple
+    '#98FB98', // Pale Green
+    '#C0C0C0', // Silver
+    
 
     // Subgroup 4
     '#FF4500', // Orange Red
     '#8000FF', // Pure Purple
     '#BA55D3', // Medium Orchid
     '#B8860B', // Dark Gold
-    '#20B2AA', // Light Sea Green
+    '#008B8B', // Dark Cyan
     '#FF69B4', // Hot Pink
 ];
 

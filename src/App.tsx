@@ -20,7 +20,8 @@ const App: React.FC = () => {
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [selectedIdColumn, setSelectedIdColumn] = useState<string>('');
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
-  
+  const [controlLabels, setControlLabels] = useState<string>('');
+
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('greedy');
   
@@ -122,84 +123,122 @@ const App: React.FC = () => {
     resetCovariateState();
   };
 
+  // Control labels change handler
+  const handleControlLabelsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setControlLabels(event.target.value);
+    resetCovariateState();
+  };
+
   const generateCovariateColors = useCallback(() => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
-      // Create unique combinations of covariate values using the utility function
-      const covariateValues = new Set(
-        searches.map((search) => getCovariateKey(search, selectedCovariates))
-      );
+      // Group searches by covariate combinations and count them
+      const combinationCounts = new Map<string, number>();
+      searches.forEach((search) => {
+        const combination = getCovariateKey(search, selectedCovariates);
+        combinationCounts.set(combination, (combinationCounts.get(combination) || 0) + 1);
+      });
 
+      // Parse control labels (split by comma and trim)
+      const controlLabelsList = controlLabels
+        .split(',')
+        .map(label => label.trim())
+        .filter(label => label.length > 0);
+
+      // Separate control combinations from regular combinations
+      const controlCombinations: string[] = [];
+      const regularCombinations: string[] = [];
+
+      Array.from(combinationCounts.keys()).forEach((combination) => {
+        const isControl = controlLabelsList.length > 0 && controlLabelsList.some(controlLabel =>
+          combination.toLowerCase().includes(controlLabel.toLowerCase())
+        );
+
+        if (isControl) {
+          controlCombinations.push(combination);
+        } else {
+          regularCombinations.push(combination);
+        }
+      });
+
+      // Sort control combinations by count (descending)
+      controlCombinations.sort((a, b) => (combinationCounts.get(b) || 0) - (combinationCounts.get(a) || 0));
+
+      // Sort regular combinations by count (descending)
+      regularCombinations.sort((a, b) => (combinationCounts.get(b) || 0) - (combinationCounts.get(a) || 0));
+
+      // Combine arrays: controls first, then regular combinations
+      const sortedCombinations = [...controlCombinations, ...regularCombinations];
+
+      // Assign colors in the new order
       const covariateColorsMap: { [key: string]: CovariateColorInfo } = {};
-      let colorIndex = 0;
 
-      covariateValues.forEach((combination) => {
+      sortedCombinations.forEach((combination, colorIndex) => {
         const paletteIndex = colorIndex % BRIGHT_COLOR_PALETTE.length;
         const cycle = Math.floor(colorIndex / BRIGHT_COLOR_PALETTE.length);
-        
+
         covariateColorsMap[combination] = {
           color: BRIGHT_COLOR_PALETTE[paletteIndex],
           useOutline: cycle === 1, // Second cycle (25-48)
           useStripes: cycle === 2   // Third cycle (49-72)
         };
-        colorIndex += 1;
       });
 
       return covariateColorsMap;
     }
     return {};
-}, [selectedCovariates, searches]);
+  }, [selectedCovariates, searches, controlLabels]);
 
   // Generate summary data for the panel
-const generateSummaryData = useCallback((colors: { [key: string]: CovariateColorInfo }) => {
-  if (selectedCovariates.length > 0 && searches.length > 0) {
-    // Group searches by their covariate combinations using getCovariateKey
-    const combinationsMap = new Map<string, {
-      values: { [key: string]: string };
-      count: number;
-    }>();
+  const generateSummaryData = useCallback((colors: { [key: string]: CovariateColorInfo }) => {
+    if (selectedCovariates.length > 0 && searches.length > 0) {
+      // Group searches by their covariate combinations using getCovariateKey
+      const combinationsMap = new Map<string, {
+        values: { [key: string]: string };
+        count: number;
+      }>();
 
-    searches.forEach((search) => {
-      const covariateValues: { [key: string]: string } = {};
-      selectedCovariates.forEach((covariate) => {
-        covariateValues[covariate] = search.metadata[covariate] || 'N/A';
-      });
-      
-      const combinationKey = getCovariateKey(search, selectedCovariates);
-      
-      if (combinationsMap.has(combinationKey)) {
-        const existing = combinationsMap.get(combinationKey)!;
-        existing.count++;
-      } else {
-        combinationsMap.set(combinationKey, {
-          values: covariateValues,
-          count: 1
+      searches.forEach((search) => {
+        const covariateValues: { [key: string]: string } = {};
+        selectedCovariates.forEach((covariate) => {
+          covariateValues[covariate] = search.metadata[covariate] || 'N/A';
         });
-      }
-    });
 
-    // Convert to summary data with colors
-    const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([combinationKey, data]) => {
-      const colorInfo = colors[combinationKey] || { color: '#cccccc', useOutline: false, useStripes: false };
-      return {
-        combination: combinationKey, // Use the same key format as colors
-        values: data.values,
-        count: data.count,
-        color: colorInfo.color,
-        useOutline: colorInfo.useOutline,
-        useStripes: colorInfo.useStripes
-      };
-    });
+        const combinationKey = getCovariateKey(search, selectedCovariates);
 
-    // Sort by count (descending) then by combination name
-    summary.sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.combination.localeCompare(b.combination);
-    });
+        if (combinationsMap.has(combinationKey)) {
+          const existing = combinationsMap.get(combinationKey)!;
+          existing.count++;
+        } else {
+          combinationsMap.set(combinationKey, {
+            values: covariateValues,
+            count: 1
+          });
+        }
+      });
 
-    return summary;
-  }
-  return [];
-}, [selectedCovariates, searches]);
+      // Convert to summary data with colors
+      const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([combinationKey, data]) => {
+        const colorInfo = colors[combinationKey] || { color: '#cccccc', useOutline: false, useStripes: false };
+        return {
+          combination: combinationKey, // Use the same key format as colors
+          values: data.values,
+          count: data.count,
+          color: colorInfo.color,
+          useOutline: colorInfo.useOutline,
+          useStripes: colorInfo.useStripes
+        };
+      });
+
+      // Sort by count (descending) then by combination name
+      summary.sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.combination.localeCompare(b.combination);
+      });
+
+      return summary;
+    }
+    return [];
+  }, [selectedCovariates, searches]);
 
   // Main processing handler
   const handleProcessRandomization = () => {
@@ -304,11 +343,11 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
         <h1 style={styles.heading}>Octopus Block Randomization</h1>
         
         {/* File Upload */}
-        <input 
-          type="file" 
-          accept=".csv" 
-          onChange={handleFileUpload} 
-          style={styles.fileInput} 
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
+          style={styles.fileInput}
         />
         
         {/* ID Column, Algorithm, and Covariate Selection */}
@@ -318,9 +357,9 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
               {/* ID Column Selection */}
               <div style={styles.selectionGroup}>
                 <label htmlFor="idColumn">Select ID Column:</label>
-                <select 
-                  id="idColumn" 
-                  value={selectedIdColumn} 
+                <select
+                  id="idColumn"
+                  value={selectedIdColumn}
                   onChange={handleIdColumnChange}
                   style={styles.select}
                 >
@@ -335,9 +374,9 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
               {/* Algorithm Selection */}
               <div style={styles.selectionGroup}>
                 <label htmlFor="algorithm">Randomization Algorithm:</label>
-                <select 
-                  id="algorithm" 
-                  value={selectedAlgorithm} 
+                <select
+                  id="algorithm"
+                  value={selectedAlgorithm}
                   onChange={handleAlgorithmChange}
                   style={styles.select}
                 >
@@ -355,10 +394,10 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
               <div style={styles.covariateSection}>
                 <div style={styles.selectionGroup}>
                   <label htmlFor="covariates">Select Covariates:</label>
-                  <select 
-                    id="covariates" 
-                    multiple 
-                    value={selectedCovariates} 
+                  <select
+                    id="covariates"
+                    multiple
+                    value={selectedCovariates}
                     onChange={handleCovariateChange}
                     style={styles.multiSelect}
                   >
@@ -369,6 +408,26 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
                     ))}
                   </select>
                   <small style={styles.hint}>Hold Ctrl/Cmd to select multiple options</small>
+                </div>
+              </div>
+            )}
+
+            {/* Control Labels Input */}
+            {selectedCovariates.length > 0 && (
+              <div style={styles.controlLabelsSection}>
+                <div style={styles.selectionGroup}>
+                  <label htmlFor="controlLabels">Control/Reference Sample Labels (optional):</label>
+                  <input
+                    id="controlLabels"
+                    type="text"
+                    value={controlLabels}
+                    onChange={handleControlLabelsChange}
+                    placeholder="e.g., Inter-Experiment Reference, Control, QC"
+                    style={styles.textInput}
+                  />
+                  <small style={styles.hint}>
+                    Enter labels separated by commas. Samples containing these labels will get priority colors.
+                  </small>
                 </div>
               </div>
             )}
@@ -385,7 +444,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
         {/* Summary Panel */}
         {isProcessed && summaryData.length > 0 && (
           <div style={styles.summaryContainer}>
-            <button 
+            <button
               onClick={() => setShowSummary(!showSummary)}
               style={styles.summaryToggle}
             >
@@ -396,8 +455,8 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
               <div style={styles.summaryPanel}>
                 <div style={styles.summaryGrid}>
                   {summaryData.map((item, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       style={{
                         ...styles.summaryItem,
                         ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
@@ -406,7 +465,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
                       onClick={() => handleSummaryItemClick(item.combination)}
                     >
                       <div style={styles.summaryHeader}>
-                        <div 
+                        <div
                           style={{
                             ...styles.colorIndicator,
                             backgroundColor: item.useOutline ? 'transparent' : item.color,
@@ -437,7 +496,7 @@ const generateSummaryData = useCallback((colors: { [key: string]: CovariateColor
         {isProcessed && randomizedPlates.length > 0 && (
           <>
             <div style={styles.viewControls}>
-              <button 
+              <button
                 onClick={() => setCompactView(!compactView)}
                 style={styles.controlButton}
               >
@@ -542,6 +601,12 @@ const styles = {
     justifyContent: 'center',
     width: '100%',
   },
+  controlLabelsSection: {
+    display: 'flex',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: '20px',
+  },
   select: {
     padding: '10px',
     borderRadius: '6px',
@@ -557,6 +622,14 @@ const styles = {
     fontSize: '14px',
     width: '100%',
     minHeight: '120px',
+    backgroundColor: '#fff',
+  },
+  textInput: {
+    padding: '10px',
+    borderRadius: '6px',
+    border: '1px solid #ddd',
+    fontSize: '14px',
+    width: '100%',
     backgroundColor: '#fff',
   },
   hint: {

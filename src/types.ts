@@ -2,7 +2,7 @@ export interface SearchData {
     name: string;
     metadata: { [key: string]: string };
 }
-export type RandomizationAlgorithm = 'greedy' | 'optimized' | 'latin_square';
+export type RandomizationAlgorithm = 'greedy' | 'balanced';
 
 export interface RandomizationOptions {
     algorithm: RandomizationAlgorithm;

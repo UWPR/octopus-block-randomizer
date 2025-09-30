@@ -24,6 +24,7 @@ const App: React.FC = () => {
 
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('greedy');
+  const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
   
   // Processing states
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
@@ -114,6 +115,12 @@ const App: React.FC = () => {
     const newAlgorithm = event.target.value as RandomizationAlgorithm;
     setSelectedAlgorithm(newAlgorithm);
     resetCovariateState(); // Reset processing state when algorithm changes
+  };
+
+  // Empty spots option handler
+  const handleKeepEmptyInLastPlateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setKeepEmptyInLastPlate(event.target.checked);
+    resetCovariateState(); // Reset processing state when option changes
   };
 
   // Covariate selection handler
@@ -244,7 +251,7 @@ const App: React.FC = () => {
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate randomized plates using selected algorithm
-      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm);
+      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate);
       setRandomizedPlates(plates);
       
       // Generate colors
@@ -270,7 +277,7 @@ const App: React.FC = () => {
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate new randomized plates with existing colors using selected algorithm
-      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm);
+      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate);
       setRandomizedPlates(plates);
     }
   };
@@ -381,11 +388,26 @@ const App: React.FC = () => {
                   style={styles.select}
                 >
                   <option value="greedy">Greedy Randomization</option>
-                  <option value="optimized">Block Randomization</option>
+                  <option value="balanced">Balanced Block Randomization</option>
                 </select>
                 <small style={styles.algorithmDescription}>
                   {ALGORITHM_DESCRIPTIONS[selectedAlgorithm]}
                 </small>
+                
+                {/* Block Randomization Options */}
+                {selectedAlgorithm === 'balanced' && (
+                  <div style={styles.checkboxContainer}>
+                    <label style={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={keepEmptyInLastPlate}
+                        onChange={handleKeepEmptyInLastPlateChange}
+                        style={styles.checkbox}
+                      />
+                      Keep empty spots in last plate
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -644,6 +666,22 @@ const styles = {
     textAlign: 'center' as const,
     lineHeight: '1.3',
     marginTop: '5px',
+  },
+  checkboxContainer: {
+    marginTop: '10px',
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: '12px',
+    color: '#333',
+    cursor: 'pointer',
+  },
+  checkbox: {
+    marginRight: '6px',
+    cursor: 'pointer',
   },
   processButton: {
     marginBottom: '30px',

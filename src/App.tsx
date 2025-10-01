@@ -462,62 +462,22 @@ const App: React.FC = () => {
             Generate Randomized Plates
           </button>
         )}
-        
-        {/* Summary Panel */}
-        {isProcessed && summaryData.length > 0 && (
-          <div style={styles.summaryContainer}>
-            <button
-              onClick={() => setShowSummary(!showSummary)}
-              style={styles.summaryToggle}
-            >
-              {showSummary ? '▼ Hide' : '▶ Show'} Covariate Summary ({summaryData.length} combinations)
-            </button>
-            
-            {showSummary && (
-              <div style={styles.summaryPanel}>
-                <div style={styles.summaryGrid}>
-                  {summaryData.map((item, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        ...styles.summaryItem,
-                        ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => handleSummaryItemClick(item.combination)}
-                    >
-                      <div style={styles.summaryHeader}>
-                        <div
-                          style={{
-                            ...styles.colorIndicator,
-                            backgroundColor: item.useOutline ? 'transparent' : item.color,
-                            ...(item.useStripes && { background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)` }),
-                            border: item.useOutline ? `3px solid ${item.color}` : styles.colorIndicator.border
-                          }}
-                        />
-                        <span style={styles.summaryCount}>
-                          {item.count}
-                        </span>
-                      </div>
-                      <div style={styles.summaryDetails}>
-                        {Object.entries(item.values).map(([covariate, value]) => (
-                          <div key={covariate} style={styles.covariateDetail}>
-                            <strong>{covariate}:</strong> {value}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
+
+
+
         {/* Plates Visualization */}
         {isProcessed && randomizedPlates.length > 0 && (
           <>
             <div style={styles.viewControls}>
+              {summaryData.length > 0 && (
+                <button
+                  onClick={() => setShowSummary(!showSummary)}
+                  style={styles.summaryToggle}
+                >
+                  {showSummary ? '▼ Hide' : '▶ Show'} Covariate Summary ({summaryData.length} combinations)
+                </button>
+              )}
+
               <button
                 onClick={() => setCompactView(!compactView)}
                 style={styles.controlButton}
@@ -533,7 +493,49 @@ const App: React.FC = () => {
                 Download CSV
               </button>
             </div>
-            
+
+            {/* Summary Panel */}
+            {summaryData.length > 0 && showSummary && (
+              <div style={styles.summaryContainer}>
+                <div style={styles.summaryPanel}>
+                  <div style={styles.summaryGrid}>
+                    {summaryData.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          ...styles.summaryItem,
+                          ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => handleSummaryItemClick(item.combination)}
+                      >
+                        <div style={styles.summaryHeader}>
+                          <div
+                            style={{
+                              ...styles.colorIndicator,
+                              backgroundColor: item.useOutline ? 'transparent' : item.color,
+                              ...(item.useStripes && { background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)` }),
+                              border: item.useOutline ? `3px solid ${item.color}` : styles.colorIndicator.border
+                            }}
+                          />
+                          <span style={styles.summaryCount}>
+                            {item.count}
+                          </span>
+                        </div>
+                        <div style={styles.summaryDetails}>
+                          {Object.entries(item.values).map(([covariate, value]) => (
+                            <div key={covariate} style={styles.covariateDetail}>
+                              <strong>{covariate}:</strong> {value}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={compactView ? styles.compactPlatesContainer : styles.platesContainer}>
               {randomizedPlates.map((plate, plateIndex) => (
                 <div key={plateIndex} style={compactView ? styles.compactPlateWrapper : styles.plateWrapper}>
@@ -614,7 +616,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
-    gap: '10px',
+    gap: '1px',
     flex: '1',
     minWidth: '250px',
   },
@@ -696,8 +698,7 @@ const styles = {
     transition: 'background-color 0.3s ease',
   },
   summaryContainer: {
-    width: '100%',
-    maxWidth: '900px',
+    width: '90%',
     marginBottom: '20px',
   },
   summaryToggle: {
@@ -710,7 +711,6 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 'bold',
     transition: 'background-color 0.3s ease',
-    marginBottom: '10px',
   },
   summaryPanel: {
     backgroundColor: '#f9f9f9',
@@ -721,7 +721,7 @@ const styles = {
   summaryGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '10px',
+    gap: '1px',
   },
   summaryItem: {
     backgroundColor: '#fff',
@@ -765,7 +765,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '15px',
+    gap: '10px',
     marginBottom: '20px',
   },
   controlButton: {
@@ -793,7 +793,7 @@ const styles = {
   compactPlatesContainer: {
     display: 'flex',
     flexWrap: 'wrap' as const,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'flex-start',
     gap: '15px',
     width: '100%',

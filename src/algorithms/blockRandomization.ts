@@ -20,113 +20,65 @@ function distributeToBlocks(
     numBlocks: number,
     blockCapacity: number
 ): Map<number, SearchData[]> {
-    const blockAssignments = new Map<number, SearchData[]>();
-    const blockCounts = new Array(numBlocks).fill(0);
+    const [blockAssignments, blockCounts] = initializeBlockAssignments(numBlocks);
 
-    // Initialize block assignments
-    for (let i = 0; i < numBlocks; i++) {
-        blockAssignments.set(i, []);
-    }
-
-    // Calculate total samples and verify we have enough capacity
+    // Create uniform capacities array for validation
+    const blockCapacities = Array(numBlocks).fill(blockCapacity);
     const totalSamples = Array.from(covariateGroups.values()).reduce((sum, samples) => sum + samples.length, 0);
-    const totalCapacity = numBlocks * blockCapacity;
 
-    console.log(`Block size: ${blockCapacity}; Number of blocks: ${numBlocks}; Sample count: ${totalSamples}`);
-
-    if (totalSamples > totalCapacity) {
-        console.error(`Not enough capacity: ${totalSamples} samples > ${totalCapacity} total capacity`);
+    if (!validateCapacity(totalSamples, blockCapacities)) {
         return blockAssignments;
     }
 
-    // Store remaining samples for Phase 2
-    const remainingSamplesMap = new Map<string, SearchData[]>();
+    // PHASE 1: Place proportional samples
+    const [unplacedGroupsMap, remainingSamplesMap] = placeProportionalSamples(
+        covariateGroups,
+        blockCapacities, // All blocks have uniform capacity
+        blockAssignments,
+        blockCounts
+    );
 
-    // PHASE 1: Place minimum required samples from ALL covariate groups
-    covariateGroups.forEach((samples, groupKey) => {
-        const shuffledSamples = shuffleArray([...samples]);
-        const totalGroupSamples = shuffledSamples.length;
-        const baseSamplesPerBlock = Math.floor(totalGroupSamples / numBlocks);
-
-        let sampleIndex = 0;
-
-        console.log(`Phase 1: Minimum required samples for group ${groupKey} (${totalGroupSamples}/${numBlocks}): ${baseSamplesPerBlock}`);
-
-        // Place minimum required samples in each block for this group
-        if (baseSamplesPerBlock > 0) {
-            for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-                console.log(`  Placing minimum required samples in block index ${blockIdx}`);
-
-                // Check if we have capacity for the minimum required samples
-                const availableCapacity = blockCapacity - blockCounts[blockIdx];
-                const samplesToPlace = Math.min(baseSamplesPerBlock, availableCapacity);
-
-                if (samplesToPlace < baseSamplesPerBlock) {
-                    console.error(`Phase 1 (Blocks): Block ${blockIdx} cannot accommodate minimum ${baseSamplesPerBlock} samples for group ${groupKey}. Only ${samplesToPlace} can be placed.`);
-                }
-
-                // Place the guaranteed minimum samples
-                for (let i = 0; i < samplesToPlace && sampleIndex < shuffledSamples.length; i++) {
-                    blockAssignments.get(blockIdx)!.push(shuffledSamples[sampleIndex++]);
-                    blockCounts[blockIdx]++;
-                }
-            }
-        }
-
-        // Store any remaining samples for Phase 2
-        if (sampleIndex < shuffledSamples.length) {
-            const remainingSamples = shuffledSamples.slice(sampleIndex);
-            remainingSamplesMap.set(groupKey, remainingSamples);
+    // Combine unplaced and remaining samples for Phase 2
+    const allRemainingSamples = new Map<string, SearchData[]>();
+    unplacedGroupsMap.forEach((samples, groupKey) => {
+        allRemainingSamples.set(groupKey, samples);
+    });
+    remainingSamplesMap.forEach((samples, groupKey) => {
+        if (allRemainingSamples.has(groupKey)) {
+            // Combine samples if group exists in both maps
+            const existingSamples = allRemainingSamples.get(groupKey)!;
+            allRemainingSamples.set(groupKey, [...existingSamples, ...samples]);
+        } else {
+            allRemainingSamples.set(groupKey, samples);
         }
     });
 
     // PHASE 2: Distribute remaining samples one covariate group at a time
-    remainingSamplesMap.forEach((remainingSamples, groupKey) => {
+    const sortedRemainingGroups = Array.from(allRemainingSamples.entries())
+        .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
+
+    sortedRemainingGroups.forEach(([groupKey, remainingSamples]) => {
         console.log(`Phase 2: Remaining samples for group ${groupKey}: ${remainingSamples.length}`);
 
         // Get blocks with available capacity
-        const availableBlocks = [];
-        for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-            const availableCapacity = blockCapacity - blockCounts[blockIdx];
-            if (availableCapacity > 0) {
-                console.log(`  Block is available. Index: ${blockIdx}; Capacity: ${availableCapacity}`);
-                availableBlocks.push(blockIdx);
-            }
-        }
+        const availableBlocks = getAvailableBlocks(numBlocks, blockCapacities, blockCounts);
 
         if (availableBlocks.length === 0) {
             console.error(`Phase 2 (Blocks): No available capacity for remaining samples from group ${groupKey}`);
             return;
         }
 
-        // Shuffle available blocks for random distribution
-        const shuffledAvailableBlocks = shuffleArray([...availableBlocks]);
+        const placedSamples = distributeSamplesAcrossPlates(
+            remainingSamples,
+            availableBlocks,
+            blockCapacities,
+            blockAssignments,
+            blockCounts,
+            "Placing 1 remaining"
+        );
 
-        // Distribute remaining samples from this group across available blocks
-        let sampleIndex = 0;
-        let blockIndex = 0;
-
-        while (sampleIndex < remainingSamples.length && shuffledAvailableBlocks.length > 0) {
-            const blockIdx = shuffledAvailableBlocks[blockIndex % shuffledAvailableBlocks.length];
-
-            if (blockCounts[blockIdx] < blockCapacity) {
-                console.log(`  Placing 1 remaining sample in block index: ${blockIdx}`);
-                blockAssignments.get(blockIdx)!.push(remainingSamples[sampleIndex]);
-                blockCounts[blockIdx]++;
-                sampleIndex++;
-            } else {
-                // Remove this block from available blocks if it's at capacity
-                shuffledAvailableBlocks.splice(blockIndex % shuffledAvailableBlocks.length, 1);
-                if (shuffledAvailableBlocks.length === 0) break;
-                blockIndex = blockIndex % shuffledAvailableBlocks.length;
-                continue;
-            }
-
-            blockIndex = (blockIndex + 1) % shuffledAvailableBlocks.length;
-        }
-
-        if (sampleIndex < remainingSamples.length) {
-            console.error(`Phase 2 (Blocks): Failed to place ${remainingSamples.length - sampleIndex} remaining samples from group ${groupKey}`);
+        if (placedSamples < remainingSamples.length) {
+            console.error(`Phase 2 (Blocks): Failed to place ${remainingSamples.length - placedSamples} remaining samples from group ${groupKey}`);
         }
     });
 
@@ -143,6 +95,23 @@ function initializeBlockAssignments(numPlates: number): [Map<number, SearchData[
     }
 
     return [blockAssignments, blockCounts];
+}
+
+// Helper function to get available blocks/plates with capacity
+function getAvailableBlocks(
+    numBlocks: number,
+    blockCapacities: number[],
+    blockCounts: number[]
+): number[] {
+    const availableBlocks = [];
+    for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+        const availableCapacity = blockCapacities[blockIdx] - blockCounts[blockIdx];
+        if (availableCapacity > 0) {
+            console.log(`  Block is available. Index: ${blockIdx}; Capacity: ${availableCapacity}`);
+            availableBlocks.push(blockIdx);
+        }
+    }
+    return availableBlocks;
 }
 
 // Helper function to validate capacity
@@ -261,14 +230,7 @@ function processUnplacedGroups(
     sortedUnplacedGroups.forEach(([groupKey, remainingSamples]) => {
         console.log(`Phase 2A: Unplaced group ${groupKey}: ${remainingSamples.length} samples`);
 
-        const availablePlates = [];
-        for (let plateIdx = 0; plateIdx < numPlates; plateIdx++) {
-            const availableCapacity = plateCapacities[plateIdx] - blockCounts[plateIdx];
-            if (availableCapacity > 0) {
-                console.log(`  Plate is available. Index: ${plateIdx}; Capacity: ${availableCapacity}`);
-                availablePlates.push(plateIdx);
-            }
-        }
+        const availablePlates = getAvailableBlocks(numPlates, plateCapacities, blockCounts);
 
         if (availablePlates.length === 0) {
             console.error(`Phase 2A (Plates): No available capacity for unplaced group ${groupKey}`);

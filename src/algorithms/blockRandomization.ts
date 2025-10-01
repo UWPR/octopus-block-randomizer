@@ -342,7 +342,7 @@ function distributeToBlocksWithCapacities(
 function validateDistribution(
     blockAssignments: Map<number, SearchData[]>,
     selectedCovariates: string[],
-    expectedMinimum: { [groupKey: string]: number },
+    expectedMinimum: { [groupKey: string]: number } | { [blockIdx: number]: { [groupKey: string]: number } },
     blockType: string = "block"
 ): boolean {
     let isValid = true;
@@ -356,8 +356,22 @@ function validateDistribution(
             groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
         });
 
+        // Determine expected minimums for this block
+        let blockExpectedMinimums: { [groupKey: string]: number };
+
+        // Check if expectedMinimum is per-block (has numeric keys) or global (has string keys)
+        const firstKey = Object.keys(expectedMinimum)[0];
+        if (firstKey && !isNaN(Number(firstKey))) {
+            // Per-block minimums
+            const perBlockMinimums = expectedMinimum as { [blockIdx: number]: { [groupKey: string]: number } };
+            blockExpectedMinimums = perBlockMinimums[blockIdx] || {};
+        } else {
+            // Global minimums
+            blockExpectedMinimums = expectedMinimum as { [groupKey: string]: number };
+        }
+
         // Check if each group meets minimum requirements
-        Object.entries(expectedMinimum).forEach(([groupKey, minCount]) => {
+        Object.entries(blockExpectedMinimums).forEach(([groupKey, minCount]) => {
             const actualCount = groupCounts.get(groupKey) || 0;
             if (actualCount < minCount) {
                 console.error(`Validation: ${blockType} ${blockIdx} has only ${actualCount} samples for group ${groupKey}, expected minimum ${minCount}`);
@@ -403,21 +417,18 @@ export function balancedBlockRandomization(
     // STEP 1: Group samples by covariate combinations
     const covariateGroups = groupByCovariates(searches, selectedCovariates);
 
-    // STEP 2: Calculate expected minimums for validation
-    const expectedMinimums: { [groupKey: string]: number } = {};
-    let effectivePlatesForMinimum: number;
+    // STEP 2: Calculate expected minimums per plate based on plate capacities
+    const expectedMinimumsPerPlate: { [plateIdx: number]: { [groupKey: string]: number } } = {};
 
-    if (keepEmptyInLastPlate) {
-        // Based on full plates only
-        const fullPlates = Math.floor(totalSamples / 96);
-        effectivePlatesForMinimum = fullPlates > 0 ? fullPlates : 1;
-    } else {
-        // Based on all plates
-        effectivePlatesForMinimum = actualPlatesNeeded;
-    }
-
-    covariateGroups.forEach((samples, groupKey) => {
-        expectedMinimums[groupKey] = Math.floor(samples.length / effectivePlatesForMinimum);
+    plateCapacities.forEach((capacity, plateIdx) => {
+        expectedMinimumsPerPlate[plateIdx] = {};
+        covariateGroups.forEach((samples, groupKey) => {
+            // Calculate expected minimum for this covariate group on this specific plate
+            // Based on the plate's capacity relative to a full plate (96)
+            const capacityRatio = capacity / 96;
+            const globalExpected = Math.floor(samples.length / actualPlatesNeeded);
+            expectedMinimumsPerPlate[plateIdx][groupKey] = Math.floor(globalExpected * capacityRatio);
+        });
     });
 
     // STEP 3: Distribute samples across plates
@@ -426,7 +437,7 @@ export function balancedBlockRandomization(
         : distributeToBlocks(covariateGroups, actualPlatesNeeded, 96);
 
     // STEP 4: Validate plate-level distribution
-    const plateDistributionValid = validateDistribution(plateAssignments, selectedCovariates, expectedMinimums, "plate");
+    const plateDistributionValid = validateDistribution(plateAssignments, selectedCovariates, expectedMinimumsPerPlate, "plate");
     if (!plateDistributionValid) {
         console.error("Plate-level distribution validation failed");
     }

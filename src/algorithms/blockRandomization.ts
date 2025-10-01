@@ -162,10 +162,6 @@ function distributeToBlocksWithCapacities(
     const overflowSamplesMap = new Map<string, SearchData[]>(); // Groups with Phase 1 overflow
 
     // PHASE 1: Place minimum required samples from ALL covariate groups
-    // Calculate minimum samples per full plate (only consider full capacity plates)
-    const fullPlatesCount = plateCapacities.filter(capacity => capacity === 96).length;
-    const effectivePlatesForMinimum = fullPlatesCount > 0 ? fullPlatesCount : numPlates;
-
     covariateGroups.forEach((samples, groupKey) => {
         const shuffledSamples = shuffleArray([...samples]);
         const totalGroupSamples = shuffledSamples.length;
@@ -175,25 +171,24 @@ function distributeToBlocksWithCapacities(
 
         console.log(`Phase 1: Minimum required samples for group ${groupKey} (${totalGroupSamples}/${numPlates}): ${baseSamplesPerPlate}`);
 
-        // Place minimum required samples in full plates only (capacity 96)
+        // Place samples proportionally in all plates based on capacity ratio
         if (baseSamplesPerPlate > 0) {
-            let fullPlatesProcessed = 0;
-            for (let plateIdx = 0; plateIdx < numPlates && fullPlatesProcessed < fullPlatesCount; plateIdx++) {
-                // Only place in full capacity plates during Phase 1
-                if (plateCapacities[plateIdx] < 96) continue;
+            for (let plateIdx = 0; plateIdx < numPlates; plateIdx++) {
+                // Calculate proportional samples based on plate capacity ratio
+                const capacityRatio = plateCapacities[plateIdx] / 96; // 96 is max capacity
+                const proportionalSamples = Math.floor(baseSamplesPerPlate * capacityRatio);
 
-                fullPlatesProcessed++;
-                console.log(`  Placing minimum required samples in plate index ${plateIdx}`);
+                console.log(`  Placing proportional samples in plate index ${plateIdx}: ${proportionalSamples} (capacity ratio: ${capacityRatio.toFixed(2)})`);
 
-                // Check if we have capacity for the minimum required samples
+                // Check if we have capacity for the proportional samples
                 const availableCapacity = plateCapacities[plateIdx] - blockCounts[plateIdx];
-                const samplesToPlace = Math.min(baseSamplesPerPlate, availableCapacity);
+                const samplesToPlace = Math.min(proportionalSamples, availableCapacity);
 
-                if (samplesToPlace < baseSamplesPerPlate) {
-                    console.error(`Phase 1 (Plates): Plate ${plateIdx} cannot accommodate minimum ${baseSamplesPerPlate} samples for group ${groupKey}. Only ${samplesToPlace} can be placed.`);
+                if (samplesToPlace < proportionalSamples) {
+                    console.error(`Phase 1 (Plates): Plate ${plateIdx} cannot accommodate proportional ${proportionalSamples} samples for group ${groupKey}. Only ${samplesToPlace} can be placed.`);
                 }
 
-                // Place the guaranteed minimum samples
+                // Place the proportional samples
                 for (let i = 0; i < samplesToPlace && sampleIndex < shuffledSamples.length; i++) {
                     blockAssignments.get(plateIdx)!.push(shuffledSamples[sampleIndex++]);
                     blockCounts[plateIdx]++;
@@ -214,21 +209,14 @@ function distributeToBlocksWithCapacities(
         }
     });
 
-    // PHASE 2: Distribute remaining samples across all plates (including partial plates)
-    // First process unplaced groups (priority), then overflow samples
+    // PHASE 2A: Process unplaced groups first (distribute across all plates for balance)
     const sortedUnplacedGroups = Array.from(unplacedGroupsMap.entries())
         .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
-    
-    const sortedOverflowGroups = Array.from(overflowSamplesMap.entries())
-        .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
-    
-    // Combine: unplaced groups first, then overflow groups
-    const allSortedGroups = [...sortedUnplacedGroups, ...sortedOverflowGroups];
 
-    allSortedGroups.forEach(([groupKey, remainingSamples]) => {
-        console.log(`Phase 2: Remaining samples for group ${groupKey}: ${remainingSamples.length}`);
+    sortedUnplacedGroups.forEach(([groupKey, remainingSamples]) => {
+        console.log(`Phase 2A: Unplaced group ${groupKey}: ${remainingSamples.length} samples`);
 
-        // Get plates with available capacity
+        // Get all plates with available capacity (no prioritization for full plates)
         const availablePlates = [];
         for (let plateIdx = 0; plateIdx < numPlates; plateIdx++) {
             const availableCapacity = plateCapacities[plateIdx] - blockCounts[plateIdx];
@@ -239,14 +227,14 @@ function distributeToBlocksWithCapacities(
         }
 
         if (availablePlates.length === 0) {
-            console.error(`Phase 2 (Plates): No available capacity for remaining samples from group ${groupKey}`);
+            console.error(`Phase 2A (Plates): No available capacity for unplaced group ${groupKey}`);
             return;
         }
 
-        // Shuffle available plates for random distribution
+        // Shuffle all available plates for random distribution
         const shuffledAvailablePlates = shuffleArray([...availablePlates]);
 
-        // Distribute remaining samples from this group across available plates
+        // Distribute samples across available plates
         let sampleIndex = 0;
         let plateIndex = 0;
 
@@ -254,7 +242,7 @@ function distributeToBlocksWithCapacities(
             const plateIdx = shuffledAvailablePlates[plateIndex % shuffledAvailablePlates.length];
 
             if (blockCounts[plateIdx] < plateCapacities[plateIdx]) {
-                console.log(`  Placing 1 remaining sample in plate index: ${plateIdx}`);
+                console.log(`  Placing 1 unplaced sample in plate index: ${plateIdx}`);
                 blockAssignments.get(plateIdx)!.push(remainingSamples[sampleIndex]);
                 blockCounts[plateIdx]++;
                 sampleIndex++;
@@ -270,7 +258,71 @@ function distributeToBlocksWithCapacities(
         }
 
         if (sampleIndex < remainingSamples.length) {
-            console.error(`Phase 2 (Plates): Failed to place ${remainingSamples.length - sampleIndex} remaining samples from group ${groupKey}`);
+            console.error(`Phase 2A (Plates): Failed to place ${remainingSamples.length - sampleIndex} unplaced samples from group ${groupKey}`);
+        }
+    });
+
+    // PHASE 2B: Process overflow groups (prioritize full plates)
+    const sortedOverflowGroups = Array.from(overflowSamplesMap.entries())
+        .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
+
+    sortedOverflowGroups.forEach(([groupKey, remainingSamples]) => {
+        console.log(`Phase 2B: Overflow group ${groupKey}: ${remainingSamples.length} samples`);
+
+        // Get plates with available capacity, prioritizing full plates
+        const fullPlatesAvailable = [];
+        const partialPlatesAvailable = [];
+
+        for (let plateIdx = 0; plateIdx < numPlates; plateIdx++) {
+            const availableCapacity = plateCapacities[plateIdx] - blockCounts[plateIdx];
+            if (availableCapacity > 0) {
+                console.log(`  Plate is available. Index: ${plateIdx}; Capacity: ${availableCapacity}`);
+                if (plateCapacities[plateIdx] === 96) {
+                    fullPlatesAvailable.push(plateIdx);
+                } else {
+                    partialPlatesAvailable.push(plateIdx);
+                }
+            }
+        }
+
+        // Combine plates with full plates first, then partial plates
+        const prioritizedPlates = [...fullPlatesAvailable, ...partialPlatesAvailable];
+
+        if (prioritizedPlates.length === 0) {
+            console.error(`Phase 2 (Plates): No available capacity for remaining samples from group ${groupKey}`);
+            return;
+        }
+
+        // Shuffle within each category but maintain priority order
+        const shuffledFullPlates = shuffleArray([...fullPlatesAvailable]);
+        const shuffledPartialPlates = shuffleArray([...partialPlatesAvailable]);
+        const shuffledAvailablePlates = [...shuffledFullPlates, ...shuffledPartialPlates];
+
+        // Distribute remaining samples from this group across available plates
+        let sampleIndex = 0;
+        let plateIndex = 0;
+
+        while (sampleIndex < remainingSamples.length && shuffledAvailablePlates.length > 0) {
+            const plateIdx = shuffledAvailablePlates[plateIndex % shuffledAvailablePlates.length];
+
+            if (blockCounts[plateIdx] < plateCapacities[plateIdx]) {
+                console.log(`  Placing 1 overflow sample in plate index: ${plateIdx}`);
+                blockAssignments.get(plateIdx)!.push(remainingSamples[sampleIndex]);
+                blockCounts[plateIdx]++;
+                sampleIndex++;
+            } else {
+                // Remove this plate from available plates if it's at capacity
+                shuffledAvailablePlates.splice(plateIndex % shuffledAvailablePlates.length, 1);
+                if (shuffledAvailablePlates.length === 0) break;
+                plateIndex = plateIndex % shuffledAvailablePlates.length;
+                continue;
+            }
+
+            plateIndex = (plateIndex + 1) % shuffledAvailablePlates.length;
+        }
+
+        if (sampleIndex < remainingSamples.length) {
+            console.error(`Phase 2B (Plates): Failed to place ${remainingSamples.length - sampleIndex} overflow samples from group ${groupKey}`);
         }
     });
 

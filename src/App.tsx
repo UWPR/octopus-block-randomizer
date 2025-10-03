@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [controlLabels, setControlLabels] = useState<string>('');
 
   // Algorithm selection
-  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('greedy');
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('balanced');
   const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
   
   // Processing states

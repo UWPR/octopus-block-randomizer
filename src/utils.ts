@@ -85,7 +85,7 @@ function groupByCovariates(searches: SearchData[], selectedCovariates: string[])
 export function randomizeSearches(
     searches: SearchData[],
     selectedCovariates: string[],
-    algorithm: RandomizationAlgorithm = 'greedy',
+    algorithm: RandomizationAlgorithm = 'balanced',
     keepEmptyInLastPlate: boolean = true
 ): (SearchData | undefined)[][][] {
     switch (algorithm) {

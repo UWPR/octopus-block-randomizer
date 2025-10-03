@@ -86,11 +86,13 @@ export function randomizeSearches(
     searches: SearchData[],
     selectedCovariates: string[],
     algorithm: RandomizationAlgorithm = 'balanced',
-    keepEmptyInLastPlate: boolean = true
+    keepEmptyInLastPlate: boolean = true,
+    numRows: number = 8,
+    numColumns: number = 12
 ): (SearchData | undefined)[][][] {
     switch (algorithm) {
         case 'balanced':
-            return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate);
+            return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
         case 'greedy':
         default:
             return greedyRandomization(searches, selectedCovariates);

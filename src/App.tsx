@@ -26,6 +26,10 @@ const App: React.FC = () => {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('balanced');
   const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
   
+  // Plate dimensions
+  const [plateRows, setPlateRows] = useState<number>(8);
+  const [plateColumns, setPlateColumns] = useState<number>(12);
+  
   // Processing states
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
   const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
@@ -251,7 +255,7 @@ const App: React.FC = () => {
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate randomized plates using selected algorithm
-      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate);
+      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
       setRandomizedPlates(plates);
       
       // Generate colors
@@ -277,7 +281,7 @@ const App: React.FC = () => {
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate new randomized plates with existing colors using selected algorithm
-      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate);
+      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
       setRandomizedPlates(plates);
     }
   };
@@ -396,16 +400,55 @@ const App: React.FC = () => {
                 
                 {/* Block Randomization Options */}
                 {selectedAlgorithm === 'balanced' && (
-                  <div style={styles.checkboxContainer}>
-                    <label style={styles.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={keepEmptyInLastPlate}
-                        onChange={handleKeepEmptyInLastPlateChange}
-                        style={styles.checkbox}
-                      />
-                      Keep empty spots in last plate
-                    </label>
+                  <div>
+                    <div style={styles.checkboxContainer}>
+                      <label style={styles.checkboxLabel}>
+                        <input
+                          type="checkbox"
+                          checked={keepEmptyInLastPlate}
+                          onChange={handleKeepEmptyInLastPlateChange}
+                          style={styles.checkbox}
+                        />
+                        Keep empty spots in last plate
+                      </label>
+                    </div>
+                    
+                    {/* Plate Dimensions */}
+                    <div style={styles.plateDimensionsContainer}>
+                      <div style={styles.dimensionGroup}>
+                        <label htmlFor="plateRows">Plate Rows:</label>
+                        <input
+                          id="plateRows"
+                          type="number"
+                          min="1"
+                          max="32"
+                          value={plateRows}
+                          onChange={(e) => {
+                            setPlateRows(Math.max(1, Math.min(32, parseInt(e.target.value) || 8)));
+                            resetCovariateState(); // Reset processing state when dimensions change
+                          }}
+                          style={styles.dimensionInput}
+                        />
+                      </div>
+                      <div style={styles.dimensionGroup}>
+                        <label htmlFor="plateColumns">Plate Columns:</label>
+                        <input
+                          id="plateColumns"
+                          type="number"
+                          min="1"
+                          max="48"
+                          value={plateColumns}
+                          onChange={(e) => {
+                            setPlateColumns(Math.max(1, Math.min(48, parseInt(e.target.value) || 12)));
+                            resetCovariateState(); // Reset processing state when dimensions change
+                          }}
+                          style={styles.dimensionInput}
+                        />
+                      </div>
+                      <small style={styles.dimensionNote}>
+                        Plate size: {plateRows} × {plateColumns} = {plateRows * plateColumns} wells
+                      </small>
+                    </div>
                   </div>
                 )}
               </div>
@@ -549,6 +592,7 @@ const App: React.FC = () => {
                     onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
                     compact={compactView}
                     highlightFunction={isSearchHighlighted}
+                    numColumns={plateColumns}
                   />
                 </div>
               ))}
@@ -684,6 +728,36 @@ const styles = {
   checkbox: {
     marginRight: '6px',
     cursor: 'pointer',
+  },
+  plateDimensionsContainer: {
+    marginTop: '10px',
+    padding: '10px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px',
+    border: '1px solid #e9ecef',
+  },
+  dimensionGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '8px',
+    fontSize: '12px',
+  },
+  dimensionInput: {
+    width: '60px',
+    padding: '4px 6px',
+    border: '1px solid #ccc',
+    borderRadius: '3px',
+    fontSize: '12px',
+    textAlign: 'center' as const,
+  },
+  dimensionNote: {
+    display: 'block',
+    textAlign: 'center' as const,
+    color: '#666',
+    fontSize: '11px',
+    fontStyle: 'italic',
+    marginTop: '5px',
   },
   processButton: {
     marginBottom: '30px',

@@ -13,18 +13,20 @@ interface PlateProps {
   onDrop: (event: DragEvent<HTMLDivElement>, rowIndex: number, columnIndex: number) => void;
   compact?: boolean;
   highlightFunction?: (search: SearchData) => boolean;
+  numColumns?: number;
 }
 
-const Plate: React.FC<PlateProps> = ({ 
-  plateIndex, 
-  rows, 
-  covariateColors, 
-  selectedCovariates, 
-  onDragStart, 
-  onDragOver, 
+const Plate: React.FC<PlateProps> = ({
+  plateIndex,
+  rows,
+  covariateColors,
+  selectedCovariates,
+  onDragStart,
+  onDragOver,
   onDrop,
   compact = true,
-  highlightFunction
+  highlightFunction,
+  numColumns = 12
 }) => {
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -36,7 +38,7 @@ const Plate: React.FC<PlateProps> = ({
     onDrop(event, rowIndex, columnIndex);
   };
 
-  const columns = Array.from({ length: 12 }, (_, index) => (index + 1).toString().padStart(2, '0'));
+  const columns = Array.from({ length: numColumns }, (_, index) => (index + 1).toString().padStart(2, '0'));
 
   // Get styles based on compact mode
   const getStyles = () => {
@@ -77,14 +79,13 @@ const Plate: React.FC<PlateProps> = ({
                   onDragOver={handleDragOver}
                   onDrop={(event) => handleDrop(event, rowIndex, columnIndex)}
                   title={
-                    compact && search 
-                      ? `${search.name} (${String.fromCharCode(65 + rowIndex)}${columnIndex + 1})${
-                          selectedCovariates.length > 0 
-                            ? '\n' + selectedCovariates
-                                .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
-                                .join(', ') 
-                            : ''
-                        }` 
+                    compact && search
+                      ? `${search.name} (${String.fromCharCode(65 + rowIndex)}${columnIndex + 1})${selectedCovariates.length > 0
+                        ? '\n' + selectedCovariates
+                          .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
+                          .join(', ')
+                        : ''
+                      }`
                       : undefined
                   }
                 >
@@ -215,8 +216,9 @@ const styles = {
     boxSizing: 'border-box' as const,
   },
   highlightedWell: {
-    border: '3px solid #2196f3',
-    boxShadow: '0 0 8px rgba(33, 150, 243, 0.5)',
+    border: '4px solid #2196f3',
+    boxShadow: '0 0 12px rgba(33, 150, 243, 0.5), inset 0 0 0 1px rgba(33, 150, 243, 0.3)',
+    transform: 'scale(1.02)',
   },
   highlightedIndicator: {
     border: '2px solid #2196f3',
@@ -302,8 +304,9 @@ const compactStyles = {
     boxSizing: 'border-box' as const,
   },
   highlightedWell: {
-    border: '3px solid #2196f3',
-	boxShadow: '0 0 8px rgba(33, 150, 243, 0.5)',
+    border: '4px solid #2196f3',
+    boxShadow: '0 0 12px rgba(33, 150, 243, 0.8), inset 0 0 0 1px rgba(33, 150, 243, 0.3)',
+    transform: 'scale(1.05)',
   },
   highlightedIndicator: {
     border: '2px solid #ffffff',

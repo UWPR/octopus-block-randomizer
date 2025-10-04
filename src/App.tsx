@@ -29,7 +29,10 @@ const App: React.FC = () => {
   // Plate dimensions
   const [plateRows, setPlateRows] = useState<number>(8);
   const [plateColumns, setPlateColumns] = useState<number>(12);
-  
+
+  // File state
+  const [selectedFileName, setSelectedFileName] = useState<string>('');
+
   // Processing states
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
   const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
@@ -77,6 +80,7 @@ const App: React.FC = () => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setSelectedFileName(file.name);
       Papa.parse(file, {
         header: true,
         complete: (results) => {
@@ -354,25 +358,35 @@ const App: React.FC = () => {
         <h1 style={styles.heading}>Octopus Block Randomization</h1>
         
         {/* File Upload */}
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleFileUpload}
-          style={styles.fileInput}
-        />
-        
-        {/* ID Column, Algorithm, and Covariate Selection */}
+        <div style={styles.fileUploadContainer}>
+          <input
+            id="file-upload"
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+            style={styles.hiddenFileInput}
+          />
+          <label htmlFor="file-upload" style={styles.fileButton}>
+            Choose File
+          </label>
+          {selectedFileName && (
+            <span style={styles.fileName}>{selectedFileName}</span>
+          )}
+        </div>
+
+        {/* Compact Form Layout */}
         {availableColumns.length > 0 && (
-          <div style={styles.selectionContainer}>
-            <div style={styles.selectionRow}>
-              {/* ID Column Selection */}
-              <div style={styles.selectionGroup}>
-                <label htmlFor="idColumn">Select ID Column:</label>
+          <div style={styles.compactFormContainer}>
+            {/* Top Row: ID Column and Covariates */}
+            <div style={styles.compactRow}>
+              {/* Left Column: ID Column Selection and Algorithm */}
+              <div style={styles.compactColumn}>
+                <label htmlFor="idColumn" style={styles.compactLabel}>Select ID Column:</label>
                 <select
                   id="idColumn"
                   value={selectedIdColumn}
                   onChange={handleIdColumnChange}
-                  style={styles.select}
+                  style={styles.compactSelect}
                 >
                   {availableColumns.map((column) => (
                     <option key={column} value={column}>
@@ -380,16 +394,24 @@ const App: React.FC = () => {
                     </option>
                   ))}
                 </select>
-              </div>
-              
-              {/* Algorithm Selection */}
-              <div style={styles.selectionGroup}>
-                <label htmlFor="algorithm">Randomization Algorithm:</label>
+
+                <label htmlFor="controlLabels" style={{ ...styles.compactLabel, marginTop: '10px' }}>Control/Reference Sample Labels (optional):</label>
+                <input
+                  id="controlLabels"
+                  type="text"
+                  value={controlLabels}
+                  onChange={handleControlLabelsChange}
+                  placeholder="e.g., Inter-Experiment Reference, Control, QC"
+                  style={styles.compactTextInput}
+                />
+                <small style={styles.compactHint}>Enter labels separated by commas. Samples containing these labels will get priority colors.</small>
+
+                <label htmlFor="algorithm" style={{ ...styles.compactLabel, marginTop: '10px' }}>Randomization Algorithm:</label>
                 <select
                   id="algorithm"
                   value={selectedAlgorithm}
                   onChange={handleAlgorithmChange}
-                  style={styles.select}
+                  style={styles.compactSelect}
                 >
                   <option value="greedy">Greedy Randomization</option>
                   <option value="balanced">Balanced Block Randomization</option>
@@ -397,12 +419,48 @@ const App: React.FC = () => {
                 <small style={styles.algorithmDescription}>
                   {ALGORITHM_DESCRIPTIONS[selectedAlgorithm]}
                 </small>
-                
-                {/* Block Randomization Options */}
-                {selectedAlgorithm === 'balanced' && (
-                  <div>
-                    <div style={styles.checkboxContainer}>
-                      <label style={styles.checkboxLabel}>
+              </div>
+
+              {/* Right Column: Covariate Selection */}
+              {searches.length > 0 && (
+                <div style={styles.compactColumn}>
+                  <label htmlFor="covariates" style={styles.compactLabel}>Select Covariates:</label>
+                  <select
+                    id="covariates"
+                    multiple
+                    value={selectedCovariates}
+                    onChange={handleCovariateChange}
+                    style={styles.compactMultiSelect}
+                  >
+                    {Object.keys(searches[0].metadata).map((covariate) => (
+                      <option key={covariate} value={covariate}>
+                        {covariate}
+                      </option>
+                    ))}
+                  </select>
+                  <small style={styles.compactHint}>Hold Ctrl/Cmd to select multiple options</small>
+                  {selectedCovariates.length > 0 && (
+                    <div style={styles.selectedCovariatesDisplay}>
+                      <small style={styles.selectedCovariatesList}>
+                        <span style={styles.selectedCovariatesLabel}>Selected: </span>
+                        {selectedCovariates.join(', ')}
+                      </small>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+
+
+            {/* Third Row: Balanced Algorithm Options */}
+            {selectedAlgorithm === 'balanced' && (
+              <div style={styles.compactRow}>
+                <div style={styles.fullWidthColumn}>
+                  <div style={styles.balancedOptionsContainer}>
+                    {/* Checkbox and Plate Dimensions in one row */}
+                    <div style={styles.optionsRow}>
+                      <label style={styles.compactCheckboxLabel}>
                         <input
                           type="checkbox"
                           checked={keepEmptyInLastPlate}
@@ -411,12 +469,9 @@ const App: React.FC = () => {
                         />
                         Keep empty spots in last plate
                       </label>
-                    </div>
-                    
-                    {/* Plate Dimensions */}
-                    <div style={styles.plateDimensionsContainer}>
-                      <div style={styles.dimensionGroup}>
-                        <label htmlFor="plateRows">Plate Rows:</label>
+
+                      <div style={styles.plateDimensionsInline}>
+                        <span style={styles.dimensionLabel}>Plate Rows:</span>
                         <input
                           id="plateRows"
                           type="number"
@@ -425,13 +480,12 @@ const App: React.FC = () => {
                           value={plateRows}
                           onChange={(e) => {
                             setPlateRows(Math.max(1, Math.min(32, parseInt(e.target.value) || 8)));
-                            resetCovariateState(); // Reset processing state when dimensions change
+                            resetCovariateState();
                           }}
-                          style={styles.dimensionInput}
+                          style={styles.compactDimensionInput}
                         />
-                      </div>
-                      <div style={styles.dimensionGroup}>
-                        <label htmlFor="plateColumns">Plate Columns:</label>
+
+                        <span style={styles.dimensionLabel}>Plate Columns:</span>
                         <input
                           id="plateColumns"
                           type="number"
@@ -440,165 +494,130 @@ const App: React.FC = () => {
                           value={plateColumns}
                           onChange={(e) => {
                             setPlateColumns(Math.max(1, Math.min(48, parseInt(e.target.value) || 12)));
-                            resetCovariateState(); // Reset processing state when dimensions change
+                            resetCovariateState();
                           }}
-                          style={styles.dimensionInput}
+                          style={styles.compactDimensionInput}
                         />
+
+                        <small style={styles.compactDimensionNote}>
+                          Plate size: {plateRows} × {plateColumns} = {plateRows * plateColumns} wells
+                        </small>
                       </div>
-                      <small style={styles.dimensionNote}>
-                        Plate size: {plateRows} × {plateColumns} = {plateRows * plateColumns} wells
-                      </small>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Covariate Selection */}
-            {searches.length > 0 && (
-              <div style={styles.covariateSection}>
-                <div style={styles.selectionGroup}>
-                  <label htmlFor="covariates">Select Covariates:</label>
-                  <select
-                    id="covariates"
-                    multiple
-                    value={selectedCovariates}
-                    onChange={handleCovariateChange}
-                    style={styles.multiSelect}
-                  >
-                    {Object.keys(searches[0].metadata).map((covariate) => (
-                      <option key={covariate} value={covariate}>
-                        {covariate}
-                      </option>
-                    ))}
-                  </select>
-                  <small style={styles.hint}>Hold Ctrl/Cmd to select multiple options</small>
-                </div>
-              </div>
-            )}
-
-            {/* Control Labels Input */}
-            {selectedCovariates.length > 0 && (
-              <div style={styles.controlLabelsSection}>
-                <div style={styles.selectionGroup}>
-                  <label htmlFor="controlLabels">Control/Reference Sample Labels (optional):</label>
-                  <input
-                    id="controlLabels"
-                    type="text"
-                    value={controlLabels}
-                    onChange={handleControlLabelsChange}
-                    placeholder="e.g., Inter-Experiment Reference, Control, QC"
-                    style={styles.textInput}
-                  />
-                  <small style={styles.hint}>
-                    Enter labels separated by commas. Samples containing these labels will get priority colors.
-                  </small>
                 </div>
               </div>
             )}
           </div>
         )}
-        
-        {/* Process Button */}
-        {canProcess && !isProcessed && (
-          <button onClick={handleProcessRandomization} style={styles.processButton}>
-            Generate Randomized Plates
-          </button>
-        )}
 
+        <>
+          {/* Process Button */}
+          {searches.length > 0 && !isProcessed && (
+            <button
+              onClick={handleProcessRandomization}
+              disabled={!canProcess}
+              style={{
+                ...styles.processButton,
+                ...(canProcess ? {} : styles.processButtonDisabled)
+              }}
+            >
+              Generate Randomized Plates
+            </button>
+          )}
 
+          {/* Plates Visualization */}
+          {isProcessed && randomizedPlates.length > 0 && (
+            <>
+              <div style={styles.viewControls}>
+                {summaryData.length > 0 && (
+                  <button
+                    onClick={() => setShowSummary(!showSummary)}
+                    style={styles.summaryToggle}
+                  >
+                    {showSummary ? '▼ Hide' : '▶ Show'} Covariate Summary ({summaryData.length} combinations)
+                  </button>
+                )}
 
-        {/* Plates Visualization */}
-        {isProcessed && randomizedPlates.length > 0 && (
-          <>
-            <div style={styles.viewControls}>
-              {summaryData.length > 0 && (
                 <button
-                  onClick={() => setShowSummary(!showSummary)}
-                  style={styles.summaryToggle}
+                  onClick={() => setCompactView(!compactView)}
+                  style={styles.controlButton}
                 >
-                  {showSummary ? '▼ Hide' : '▶ Show'} Covariate Summary ({summaryData.length} combinations)
+                  {compactView ? 'Full Size View' : 'Compact View'}
                 </button>
-              )}
 
-              <button
-                onClick={() => setCompactView(!compactView)}
-                style={styles.controlButton}
-              >
-                {compactView ? 'Full Size View' : 'Compact View'}
-              </button>
-              
-              <button onClick={handleReRandomize} style={styles.controlButton}>
-                Re-randomize
-              </button>
-              
-              <button onClick={handleDownloadCSV} style={styles.downloadButton}>
-                Download CSV
-              </button>
-            </div>
+                <button onClick={handleReRandomize} style={styles.controlButton}>
+                  Re-randomize
+                </button>
 
-            {/* Summary Panel */}
-            {summaryData.length > 0 && showSummary && (
-              <div style={styles.summaryContainer}>
-                <div style={styles.summaryPanel}>
-                  <div style={styles.summaryGrid}>
-                    {summaryData.map((item, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          ...styles.summaryItem,
-                          ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
-                          cursor: 'pointer'
-                        }}
-                        onClick={() => handleSummaryItemClick(item.combination)}
-                      >
-                        <div style={styles.summaryHeader}>
-                          <div
-                            style={{
-                              ...styles.colorIndicator,
-                              backgroundColor: item.useOutline ? 'transparent' : item.color,
-                              ...(item.useStripes && { background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)` }),
-                              border: item.useOutline ? `3px solid ${item.color}` : styles.colorIndicator.border
-                            }}
-                          />
-                          <span style={styles.summaryCount}>
-                            {item.count}
-                          </span>
+                <button onClick={handleDownloadCSV} style={styles.downloadButton}>
+                  Download CSV
+                </button>
+              </div>
+
+              {/* Summary Panel */}
+              {summaryData.length > 0 && showSummary && (
+                <div style={styles.summaryContainer}>
+                  <div style={styles.summaryPanel}>
+                    <div style={styles.summaryGrid}>
+                      {summaryData.map((item, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            ...styles.summaryItem,
+                            ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => handleSummaryItemClick(item.combination)}
+                        >
+                          <div style={styles.summaryHeader}>
+                            <div
+                              style={{
+                                ...styles.colorIndicator,
+                                backgroundColor: item.useOutline ? 'transparent' : item.color,
+                                ...(item.useStripes && { background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)` }),
+                                border: item.useOutline ? `3px solid ${item.color}` : styles.colorIndicator.border
+                              }}
+                            />
+                            <span style={styles.summaryCount}>
+                              {item.count}
+                            </span>
+                          </div>
+                          <div style={styles.summaryDetails}>
+                            {Object.entries(item.values).map(([covariate, value]) => (
+                              <div key={covariate} style={styles.covariateDetail}>
+                                <strong>{covariate}:</strong> {value}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div style={styles.summaryDetails}>
-                          {Object.entries(item.values).map(([covariate, value]) => (
-                            <div key={covariate} style={styles.covariateDetail}>
-                              <strong>{covariate}:</strong> {value}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div style={compactView ? styles.compactPlatesContainer : styles.platesContainer}>
-              {randomizedPlates.map((plate, plateIndex) => (
-                <div key={plateIndex} style={compactView ? styles.compactPlateWrapper : styles.plateWrapper}>
-                  <Plate
-                    plateIndex={plateIndex}
-                    rows={plate}
-                    covariateColors={covariateColors}
-                    selectedCovariates={selectedCovariates}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
-                    compact={compactView}
-                    highlightFunction={isSearchHighlighted}
-                    numColumns={plateColumns}
-                  />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+              <div style={compactView ? styles.compactPlatesContainer : styles.platesContainer}>
+                {randomizedPlates.map((plate, plateIndex) => (
+                  <div key={plateIndex} style={compactView ? styles.compactPlateWrapper : styles.plateWrapper}>
+                    <Plate
+                      plateIndex={plateIndex}
+                      rows={plate}
+                      covariateColors={covariateColors}
+                      selectedCovariates={selectedCovariates}
+                      onDragStart={handleDragStart}
+                      onDragOver={handleDragOver}
+                      onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
+                      compact={compactView}
+                      highlightFunction={isSearchHighlighted}
+                      numColumns={plateColumns}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
       </div>
     </div>
   );
@@ -613,6 +632,18 @@ const styles = {
     backgroundColor: '#f5f5f5',
     padding: '20px',
     boxSizing: 'border-box' as const,
+  },
+  fileUploadContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    marginBottom: '25px',
+  },
+  fileName: {
+    fontSize: '14px',
+    color: '#333',
+    fontWeight: 'normal',
+    wordBreak: 'break-all' as const,
   },
   content: {
     width: '100%',
@@ -633,13 +664,22 @@ const styles = {
     color: '#333',
     textAlign: 'center' as const,
   },
-  fileInput: {
-    marginBottom: '25px',
-    padding: '10px',
-    border: '2px dashed #ccc',
+  hiddenFileInput: {
+    display: 'none',
+  },
+  fileButton: {
+    display: 'inline-block',
+    padding: '8px 16px',
+    backgroundColor: '#2196f3',
+    color: '#fff',
+    border: 'none',
     borderRadius: '6px',
-    backgroundColor: '#fafafa',
     cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    textAlign: 'center' as const,
+    textDecoration: 'none',
+    transition: 'background-color 0.3s ease',
   },
   selectionContainer: {
     width: '100%',
@@ -709,9 +749,9 @@ const styles = {
     color: '#666',
     fontSize: '11px',
     fontStyle: 'italic',
-    textAlign: 'center' as const,
+    textAlign: 'left' as const,
     lineHeight: '1.3',
-    marginTop: '5px',
+    marginTop: '2px',
   },
   checkboxContainer: {
     marginTop: '10px',
@@ -770,6 +810,11 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 'bold',
     transition: 'background-color 0.3s ease',
+  },
+  processButtonDisabled: {
+    backgroundColor: '#ccc',
+    color: '#666',
+    cursor: 'not-allowed',
   },
   summaryContainer: {
     width: '90%',
@@ -889,6 +934,127 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 'bold',
     transition: 'background-color 0.3s ease',
+  },
+  // Compact form styles
+  compactFormContainer: {
+    width: '100%',
+    maxWidth: '900px',
+    marginBottom: '20px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '15px',
+  },
+  compactRow: {
+    display: 'flex',
+    gap: '20px',
+    alignItems: 'flex-start',
+  },
+  compactColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  fullWidthColumn: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  compactLabel: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  compactSelect: {
+    padding: '8px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+  },
+  compactMultiSelect: {
+    padding: '8px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    minHeight: '150px',
+    maxHeight: '150px',
+  },
+  compactTextInput: {
+    padding: '8px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+  },
+  compactHint: {
+    fontSize: '11px',
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  balancedOptionsContainer: {
+    marginTop: '0px',
+    padding: '5px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px',
+    border: '1px solid #e9ecef',
+  },
+  optionsRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '20px',
+    flexWrap: 'wrap' as const,
+  },
+  compactCheckboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: '12px',
+    color: '#333',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  plateDimensionsInline: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap' as const,
+  },
+  dimensionLabel: {
+    fontSize: '12px',
+    color: '#333',
+    whiteSpace: 'nowrap' as const,
+  },
+  compactDimensionInput: {
+    width: '50px',
+    padding: '4px 6px',
+    border: '1px solid #ccc',
+    borderRadius: '3px',
+    fontSize: '12px',
+    textAlign: 'center' as const,
+  },
+  compactDimensionNote: {
+    fontSize: '11px',
+    color: '#666',
+    fontStyle: 'italic',
+    whiteSpace: 'nowrap' as const,
+  },
+  selectedCovariatesDisplay: {
+    marginTop: '0px',
+    padding: '0px',
+  },
+  selectedCovariatesLabel: {
+    fontWeight: 'bold',
+    color: '#616161ff',
+  },
+  selectedCovariatesList: {
+    fontSize: '11px',
+    color: '#333',
+    lineHeight: '1.4',
+  },
+  selectedCovariateItem: {
+    fontWeight: '500',
   },
 };
 

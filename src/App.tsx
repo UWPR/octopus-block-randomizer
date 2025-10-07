@@ -25,7 +25,7 @@ const App: React.FC = () => {
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('balanced');
   const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
-  
+
   // Plate dimensions
   const [plateRows, setPlateRows] = useState<number>(8);
   const [plateColumns, setPlateColumns] = useState<number>(12);
@@ -39,7 +39,7 @@ const App: React.FC = () => {
   const [plateAssignments, setPlateAssignments] = useState<Map<number, SearchData[]> | undefined>(undefined);
   const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});
   const [summaryData, setSummaryData] = useState<SummaryItem[]>([]);
-  
+
   // UI states
   const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState<boolean>(false);
@@ -47,7 +47,7 @@ const App: React.FC = () => {
   const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
   const [showPlateDetails, setShowPlateDetails] = useState<boolean>(false);
   const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
-  
+
   // Modal drag states
   const [modalPosition, setModalPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDraggingModal, setIsDraggingModal] = useState<boolean>(false);
@@ -97,7 +97,7 @@ const App: React.FC = () => {
           const headers = results.meta.fields || [];
           setAvailableColumns(headers);
           setParsedData(results.data);
-          
+
           // Auto-select reference column
           let defaultColumn = headers[0];
           if (headers.includes('search name')) {
@@ -120,7 +120,7 @@ const App: React.FC = () => {
   const handleIdColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newIdColumn = event.target.value;
     setSelectedIdColumn(newIdColumn);
-    
+
     if (parsedData.length > 0) {
       const processedSearches = processSearchData(parsedData, newIdColumn);
       setSearches(processedSearches);
@@ -276,11 +276,11 @@ const App: React.FC = () => {
       // Generate colors
       const colors = generateCovariateColors();
       setCovariateColors(colors);
-      
+
       // Generate summary data
       const summary = generateSummaryData(colors);
       setSummaryData(summary);
-      
+
       setIsProcessed(true);
     }
   };
@@ -337,7 +337,7 @@ const App: React.FC = () => {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top
       });
-      
+
       // If this is the first drag, set initial position to current position
       if (modalPosition.x === 0 && modalPosition.y === 0) {
         setModalPosition({
@@ -352,11 +352,11 @@ const App: React.FC = () => {
     if (isDraggingModal) {
       const newX = event.clientX - dragOffset.x;
       const newY = event.clientY - dragOffset.y;
-      
+
       // Constrain to viewport bounds
       const maxX = window.innerWidth - 600; // Assuming max modal width
       const maxY = window.innerHeight - 400; // Assuming max modal height
-      
+
       setModalPosition({
         x: Math.max(0, Math.min(newX, maxX)),
         y: Math.max(0, Math.min(newY, maxY))
@@ -383,9 +383,9 @@ const App: React.FC = () => {
   // Check if a search matches the selected combination
   const isSearchHighlighted = (search: SearchData): boolean => {
     if (!selectedCombination) return false;
-    
+
     const searchCombination = getCovariateKey(search, selectedCovariates);
-    
+
     return searchCombination === selectedCombination;
   };
 
@@ -437,7 +437,7 @@ const App: React.FC = () => {
     <div style={styles.container}>
       <div style={styles.content}>
         <h1 style={styles.heading}>Octopus Block Randomization</h1>
-        
+
         {/* File Upload */}
         <div style={styles.fileUploadContainer}>
           <input
@@ -692,8 +692,6 @@ const App: React.FC = () => {
                       compact={compactView}
                       highlightFunction={isSearchHighlighted}
                       numColumns={plateColumns}
-                      plateCapacity={plateRows * plateColumns}
-                      summaryData={summaryData}
                       onShowDetails={selectedAlgorithm === 'balanced' ? handleShowPlateDetails : undefined}
                     />
                   </div>
@@ -705,15 +703,15 @@ const App: React.FC = () => {
 
         {/* Plate Details Modal */}
         {showPlateDetails && selectedPlateIndex !== null && (
-          <div 
-            style={styles.modalOverlay} 
+          <div
+            style={styles.modalOverlay}
             onClick={(e) => {
               if (!isDraggingModal && e.target === e.currentTarget) {
                 handleClosePlateDetails();
               }
             }}
           >
-            <div 
+            <div
               data-modal-content
               style={{
                 ...styles.modalContent,
@@ -724,10 +722,10 @@ const App: React.FC = () => {
                   transform: 'none'
                 } : {}),
                 cursor: isDraggingModal ? 'grabbing' : 'default'
-              }} 
+              }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div 
+              <div
                 style={{
                   ...styles.modalHeader,
                   cursor: 'grab'
@@ -735,8 +733,8 @@ const App: React.FC = () => {
                 onMouseDown={handleModalMouseDown}
               >
                 <h3 style={styles.modalTitle}>Plate {selectedPlateIndex + 1} Details</h3>
-                <button 
-                  onClick={handleClosePlateDetails} 
+                <button
+                  onClick={handleClosePlateDetails}
                   style={styles.modalCloseButton}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -754,7 +752,7 @@ const App: React.FC = () => {
                     {(() => {
                       const plateSamples = plateAssignments.get(selectedPlateIndex)!;
                       const covariateDistribution = new Map<string, number>();
-                      
+
                       // Calculate distribution for this plate
                       plateSamples.forEach(sample => {
                         const key = getCovariateKey(sample, selectedCovariates);
@@ -782,7 +780,7 @@ const App: React.FC = () => {
                               const count = covariateDistribution.get(combination) || 0;
                               const colorInfo = covariateColors[combination] || { color: '#cccccc', useOutline: false, useStripes: false };
                               const percentage = globalCount > 0 ? ((count / globalCount) * 100).toFixed(1) : '0.0';
-                              
+
                               return (
                                 <div key={combination} style={{
                                   ...styles.distributionItem,
@@ -793,8 +791,8 @@ const App: React.FC = () => {
                                     style={{
                                       ...styles.distributionColorIndicator,
                                       backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
-                                      ...(colorInfo.useStripes && { 
-                                        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)` 
+                                      ...(colorInfo.useStripes && {
+                                        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)`
                                       }),
                                       border: colorInfo.useOutline ? `2px solid ${colorInfo.color}` : '1px solid rgba(0,0,0,0.2)',
                                       ...(count === 0 ? { opacity: 0.4 } : {})

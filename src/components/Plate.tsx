@@ -14,15 +14,6 @@ interface PlateProps {
   compact?: boolean;
   highlightFunction?: (search: SearchData) => boolean;
   numColumns?: number;
-  plateCapacity?: number;
-  summaryData?: Array<{
-    combination: string;
-    values: { [key: string]: string };
-    count: number;
-    color: string;
-    useOutline: boolean;
-    useStripes: boolean;
-  }>;
   onShowDetails?: (plateIndex: number) => void;
 }
 
@@ -37,8 +28,6 @@ const Plate: React.FC<PlateProps> = ({
   compact = true,
   highlightFunction,
   numColumns = 12,
-  plateCapacity,
-  summaryData,
   onShowDetails
 }) => {
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -53,15 +42,7 @@ const Plate: React.FC<PlateProps> = ({
 
   const columns = Array.from({ length: numColumns }, (_, index) => (index + 1).toString().padStart(2, '0'));
 
-  // Get styles based on compact mode
-  const getStyles = () => {
-    if (compact) {
-      return compactStyles;
-    }
-    return styles;
-  };
-
-  const currentStyles = getStyles();
+  const currentStyles = compact ? compactStyles : styles;
 
   return (
     <div style={currentStyles.plate}>
@@ -92,7 +73,7 @@ const Plate: React.FC<PlateProps> = ({
             {columns.map((_, columnIndex) => {
               const search = row[columnIndex];
               const isHighlighted = search && highlightFunction?.(search);
-              
+
               return (
                 <div
                   key={columnIndex}
@@ -125,13 +106,13 @@ const Plate: React.FC<PlateProps> = ({
                           border: colorInfo.useOutline ? `5px solid ${colorInfo.color}` : currentStyles.compactSearchIndicator.border,
                           boxSizing: 'border-box'
                         };
-                        
+
                         const highlightStyle: React.CSSProperties = isHighlighted ? {
                           outline: '2px solid #2196f3',
                           outlineOffset: '1px',
                           boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)'
                         } : {};
-                        
+
                         return (
                           <div
                             style={{
@@ -165,26 +146,19 @@ const Plate: React.FC<PlateProps> = ({
   );
 };
 
-const cellWidth = 150;
-const rowLabelWidth = 30;
-const compactCellWidth = 18;
-const compactRowLabelWidth = 15;
+const DIMENSIONS = {
+  full: { cellWidth: 150, rowLabelWidth: 30 },
+  compact: { cellWidth: 18, rowLabelWidth: 15 }
+};
 
-const styles = {
-  plate: {
-    border: '1px solid #ccc',
-    borderRadius: '8px',
-    padding: '20px',
-    backgroundColor: '#f5f5f5',
-  },
+// Base styles shared between full and compact modes
+const baseStyles = {
   plateHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '10px',
   },
   plateHeading: {
-    fontSize: '20px',
     fontWeight: 'bold',
     margin: 0,
   },
@@ -192,70 +166,35 @@ const styles = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '2px',
-    borderRadius: '4px',
     transition: 'background-color 0.2s ease',
   },
   detailsIcon: {
-    width: '18px',
-    height: '18px',
     borderRadius: '50%',
     backgroundColor: '#999',
     color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '12px',
     fontWeight: 'bold',
     fontStyle: 'italic',
   },
   grid: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '10px',
   },
   columnLabels: {
     display: 'flex',
-    gap: '10px',
   },
   columnLabel: {
     fontWeight: 'bold',
     textAlign: 'center' as const,
-    width: `${cellWidth}px`,
-    padding: '5px',
   },
   row: {
     display: 'flex',
-    gap: '10px',
   },
   rowLabel: {
     fontWeight: 'bold',
     textAlign: 'center' as const,
-    width: `${rowLabelWidth}px`,
-    padding: '5px',
-  },
-  searchWell: {
-    width: `${cellWidth}px`,
-    minHeight: '40px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '5px',
-    transition: 'all 0.2s ease',
-  },
-  emptyWell: {
-    width: `${cellWidth}px`,
-    minHeight: '40px',
-    backgroundColor: '#fff',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    padding: '5px',
-  },
-  emptyCell: {
-    width: `${rowLabelWidth}px`,
-    padding: '5px',
   },
   compactSearchIndicator: {
     width: '100%',
@@ -266,18 +205,90 @@ const styles = {
     transition: 'all 0.2s ease',
     boxSizing: 'border-box' as const,
   },
+};
+
+const styles = {
+  ...baseStyles,
+  plate: {
+    border: '1px solid #ccc',
+    borderRadius: '8px',
+    padding: '20px',
+    backgroundColor: '#f5f5f5',
+  },
+  plateHeader: {
+    ...baseStyles.plateHeader,
+    marginBottom: '10px',
+  },
+  plateHeading: {
+    ...baseStyles.plateHeading,
+    fontSize: '20px',
+  },
+  detailsButton: {
+    ...baseStyles.detailsButton,
+    padding: '2px',
+    borderRadius: '4px',
+  },
+  detailsIcon: {
+    ...baseStyles.detailsIcon,
+    width: '18px',
+    height: '18px',
+    fontSize: '12px',
+  },
+  grid: {
+    ...baseStyles.grid,
+    gap: '10px',
+  },
+  columnLabels: {
+    ...baseStyles.columnLabels,
+    gap: '10px',
+  },
+  columnLabel: {
+    ...baseStyles.columnLabel,
+    width: `${DIMENSIONS.full.cellWidth}px`,
+    padding: '5px',
+  },
+  row: {
+    ...baseStyles.row,
+    gap: '10px',
+  },
+  rowLabel: {
+    ...baseStyles.rowLabel,
+    width: `${DIMENSIONS.full.rowLabelWidth}px`,
+    padding: '5px',
+  },
+  searchWell: {
+    width: `${DIMENSIONS.full.cellWidth}px`,
+    minHeight: '40px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '5px',
+    transition: 'all 0.2s ease',
+  },
+  emptyWell: {
+    width: `${DIMENSIONS.full.cellWidth}px`,
+    minHeight: '40px',
+    backgroundColor: '#fff',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    padding: '5px',
+  },
+  emptyCell: {
+    width: `${DIMENSIONS.full.rowLabelWidth}px`,
+    padding: '5px',
+  },
+  compactSearchIndicator: baseStyles.compactSearchIndicator,
   highlightedWell: {
     border: '4px solid #2196f3',
     boxShadow: '0 0 12px rgba(33, 150, 243, 0.5), inset 0 0 0 1px rgba(33, 150, 243, 0.3)',
     transform: 'scale(1.02)',
   },
-  highlightedIndicator: {
-    border: '2px solid #2196f3',
-    boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)',
-  },
 };
 
 const compactStyles = {
+  ...baseStyles,
   plate: {
     border: '1px solid #ccc',
     borderRadius: '4px',
@@ -286,52 +297,37 @@ const compactStyles = {
     fontSize: '10px',
   },
   plateHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    ...baseStyles.plateHeader,
     marginBottom: '4px',
   },
   plateHeading: {
+    ...baseStyles.plateHeading,
     fontSize: '12px',
-    fontWeight: 'bold',
-    margin: 0,
     textAlign: 'center' as const,
     flex: 1,
   },
   detailsButton: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
+    ...baseStyles.detailsButton,
     padding: '1px',
     borderRadius: '2px',
-    transition: 'background-color 0.2s ease',
   },
   detailsIcon: {
+    ...baseStyles.detailsIcon,
     width: '14px',
     height: '14px',
-    borderRadius: '50%',
-    backgroundColor: '#999',
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     fontSize: '10px',
-    fontWeight: 'bold',
-    fontStyle: 'italic',
   },
   grid: {
-    display: 'flex',
-    flexDirection: 'column' as const,
+    ...baseStyles.grid,
     gap: '2px',
   },
   columnLabels: {
-    display: 'flex',
+    ...baseStyles.columnLabels,
     gap: '2px',
   },
   columnLabel: {
-    fontWeight: 'bold',
-    textAlign: 'center' as const,
-    width: `${compactCellWidth + 2}px`, // Add 2px to account for cell borders (1px each side)
+    ...baseStyles.columnLabel,
+    width: `${DIMENSIONS.compact.cellWidth + 2}px`, // Add 2px for borders
     padding: '1px',
     fontSize: '8px',
     display: 'flex',
@@ -339,18 +335,17 @@ const compactStyles = {
     justifyContent: 'center',
   },
   row: {
-    display: 'flex',
+    ...baseStyles.row,
     gap: '2px',
   },
   rowLabel: {
-    fontWeight: 'bold',
-    textAlign: 'center' as const,
-    width: `${compactRowLabelWidth}px`,
+    ...baseStyles.rowLabel,
+    width: `${DIMENSIONS.compact.rowLabelWidth}px`,
     padding: '1px',
     fontSize: '8px',
   },
   searchWell: {
-    width: `${compactCellWidth}px`,
+    width: `${DIMENSIONS.compact.cellWidth}px`,
     height: '16px',
     border: '1px solid #ddd',
     borderRadius: '2px',
@@ -362,7 +357,7 @@ const compactStyles = {
     transition: 'all 0.2s ease',
   },
   emptyWell: {
-    width: `${compactCellWidth}px`,
+    width: `${DIMENSIONS.compact.cellWidth}px`,
     height: '16px',
     backgroundColor: '#fff',
     border: '1px solid #ddd',
@@ -370,26 +365,14 @@ const compactStyles = {
     padding: '1px',
   },
   emptyCell: {
-    width: `${compactRowLabelWidth}px`,
+    width: `${DIMENSIONS.compact.rowLabelWidth}px`,
     padding: '1px',
   },
-  compactSearchIndicator: {
-    width: '100%',
-    height: '100%',
-    borderRadius: '2px',
-    cursor: 'move',
-    border: '1px solid rgba(0,0,0,0.2)',
-    transition: 'all 0.2s ease',
-    boxSizing: 'border-box' as const,
-  },
+  compactSearchIndicator: baseStyles.compactSearchIndicator,
   highlightedWell: {
     border: '4px solid #2196f3',
     boxShadow: '0 0 12px rgba(33, 150, 243, 0.8), inset 0 0 0 1px rgba(33, 150, 243, 0.3)',
     transform: 'scale(1.05)',
-  },
-  highlightedIndicator: {
-    border: '2px solid #ffffff',
-    boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)',
   },
 };
 

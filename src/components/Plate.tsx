@@ -14,6 +14,16 @@ interface PlateProps {
   compact?: boolean;
   highlightFunction?: (search: SearchData) => boolean;
   numColumns?: number;
+  plateCapacity?: number;
+  summaryData?: Array<{
+    combination: string;
+    values: { [key: string]: string };
+    count: number;
+    color: string;
+    useOutline: boolean;
+    useStripes: boolean;
+  }>;
+  onShowDetails?: (plateIndex: number) => void;
 }
 
 const Plate: React.FC<PlateProps> = ({
@@ -26,7 +36,10 @@ const Plate: React.FC<PlateProps> = ({
   onDrop,
   compact = true,
   highlightFunction,
-  numColumns = 12
+  numColumns = 12,
+  plateCapacity,
+  summaryData,
+  onShowDetails
 }) => {
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -52,7 +65,18 @@ const Plate: React.FC<PlateProps> = ({
 
   return (
     <div style={currentStyles.plate}>
-      <h2 style={currentStyles.plateHeading}>Plate {plateIndex + 1}</h2>
+      <div style={currentStyles.plateHeader}>
+        <h2 style={currentStyles.plateHeading}>Plate {plateIndex + 1}</h2>
+        {onShowDetails && (
+          <button
+            onClick={() => onShowDetails(plateIndex)}
+            style={currentStyles.detailsButton}
+            title="Show plate details"
+          >
+            <div style={currentStyles.detailsIcon}>i</div>
+          </button>
+        )}
+      </div>
       <div style={currentStyles.grid}>
         <div style={currentStyles.columnLabels}>
           <div style={currentStyles.emptyCell} />
@@ -153,10 +177,37 @@ const styles = {
     padding: '20px',
     backgroundColor: '#f5f5f5',
   },
+  plateHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px',
+  },
   plateHeading: {
     fontSize: '20px',
     fontWeight: 'bold',
-    marginBottom: '10px',
+    margin: 0,
+  },
+  detailsButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '2px',
+    borderRadius: '4px',
+    transition: 'background-color 0.2s ease',
+  },
+  detailsIcon: {
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    backgroundColor: '#999',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    fontStyle: 'italic',
   },
   grid: {
     display: 'flex',
@@ -234,11 +285,39 @@ const compactStyles = {
     backgroundColor: '#f5f5f5',
     fontSize: '10px',
   },
+  plateHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '4px',
+  },
   plateHeading: {
     fontSize: '12px',
     fontWeight: 'bold',
-    marginBottom: '4px',
+    margin: 0,
     textAlign: 'center' as const,
+    flex: 1,
+  },
+  detailsButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '1px',
+    borderRadius: '2px',
+    transition: 'background-color 0.2s ease',
+  },
+  detailsIcon: {
+    width: '14px',
+    height: '14px',
+    borderRadius: '50%',
+    backgroundColor: '#999',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    fontStyle: 'italic',
   },
   grid: {
     display: 'flex',

@@ -36,6 +36,7 @@ const App: React.FC = () => {
   // Processing states
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
   const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
+  const [plateAssignments, setPlateAssignments] = useState<Map<number, SearchData[]> | undefined>(undefined);
   const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});
   const [summaryData, setSummaryData] = useState<SummaryItem[]>([]);
   
@@ -44,6 +45,13 @@ const App: React.FC = () => {
   const [showSummary, setShowSummary] = useState<boolean>(false);
   const [compactView, setCompactView] = useState<boolean>(true);
   const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
+  const [showPlateDetails, setShowPlateDetails] = useState<boolean>(false);
+  const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
+  
+  // Modal drag states
+  const [modalPosition, setModalPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDraggingModal, setIsDraggingModal] = useState<boolean>(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Helper functions
   const processSearchData = (data: any[], idColumn: string): SearchData[] => {
@@ -61,6 +69,7 @@ const App: React.FC = () => {
     setIsProcessed(false);
     setSelectedCovariates([]);
     setRandomizedPlates([]);
+    setPlateAssignments(undefined);
     setCovariateColors({});
     setSummaryData([]);
     setShowSummary(false);
@@ -70,6 +79,7 @@ const App: React.FC = () => {
   const resetCovariateState = () => {
     setIsProcessed(false);
     setRandomizedPlates([]);
+    setPlateAssignments(undefined);
     setCovariateColors({});
     setSummaryData([]);
     setShowSummary(false);
@@ -259,9 +269,10 @@ const App: React.FC = () => {
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate randomized plates using selected algorithm
-      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
-      setRandomizedPlates(plates);
-      
+      const result = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
+      setRandomizedPlates(result.plates);
+      setPlateAssignments(result.plateAssignments);
+
       // Generate colors
       const colors = generateCovariateColors();
       setCovariateColors(colors);
@@ -285,8 +296,9 @@ const App: React.FC = () => {
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
       // Generate new randomized plates with existing colors using selected algorithm
-      const plates = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
-      setRandomizedPlates(plates);
+      const result = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
+      setRandomizedPlates(result.plates);
+      setPlateAssignments(result.plateAssignments);
     }
   };
 
@@ -298,6 +310,75 @@ const App: React.FC = () => {
       setSelectedCombination(combination);
     }
   };
+
+  // Handle showing plate details
+  const handleShowPlateDetails = (plateIndex: number) => {
+    setSelectedPlateIndex(plateIndex);
+    setShowPlateDetails(true);
+  };
+
+  const handleClosePlateDetails = () => {
+    if (!isDraggingModal) {
+      setShowPlateDetails(false);
+      setSelectedPlateIndex(null);
+      setModalPosition({ x: 0, y: 0 }); // Reset position when closing
+    }
+  };
+
+  // Modal drag handlers
+  const handleModalMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const modalElement = event.currentTarget.closest('[data-modal-content]') as HTMLElement;
+    if (modalElement) {
+      const rect = modalElement.getBoundingClientRect();
+      setIsDraggingModal(true);
+      setDragOffset({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      });
+      
+      // If this is the first drag, set initial position to current position
+      if (modalPosition.x === 0 && modalPosition.y === 0) {
+        setModalPosition({
+          x: rect.left,
+          y: rect.top
+        });
+      }
+    }
+  };
+
+  const handleModalMouseMove = useCallback((event: MouseEvent) => {
+    if (isDraggingModal) {
+      const newX = event.clientX - dragOffset.x;
+      const newY = event.clientY - dragOffset.y;
+      
+      // Constrain to viewport bounds
+      const maxX = window.innerWidth - 600; // Assuming max modal width
+      const maxY = window.innerHeight - 400; // Assuming max modal height
+      
+      setModalPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY))
+      });
+    }
+  }, [isDraggingModal, dragOffset]);
+
+  const handleModalMouseUp = useCallback(() => {
+    setIsDraggingModal(false);
+  }, []);
+
+  // Add global mouse event listeners for modal dragging
+  React.useEffect(() => {
+    if (isDraggingModal) {
+      document.addEventListener('mousemove', handleModalMouseMove);
+      document.addEventListener('mouseup', handleModalMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleModalMouseMove);
+        document.removeEventListener('mouseup', handleModalMouseUp);
+      };
+    }
+  }, [isDraggingModal, handleModalMouseMove, handleModalMouseUp]);
 
   // Check if a search matches the selected combination
   const isSearchHighlighted = (search: SearchData): boolean => {
@@ -611,6 +692,9 @@ const App: React.FC = () => {
                       compact={compactView}
                       highlightFunction={isSearchHighlighted}
                       numColumns={plateColumns}
+                      plateCapacity={plateRows * plateColumns}
+                      summaryData={summaryData}
+                      onShowDetails={selectedAlgorithm === 'balanced' ? handleShowPlateDetails : undefined}
                     />
                   </div>
                 ))}
@@ -618,6 +702,149 @@ const App: React.FC = () => {
             </>
           )}
         </>
+
+        {/* Plate Details Modal */}
+        {showPlateDetails && selectedPlateIndex !== null && (
+          <div 
+            style={styles.modalOverlay} 
+            onClick={(e) => {
+              if (!isDraggingModal && e.target === e.currentTarget) {
+                handleClosePlateDetails();
+              }
+            }}
+          >
+            <div 
+              data-modal-content
+              style={{
+                ...styles.modalContent,
+                ...(modalPosition.x !== 0 || modalPosition.y !== 0 ? {
+                  position: 'absolute' as const,
+                  left: `${modalPosition.x}px`,
+                  top: `${modalPosition.y}px`,
+                  transform: 'none'
+                } : {}),
+                cursor: isDraggingModal ? 'grabbing' : 'default'
+              }} 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div 
+                style={{
+                  ...styles.modalHeader,
+                  cursor: 'grab'
+                }}
+                onMouseDown={handleModalMouseDown}
+              >
+                <h3 style={styles.modalTitle}>Plate {selectedPlateIndex + 1} Details</h3>
+                <button 
+                  onClick={handleClosePlateDetails} 
+                  style={styles.modalCloseButton}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  ×
+                </button>
+              </div>
+              <div style={styles.modalBody}>
+                {plateAssignments && plateAssignments.has(selectedPlateIndex) && (
+                  <>
+                    <div style={styles.modalSummary}>
+                      <span><strong>Capacity:</strong> {plateRows * plateColumns}</span>
+                      <span><strong>Samples:</strong> {plateAssignments.get(selectedPlateIndex)!.length}</span>
+                    </div>
+                    {(() => {
+                      const plateSamples = plateAssignments.get(selectedPlateIndex)!;
+                      const covariateDistribution = new Map<string, number>();
+                      
+                      // Calculate distribution for this plate
+                      plateSamples.forEach(sample => {
+                        const key = getCovariateKey(sample, selectedCovariates);
+                        covariateDistribution.set(key, (covariateDistribution.get(key) || 0) + 1);
+                      });
+
+                      // Calculate global distribution for percentage calculation
+                      const globalDistribution = new Map<string, number>();
+                      searches.forEach(sample => {
+                        const key = getCovariateKey(sample, selectedCovariates);
+                        globalDistribution.set(key, (globalDistribution.get(key) || 0) + 1);
+                      });
+
+                      return (
+                        <div style={styles.covariateDistribution}>
+                          {Array.from(globalDistribution.entries())
+                            .sort((a, b) => {
+                              // Sort by count on plate (descending), then by global count (descending)
+                              const countA = covariateDistribution.get(a[0]) || 0;
+                              const countB = covariateDistribution.get(b[0]) || 0;
+                              if (countB !== countA) return countB - countA;
+                              return b[1] - a[1];
+                            })
+                            .map(([combination, globalCount]) => {
+                              const count = covariateDistribution.get(combination) || 0;
+                              const colorInfo = covariateColors[combination] || { color: '#cccccc', useOutline: false, useStripes: false };
+                              const percentage = globalCount > 0 ? ((count / globalCount) * 100).toFixed(1) : '0.0';
+                              
+                              return (
+                                <div key={combination} style={{
+                                  ...styles.distributionItem,
+                                  ...(count === 0 ? styles.distributionItemEmpty : {}),
+                                  ...(selectedCombination === combination ? styles.distributionItemSelected : {})
+                                }}>
+                                  <div
+                                    style={{
+                                      ...styles.distributionColorIndicator,
+                                      backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
+                                      ...(colorInfo.useStripes && { 
+                                        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)` 
+                                      }),
+                                      border: colorInfo.useOutline ? `2px solid ${colorInfo.color}` : '1px solid rgba(0,0,0,0.2)',
+                                      ...(count === 0 ? { opacity: 0.4 } : {})
+                                    }}
+                                  />
+                                  <div style={styles.distributionText}>
+                                    <div style={{
+                                      ...styles.distributionCombination,
+                                      ...(count === 0 ? { color: '#999' } : {})
+                                    }}>
+                                      {selectedCovariates.map((cov, idx) => {
+                                        const values = combination.split('|');
+                                        return (
+                                          <span key={cov}>
+                                            <strong>{cov}:</strong> {values[idx] || 'N/A'}
+                                            {idx < selectedCovariates.length - 1 && ' • '}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                    <div style={styles.distributionStats}>
+                                      <span style={{
+                                        ...styles.distributionCount,
+                                        ...(count === 0 ? { color: '#999' } : {})
+                                      }}>
+                                        {count}/{globalCount}
+                                      </span>
+                                      <span style={{
+                                        ...styles.distributionPercentage,
+                                        ...(count === 0 ? { color: '#999' } : {})
+                                      }}>
+                                        ({percentage}%)
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+                {(!plateAssignments || !plateAssignments.has(selectedPlateIndex)) && (
+                  <div style={styles.noDataMessage}>No covariate distribution data available for this plate.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1055,6 +1282,137 @@ const styles = {
   },
   selectedCovariateItem: {
     fontWeight: '500',
+  },
+  modalOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    maxWidth: '600px',
+    maxHeight: '80vh',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 16px',
+    borderBottom: '1px solid #e0e0e0',
+    backgroundColor: '#f8f9fa',
+    flexShrink: 0,
+    userSelect: 'none' as const,
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#333',
+  },
+  modalCloseButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '18px',
+    cursor: 'pointer',
+    color: '#666',
+    padding: '2px',
+    width: '24px',
+    height: '24px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: '3px',
+    transition: 'background-color 0.2s ease',
+  },
+  modalBody: {
+    padding: '16px 20px',
+    fontSize: '13px',
+    lineHeight: '1.4',
+    overflow: 'auto',
+    flex: 1,
+  },
+  modalSummary: {
+    display: 'flex',
+    gap: '20px',
+    marginBottom: '16px',
+    padding: '8px 12px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px',
+    fontSize: '12px',
+  },
+  covariateDistribution: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  distributionItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 8px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '3px',
+    border: '1px solid #e9ecef',
+  },
+  distributionItemEmpty: {
+    backgroundColor: '#f5f5f5',
+    border: '1px solid #ddd',
+  },
+  distributionItemSelected: {
+    backgroundColor: '#e3f2fd',
+    border: '2px solid #2196f3',
+    boxShadow: '0 0 4px rgba(33, 150, 243, 0.3)',
+  },
+  distributionColorIndicator: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '2px',
+    flexShrink: 0,
+  },
+  distributionText: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  distributionCombination: {
+    fontSize: '12px',
+    color: '#333',
+    flex: 1,
+  },
+  distributionStats: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    flexShrink: 0,
+  },
+  distributionCount: {
+    fontSize: '12px',
+    color: '#333',
+    fontWeight: '600',
+  },
+  distributionPercentage: {
+    fontSize: '11px',
+    color: '#666',
+  },
+  noDataMessage: {
+    textAlign: 'center' as const,
+    color: '#666',
+    fontStyle: 'italic',
+    padding: '20px',
   },
 };
 

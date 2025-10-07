@@ -89,13 +89,19 @@ export function randomizeSearches(
     keepEmptyInLastPlate: boolean = true,
     numRows: number = 8,
     numColumns: number = 12
-): (SearchData | undefined)[][][] {
+): {
+    plates: (SearchData | undefined)[][][];
+    plateAssignments?: Map<number, SearchData[]>;
+} {
     switch (algorithm) {
         case 'balanced':
             return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
         case 'greedy':
         default:
-            return greedyRandomization(searches, selectedCovariates);
+            const greedyPlates = greedyRandomization(searches, selectedCovariates);
+            return {
+                plates: greedyPlates
+            };
     }
 }
 

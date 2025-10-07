@@ -412,7 +412,10 @@ export function balancedBlockRandomization(
     keepEmptyInLastPlate: boolean = true,
     numRows: number = 8,
     numColumns: number = 12
-): (SearchData | undefined)[][][] {
+): {
+    plates: (SearchData | undefined)[][][];
+    plateAssignments?: Map<number, SearchData[]>;
+} {
     const totalSamples = searches.length;
     const plateSize = numRows * numColumns;
 
@@ -430,9 +433,11 @@ export function balancedBlockRandomization(
     // STEP 1.5: Validate that we have enough capacity for all samples
     if (!validateCapacity(totalSamples, plateCapacities)) {
         // Return empty plates if validation fails
-        return Array.from({ length: actualPlatesNeeded }, () =>
-            Array.from({ length: numRows }, () => new Array(numColumns).fill(undefined))
-        );
+        return {
+            plates: Array.from({ length: actualPlatesNeeded }, () =>
+                Array.from({ length: numRows }, () => new Array(numColumns).fill(undefined))
+            )
+        };
     }
 
     // STEP 2: Calculate expected minimums per plate based on plate capacities
@@ -516,5 +521,8 @@ export function balancedBlockRandomization(
         });
     });
 
-    return plates;
+    return {
+        plates,
+        plateAssignments
+    };
 }

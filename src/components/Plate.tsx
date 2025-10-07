@@ -47,7 +47,7 @@ const Plate: React.FC<PlateProps> = ({
   return (
     <div style={currentStyles.plate}>
       <div style={currentStyles.plateHeader}>
-        <h2 style={currentStyles.plateHeading}>Plate {plateIndex + 1}</h2>
+        <div style={currentStyles.plateHeading}>Plate {plateIndex + 1}</div>
         {onShowDetails && (
           <button
             onClick={() => onShowDetails(plateIndex)}
@@ -147,7 +147,7 @@ const Plate: React.FC<PlateProps> = ({
 };
 
 const DIMENSIONS = {
-  full: { cellWidth: 150, rowLabelWidth: 30 },
+  full: { cellWidth: 100, rowLabelWidth: 25 },
   compact: { cellWidth: 18, rowLabelWidth: 15 }
 };
 
@@ -214,6 +214,8 @@ const styles = {
     borderRadius: '8px',
     padding: '20px',
     backgroundColor: '#f5f5f5',
+    overflowX: 'auto' as const,
+    maxWidth: '100%',
   },
   plateHeader: {
     ...baseStyles.plateHeader,
@@ -258,7 +260,7 @@ const styles = {
   },
   searchWell: {
     width: `${DIMENSIONS.full.cellWidth}px`,
-    minHeight: '40px',
+    minHeight: '60px',
     border: '1px solid #ccc',
     borderRadius: '4px',
     display: 'flex',
@@ -269,7 +271,7 @@ const styles = {
   },
   emptyWell: {
     width: `${DIMENSIONS.full.cellWidth}px`,
-    minHeight: '40px',
+    minHeight: '60px',
     backgroundColor: '#fff',
     border: '1px solid #ccc',
     borderRadius: '4px',

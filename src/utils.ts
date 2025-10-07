@@ -11,15 +11,15 @@ export const BRIGHT_COLOR_PALETTE = [
     '#FF8000', // Pure Orange
     '#FFFF00', // Pure Yellow
     '#FF00FF', // Magenta
-    
-    // Subgroup 2 
+
+    // Subgroup 2
     '#87CEEB', // Sky Blue
     '#800080', // Purple
     '#FF1493', // Deep Pink
     '#006400', // Dark Forest Green
     '#4169E1', // Royal Blue
     '#20B2AA', // Light Sea Green
-    
+
 
     // Subgroup 3
     '#F08080', // Light Coral
@@ -28,7 +28,7 @@ export const BRIGHT_COLOR_PALETTE = [
     '#9370DB', // Medium Purple
     '#98FB98', // Pale Green
     '#C0C0C0', // Silver
-    
+
 
     // Subgroup 4
     '#FF4500', // Orange Red
@@ -67,9 +67,9 @@ export function getCovariateKey(search: SearchData, selectedCovariates: string[]
         .join('|');
 }
 
-function groupByCovariates(searches: SearchData[], selectedCovariates: string[]): Map<string, SearchData[]> {
+export function groupByCovariates(searches: SearchData[], selectedCovariates: string[]): Map<string, SearchData[]> {
     const groups = new Map<string, SearchData[]>();
-    
+
     searches.forEach(search => {
         const key = getCovariateKey(search, selectedCovariates);
         if (!groups.has(key)) {
@@ -201,7 +201,7 @@ function assignWithFullLatinSquare(
     plateIdx: number
 ): void {
     const numGroups = groupKeys.length;
-    
+
     // Create Latin square pattern
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 12; col++) {
@@ -210,7 +210,7 @@ function assignWithFullLatinSquare(
                 const groupIndex = (row + col * plateIdx) % numGroups;
                 const groupKey = groupKeys[groupIndex];
                 const groupSamples = covariateGroups.get(groupKey) || [];
-                
+
                 if (groupSamples.length > 0) {
                     const sampleIndex = Math.floor(Math.random() * groupSamples.length);
                     plate[row][col] = groupSamples.splice(sampleIndex, 1)[0];
@@ -218,7 +218,7 @@ function assignWithFullLatinSquare(
             }
         }
     }
-    
+
     // Fill remaining positions with available samples
     fillRemainingPositions(plate, covariateGroups);
 }
@@ -230,22 +230,22 @@ function assignWithRowLatinSquare(
     plateIdx: number
 ): void {
     const numGroups = groupKeys.length;
-    
+
     // Ensure each group appears once per row
     for (let row = 0; row < 8; row++) {
         const shuffledGroups = shuffleArray([...groupKeys]);
-        
+
         for (let i = 0; i < Math.min(12, numGroups); i++) {
             const groupKey = shuffledGroups[i];
             const groupSamples = covariateGroups.get(groupKey) || [];
-            
+
             if (groupSamples.length > 0) {
                 const sampleIndex = Math.floor(Math.random() * groupSamples.length);
                 plate[row][i] = groupSamples.splice(sampleIndex, 1)[0];
             }
         }
     }
-    
+
     fillRemainingPositions(plate, covariateGroups);
 }
 
@@ -257,10 +257,10 @@ function assignWithSystematicDistribution(
 ): void {
     const allSamples: SearchData[] = [];
     covariateGroups.forEach(samples => allSamples.push(...samples));
-    
+
     const shuffledSamples = shuffleArray(allSamples);
     let sampleIndex = 0;
-    
+
     // Systematic distribution across positions
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 12; col++) {
@@ -278,10 +278,10 @@ function fillRemainingPositions(
     // Collect all remaining samples
     const remainingSamples: SearchData[] = [];
     covariateGroups.forEach(samples => remainingSamples.push(...samples));
-    
+
     const shuffledRemaining = shuffleArray(remainingSamples);
     let sampleIndex = 0;
-    
+
     // Fill empty positions
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 12; col++) {
@@ -306,13 +306,13 @@ function generatePermutations(array: SearchData[]): (SearchData | undefined)[][]
     }
     return perms;
 }
-  
+
 function calculateDissimilarityScore(row: (SearchData | undefined)[], orderedRows: (SearchData | undefined)[][], selectedCovariates: string[]): number {
     let score = 0;
     for (let i = 0; i < row.length; i++) {
       orderedRows.forEach((orderedRow: (SearchData | undefined)[]) => {
         if (i < orderedRow.length && row[i] && orderedRow[i]) {
-          const dissimilarity = selectedCovariates.some(covariate => 
+          const dissimilarity = selectedCovariates.some(covariate =>
             row[i]!.metadata[covariate] !== orderedRow[i]!.metadata[covariate]);
           if (dissimilarity) score++;
         }
@@ -324,15 +324,15 @@ function calculateDissimilarityScore(row: (SearchData | undefined)[], orderedRow
 function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedCovariates: string[]): void {
     plates.forEach((plate: (SearchData | undefined)[][]) => {
       let orderedRows: (SearchData | undefined)[][] = [];
-  
+
       const startIndex = Math.floor(Math.random() * plate.length);
       orderedRows.push(...plate.splice(startIndex, 1));
-  
+
       while (plate.length > 0) {
         let bestScore = -Infinity;
         let bestRow: (SearchData | undefined)[] | null = null;
         let bestRowIndex = -1;
-  
+
         plate.forEach((row: (SearchData | undefined)[], rowIndex: number) => {
           const permutations = generatePermutations(row.filter(item => item !== undefined) as SearchData[]);
           permutations.forEach(permutation => {
@@ -344,13 +344,13 @@ function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedC
             }
           });
         });
-  
+
         if (bestRow !== null) {
           orderedRows.push(bestRow);
           plate.splice(bestRowIndex, 1);
         }
       }
-  
+
       plate.push(...orderedRows.map(row => [...row, ...Array(12 - row.length).fill(undefined)]));
     });
 }
@@ -367,7 +367,7 @@ export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchDat
       })),
       { header: true }
     );
-  
+
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);

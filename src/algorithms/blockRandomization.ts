@@ -1,5 +1,5 @@
 import { SearchData } from '../types';
-import { shuffleArray, getCovariateKey } from '../utils';
+import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils';
 
 enum OverflowPrioritization {
     BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -7,19 +7,7 @@ enum OverflowPrioritization {
     NONE = 'none'                     // No prioritization - all available blocks considered equally
 }
 
-function groupByCovariates(searches: SearchData[], selectedCovariates: string[]): Map<string, SearchData[]> {
-    const groups = new Map<string, SearchData[]>();
 
-    searches.forEach(search => {
-        const key = getCovariateKey(search, selectedCovariates);
-        if (!groups.has(key)) {
-            groups.set(key, []);
-        }
-        groups.get(key)!.push(search);
-    });
-
-    return groups;
-}
 
 function distributeToBlocks(
     covariateGroups: Map<string, SearchData[]>,
@@ -55,6 +43,7 @@ function distributeToBlocks(
     return blockAssignments;
 }
 
+
 // Helper function to initialize block assignments
 function initializeBlockAssignments(numPlates: number): [Map<number, SearchData[]>, number[]] {
     const blockAssignments = new Map<number, SearchData[]>();
@@ -77,7 +66,7 @@ function getAvailableBlocks(
     for (let blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
         const availableCapacity = blockCapacities[blockIdx] - blockCounts[blockIdx];
         if (availableCapacity > 0) {
-            console.log(`  Block is available. Index: ${blockIdx}; Capacity: ${availableCapacity}`);
+            // console.log(`  Block is available. Index: ${blockIdx}; Capacity: ${availableCapacity}`);
             availableBlocks.push(blockIdx);
         }
     }
@@ -292,14 +281,7 @@ function processOverflowGroups(
     sortedOverflowGroups.forEach(([groupKey, remainingSamples]) => {
         console.log(`Phase 2B (${blockType}): Overflow group ${groupKey}: ${remainingSamples.length} samples`);
 
-        // Get all available blocks
-        const availableBlocks = [];
-        for (let blockIdx = 0; blockIdx < numPlates; blockIdx++) {
-            const availableCapacity = plateCapacities[blockIdx] - blockCounts[blockIdx];
-            if (availableCapacity > 0) {
-                availableBlocks.push(blockIdx);
-            }
-        }
+        const availableBlocks = getAvailableBlocks(numPlates, plateCapacities, blockCounts);
 
         if (availableBlocks.length === 0) {
             console.error(`Phase 2B (${blockType}): No available capacity for overflow group ${groupKey}`);
@@ -360,12 +342,12 @@ function processOverflowGroups(
 
 
 
-// Additional validation function to verify distribution
-function validateDistribution(
+// Validation function for per-block distribution (plates or rows)
+function validatePerBlockDistribution(
     blockAssignments: Map<number, SearchData[]>,
     selectedCovariates: string[],
-    expectedMinimum: { [groupKey: string]: number } | { [blockIdx: number]: { [groupKey: string]: number } },
-    blockType: string = "block"
+    expectedMinimumsPerBlock: { [blockIdx: number]: { [groupKey: string]: number } },
+    blockTypeName: string
 ): boolean {
     let isValid = true;
 
@@ -378,25 +360,13 @@ function validateDistribution(
             groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
         });
 
-        // Determine expected minimums for this block
-        let blockExpectedMinimums: { [groupKey: string]: number };
-
-        // Check if expectedMinimum is per-block (has numeric keys) or global (has string keys)
-        const firstKey = Object.keys(expectedMinimum)[0];
-        if (firstKey && !isNaN(Number(firstKey))) {
-            // Per-block minimums
-            const perBlockMinimums = expectedMinimum as { [blockIdx: number]: { [groupKey: string]: number } };
-            blockExpectedMinimums = perBlockMinimums[blockIdx] || {};
-        } else {
-            // Global minimums
-            blockExpectedMinimums = expectedMinimum as { [groupKey: string]: number };
-        }
+        const blockExpectedMinimums = expectedMinimumsPerBlock[blockIdx] || {};
 
         // Check if each group meets minimum requirements
         Object.entries(blockExpectedMinimums).forEach(([groupKey, minCount]) => {
             const actualCount = groupCounts.get(groupKey) || 0;
             if (actualCount < minCount) {
-                console.error(`Validation: ${blockType} ${blockIdx} has only ${actualCount} samples for group ${groupKey}, expected minimum ${minCount}`);
+                console.error(`Validation: ${blockTypeName} ${blockIdx} has only ${actualCount} samples for group ${groupKey}, expected minimum ${minCount}`);
                 isValid = false;
             }
         });
@@ -404,6 +374,8 @@ function validateDistribution(
 
     return isValid;
 }
+
+
 
 // Balanced block randomization with validation
 export function balancedBlockRandomization(
@@ -458,7 +430,7 @@ export function balancedBlockRandomization(
     const plateAssignments = distributeToBlocks(covariateGroups, plateCapacities, plateSize, selectedCovariates, "Plates", expectedMinimumsPerPlate);
 
     // STEP 4: Validate plate-level distribution
-    const plateDistributionValid = validateDistribution(plateAssignments, selectedCovariates, expectedMinimumsPerPlate, "plate");
+    const plateDistributionValid = validatePerBlockDistribution(plateAssignments, selectedCovariates, expectedMinimumsPerPlate, "plate");
     if (!plateDistributionValid) {
         console.error("Plate-level distribution validation failed");
     }
@@ -478,16 +450,10 @@ export function balancedBlockRandomization(
         for (let rowIdx = 0; rowIdx < actualRowsToUse; rowIdx++) {
             expectedRowMinimums[rowIdx] = {};
             plateGroups.forEach((samples, groupKey) => {
-                const globalExpected = Math.floor(samples.length / actualRowsToUse);
-                expectedRowMinimums[rowIdx][groupKey] = globalExpected;
+                const expectedPerRow = Math.floor(samples.length / actualRowsToUse);
+                expectedRowMinimums[rowIdx][groupKey] = expectedPerRow;
             });
         }
-
-        // Also create the old format for validation
-        const rowMinimums: { [groupKey: string]: number } = {};
-        plateGroups.forEach((samples, groupKey) => {
-            rowMinimums[groupKey] = Math.floor(samples.length / numRows);
-        });
 
         // Calculate row capacities for even distribution
         const totalPlateSamplesForCapacity = plateSamples.length;
@@ -502,7 +468,7 @@ export function balancedBlockRandomization(
         const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, "Rows", expectedRowMinimums);
 
         // Validate row-level distribution
-        const rowDistributionValid = validateDistribution(rowAssignments, selectedCovariates, rowMinimums, `plate ${plateIdx + 1} row`);
+        const rowDistributionValid = validatePerBlockDistribution(rowAssignments, selectedCovariates, expectedRowMinimums, "row");
         if (!rowDistributionValid) {
             console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
         }

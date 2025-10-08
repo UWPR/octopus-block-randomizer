@@ -15,10 +15,53 @@
  *
  */
 
-import React, { DragEvent } from 'react';
-import Search from './Search';
+import React, { DragEvent, useMemo, useCallback } from 'react';
 import { SearchData } from '../types';
 import { getCovariateKey, CovariateColorInfo } from '../utils';
+
+// Constants
+const DIMENSIONS = {
+  full: { cellWidth: 100, rowLabelWidth: 25 },
+  compact: { cellWidth: 18, rowLabelWidth: 15 }
+};
+
+const STRIPE_PATTERNS = {
+  compact: { size: '2px', gap: '4px' },
+  full: { size: '3px', gap: '6px' }
+};
+
+const HIGHLIGHT_STYLE: React.CSSProperties = {
+  outline: '2px solid #2196f3',
+  outlineOffset: '1px',
+  boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)'
+};
+
+const DEFAULT_COLOR_INFO: CovariateColorInfo = {
+  color: '#cccccc',
+  useOutline: false,
+  useStripes: false
+};
+
+// Utility functions
+const generateColumnLabels = (numColumns: number): string[] =>
+  Array.from({ length: numColumns }, (_, index) => (index + 1).toString().padStart(2, '0'));
+
+const getRowLabel = (rowIndex: number): string => String.fromCharCode(65 + rowIndex);
+
+const createTooltipText = (
+  search: SearchData,
+  rowIndex: number,
+  columnIndex: number,
+  selectedCovariates: string[]
+): string => {
+  const position = `${getRowLabel(rowIndex)}${columnIndex + 1}`;
+  const covariateInfo = selectedCovariates.length > 0
+    ? '\n' + selectedCovariates
+      .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
+      .join(', ')
+    : '';
+  return `${search.name} (${position})${covariateInfo}`;
+};
 
 interface PlateProps {
   plateIndex: number;
@@ -47,19 +90,89 @@ const Plate: React.FC<PlateProps> = ({
   numColumns = 12,
   onShowDetails
 }) => {
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+  // Memoized values to avoid recalculation
+  const columns = useMemo(() => generateColumnLabels(numColumns), [numColumns]);
+  const currentStyles = useMemo(() => compact ? compactStyles : styles, [compact]);
+
+  // Memoized drag handlers
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     onDragOver(event);
-  };
+  }, [onDragOver]);
 
-  const handleDrop = (event: DragEvent<HTMLDivElement>, rowIndex: number, columnIndex: number) => {
+  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>, rowIndex: number, columnIndex: number) => {
     event.preventDefault();
     onDrop(event, rowIndex, columnIndex);
-  };
+  }, [onDrop]);
 
-  const columns = Array.from({ length: numColumns }, (_, index) => (index + 1).toString().padStart(2, '0'));
+  // Memoized style generators
+  const createSearchCellStyle = useCallback((colorInfo: CovariateColorInfo, isHighlighted: boolean) => {
+    const pattern = compact ? STRIPE_PATTERNS.compact : STRIPE_PATTERNS.full;
 
-  const currentStyles = compact ? compactStyles : styles;
+    const baseStyle: React.CSSProperties = {
+      backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
+      ...(colorInfo.useStripes && {
+        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} ${pattern.size}, transparent ${pattern.size}, transparent ${pattern.gap})`
+      }),
+      border: colorInfo.useOutline
+        ? `3px solid ${colorInfo.color}`
+        : (compact ? currentStyles.compactSearchIndicator.border : '1px solid #ccc'),
+      boxSizing: 'border-box' as const
+    };
+
+    return {
+      ...baseStyle,
+      ...(isHighlighted ? HIGHLIGHT_STYLE : {})
+    };
+  }, [compact, currentStyles.compactSearchIndicator.border]);
+
+  // Optimized cell renderers
+  const renderCompactCell = useCallback((search: SearchData, isHighlighted: boolean) => {
+    const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || DEFAULT_COLOR_INFO;
+    const cellStyle = createSearchCellStyle(colorInfo, isHighlighted);
+
+    return (
+      <div
+        style={{
+          ...currentStyles.compactSearchIndicator,
+          ...cellStyle
+        }}
+        draggable={true}
+        onDragStart={(event) => onDragStart(event, search.name)}
+      />
+    );
+  }, [covariateColors, selectedCovariates, currentStyles.compactSearchIndicator, createSearchCellStyle, onDragStart]);
+
+  const renderFullCell = useCallback((search: SearchData, isHighlighted: boolean) => {
+    const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || DEFAULT_COLOR_INFO;
+    const cellStyle = createSearchCellStyle(colorInfo, isHighlighted);
+
+    return (
+      <div
+        style={{
+          ...currentStyles.fullSearchCard,
+          ...cellStyle
+        }}
+        draggable={true}
+        onDragStart={(event) => onDragStart(event, search.name)}
+      >
+        <h3 style={currentStyles.searchTitle}>{search.name}</h3>
+        <hr style={currentStyles.searchDivider} />
+        {selectedCovariates.map((covariate: string) =>
+          search.metadata[covariate] ? (
+            <div key={covariate} style={currentStyles.searchMetadata}>
+              {`${covariate}: ${search.metadata[covariate]}`}
+            </div>
+          ) : null
+        )}
+      </div>
+    );
+  }, [covariateColors, selectedCovariates, currentStyles, createSearchCellStyle, onDragStart]);
+
+  // Unified cell renderer
+  const renderSearchCell = useCallback((search: SearchData, isHighlighted: boolean) => {
+    return compact ? renderCompactCell(search, isHighlighted) : renderFullCell(search, isHighlighted);
+  }, [compact, renderCompactCell, renderFullCell]);
 
   return (
     <div style={currentStyles.plate}>
@@ -86,10 +199,10 @@ const Plate: React.FC<PlateProps> = ({
         </div>
         {rows.map((row, rowIndex) => (
           <div key={rowIndex} style={currentStyles.row}>
-            <div style={currentStyles.rowLabel}>{String.fromCharCode(65 + rowIndex)}</div>
+            <div style={currentStyles.rowLabel}>{getRowLabel(rowIndex)}</div>
             {columns.map((_, columnIndex) => {
               const search = row[columnIndex];
-              const isHighlighted = search && highlightFunction?.(search);
+              const isHighlighted = !!(search && highlightFunction?.(search));
 
               return (
                 <div
@@ -102,57 +215,11 @@ const Plate: React.FC<PlateProps> = ({
                   onDrop={(event) => handleDrop(event, rowIndex, columnIndex)}
                   title={
                     compact && search
-                      ? `${search.name} (${String.fromCharCode(65 + rowIndex)}${columnIndex + 1})${selectedCovariates.length > 0
-                        ? '\n' + selectedCovariates
-                          .map(cov => `${cov}: ${search.metadata[cov] || 'N/A'}`)
-                          .join(', ')
-                        : ''
-                      }`
+                      ? createTooltipText(search, rowIndex, columnIndex, selectedCovariates)
                       : undefined
                   }
                 >
-                  {search ? (
-                    compact ? (
-                      // Compact view: colored square or outline or stripes
-                      (() => {
-                        const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || { color: '#cccccc', useOutline: false, useStripes: false };
-                        const baseStyle: React.CSSProperties = {
-                          ...currentStyles.compactSearchIndicator,
-                          backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
-                          ...(colorInfo.useStripes && { background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)` }),
-                          border: colorInfo.useOutline ? `5px solid ${colorInfo.color}` : currentStyles.compactSearchIndicator.border,
-                          boxSizing: 'border-box'
-                        };
-
-                        const highlightStyle: React.CSSProperties = isHighlighted ? {
-                          outline: '2px solid #2196f3',
-                          outlineOffset: '1px',
-                          boxShadow: '0 0 4px rgba(33, 150, 243, 0.7)'
-                        } : {};
-
-                        return (
-                          <div
-                            style={{
-                              ...baseStyle,
-                              ...highlightStyle
-                            }}
-                            draggable={true}
-                            onDragStart={(event) => onDragStart(event, search.name)}
-                          />
-                        );
-                      })()
-                    ) : (
-                      // Full view: Search component
-                      <Search
-                        name={search.name}
-                        metadata={search.metadata}
-                        colorInfo={covariateColors[getCovariateKey(search, selectedCovariates)] || { color: '#cccccc', useOutline: false, useStripes: false }}
-                        onDragStart={onDragStart}
-                        selectedCovariates={selectedCovariates}
-                        isHighlighted={isHighlighted}
-                      />
-                    )
-                  ) : null}
+                  {search ? renderSearchCell(search, isHighlighted) : null}
                 </div>
               );
             })}
@@ -161,11 +228,6 @@ const Plate: React.FC<PlateProps> = ({
       </div>
     </div>
   );
-};
-
-const DIMENSIONS = {
-  full: { cellWidth: 100, rowLabelWidth: 25 },
-  compact: { cellWidth: 18, rowLabelWidth: 15 }
 };
 
 // Base styles shared between full and compact modes
@@ -221,6 +283,32 @@ const baseStyles = {
     border: '1px solid rgba(0,0,0,0.2)',
     transition: 'all 0.2s ease',
     boxSizing: 'border-box' as const,
+  },
+  fullSearchCard: {
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    padding: '16px',
+    width: '150px',
+    boxSizing: 'border-box' as const,
+    cursor: 'move',
+    transition: 'all 0.2s ease',
+  },
+  searchTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    marginBottom: '8px',
+    color: '#333',
+    margin: '0 0 8px 0',
+  },
+  searchDivider: {
+    border: 'none',
+    borderTop: '1px solid #eee',
+    margin: '12px 0',
+  },
+  searchMetadata: {
+    fontSize: '12px',
+    color: '#666',
+    marginBottom: '4px',
   },
 };
 
@@ -299,6 +387,10 @@ const styles = {
     padding: '5px',
   },
   compactSearchIndicator: baseStyles.compactSearchIndicator,
+  fullSearchCard: baseStyles.fullSearchCard,
+  searchTitle: baseStyles.searchTitle,
+  searchDivider: baseStyles.searchDivider,
+  searchMetadata: baseStyles.searchMetadata,
   highlightedWell: {
     border: '4px solid #2196f3',
     boxShadow: '0 0 12px rgba(33, 150, 243, 0.5), inset 0 0 0 1px rgba(33, 150, 243, 0.3)',
@@ -388,6 +480,10 @@ const compactStyles = {
     padding: '1px',
   },
   compactSearchIndicator: baseStyles.compactSearchIndicator,
+  fullSearchCard: baseStyles.fullSearchCard,
+  searchTitle: baseStyles.searchTitle,
+  searchDivider: baseStyles.searchDivider,
+  searchMetadata: baseStyles.searchMetadata,
   highlightedWell: {
     border: '4px solid #2196f3',
     boxShadow: '0 0 12px rgba(33, 150, 243, 0.8), inset 0 0 0 1px rgba(33, 150, 243, 0.3)',

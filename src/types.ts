@@ -2,7 +2,7 @@ export interface SearchData {
     name: string;
     metadata: { [key: string]: string };
 }
-export type RandomizationAlgorithm = 'greedy' | 'balanced';
+export type RandomizationAlgorithm = 'balanced' | 'greedy';
 
 export interface RandomizationOptions {
     algorithm: RandomizationAlgorithm;
@@ -19,4 +19,10 @@ export interface SummaryItem {
   color: string;
   useOutline: boolean;
   useStripes: boolean;
+}
+
+export interface CovariateColorInfo {
+    color: string;
+    useOutline: boolean;
+    useStripes: boolean;
 }

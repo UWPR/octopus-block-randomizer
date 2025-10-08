@@ -14,8 +14,7 @@
 
 import React, { DragEvent } from 'react';
 import Plate from './Plate';
-import { SearchData } from '../types';
-import { CovariateColorInfo } from '../utils';
+import { SearchData, CovariateColorInfo } from '../types';
 
 interface PlatesGridProps {
   randomizedPlates: (SearchData | undefined)[][][];

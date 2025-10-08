@@ -16,8 +16,8 @@
  */
 
 import React, { DragEvent, useMemo, useCallback } from 'react';
-import { SearchData } from '../types';
-import { getCovariateKey, CovariateColorInfo } from '../utils';
+import { SearchData, CovariateColorInfo } from '../types';
+import { getCovariateKey } from '../utils';
 
 // Constants
 const DIMENSIONS = {

@@ -1,3 +1,20 @@
+/**
+ * Plate Component
+ *
+ * Responsibility: Renders a single plate with its wells, samples, and interactions
+ *
+ * This component:
+ * - Displays one individual plate (typically 8 rows × 12 columns = 96 wells)
+ * - Renders samples in wells with covariate-based color coding
+ * - Handles drag & drop for individual samples within the plate
+ * - Shows plate header with plate number and optional details button
+ * - Manages compact vs full view display modes for the single plate
+ * - Provides tooltips with sample and covariate information
+ * - Renders row labels (A-H) and column labels (01-12)
+ * - Handles sample highlighting based on covariate selection in summary panel
+ *
+ */
+
 import React, { DragEvent } from 'react';
 import Search from './Search';
 import { SearchData } from '../types';

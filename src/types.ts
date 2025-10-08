@@ -11,3 +11,12 @@ export interface RandomizationOptions {
     maxIterations?: number;
     balanceWeight?: number;
 }
+
+export interface SummaryItem {
+  combination: string;
+  values: { [key: string]: string };
+  count: number;
+  color: string;
+  useOutline: boolean;
+  useStripes: boolean;
+}

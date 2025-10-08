@@ -147,10 +147,10 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                     id="plateRows"
                     type="number"
                     min="1"
-                    max="32"
+                    max="16"
                     value={plateRows}
                     onChange={(e) => {
-                      const value = Math.max(1, Math.min(32, parseInt(e.target.value) || 8));
+                      const value = Math.max(1, Math.min(16, parseInt(e.target.value) || 8));
                       onPlateRowsChange(value);
                       onResetCovariateState();
                     }}
@@ -162,10 +162,10 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                     id="plateColumns"
                     type="number"
                     min="1"
-                    max="48"
+                    max="24"
                     value={plateColumns}
                     onChange={(e) => {
-                      const value = Math.max(1, Math.min(48, parseInt(e.target.value) || 12));
+                      const value = Math.max(1, Math.min(24, parseInt(e.target.value) || 12));
                       onPlateColumnsChange(value);
                       onResetCovariateState();
                     }}

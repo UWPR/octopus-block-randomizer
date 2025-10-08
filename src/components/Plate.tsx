@@ -1,7 +1,7 @@
 /**
  * Plate Component
  *
- * Responsibility: Renders a single plate with its wells, samples, and interactions
+ * Renders a single plate with its wells, samples, and interactions
  *
  * This component:
  * - Displays one individual plate (typically 8 rows × 12 columns = 96 wells)

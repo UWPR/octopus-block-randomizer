@@ -1,24 +1,69 @@
-import React, { useState, useCallback, useEffect, DragEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import FileUploadSection from './components/FileUploadSection';
 import ConfigurationForm from './components/ConfigurationForm';
 import SummaryPanel from './components/SummaryPanel';
 import PlateDetailsModal from './components/PlateDetailsModal';
 import PlatesGrid from './components/PlatesGrid';
-import { SearchData, RandomizationAlgorithm, SummaryItem } from './types';
-import { randomizeSearches, downloadCSV, BRIGHT_COLOR_PALETTE, ALGORITHM_DESCRIPTIONS, getCovariateKey, CovariateColorInfo } from './utils';
+import { SearchData, RandomizationAlgorithm } from './types';
+import { downloadCSV, getCovariateKey } from './utils';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useModalDrag } from './hooks/useModalDrag';
-import Papa from 'papaparse';
-import Plate from './components/Plate';
+import { useRandomization } from './hooks/useRandomization';
+import { useCovariateColors } from './hooks/useCovariateColors';
+import { useDragAndDrop } from './hooks/useDragAndDrop';
 
 
 
 const App: React.FC = () => {
-  // Data states
-  const [searches, setSearches] = useState<SearchData[]>([]);
-  const [parsedData, setParsedData] = useState<any[]>([]);
-  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
-  const [selectedIdColumn, setSelectedIdColumn] = useState<string>('');
+  // File upload hook
+  const {
+    searches,
+    availableColumns,
+    selectedIdColumn,
+    selectedFileName,
+    handleFileUpload,
+    handleIdColumnChange,
+  } = useFileUpload();
+
+  // Modal drag hook
+  const {
+    modalPosition,
+    isDraggingModal,
+    handleModalMouseDown,
+    handleModalMouseMove,
+    handleModalMouseUp,
+    resetModalPosition,
+  } = useModalDrag();
+
+  // Randomization hook
+  const {
+    isProcessed,
+    randomizedPlates,
+    plateAssignments,
+    processRandomization,
+    reRandomize,
+    resetRandomization,
+    updatePlates,
+  } = useRandomization();
+
+  // Covariate colors hook
+  const {
+    covariateColors,
+    summaryData,
+    generateCovariateColors,
+    generateSummaryData,
+    resetColors,
+  } = useCovariateColors();
+
+  // Drag and drop hook
+  const {
+    draggedSearch,
+    handleDragStart,
+    handleDragOver,
+    handleDrop,
+  } = useDragAndDrop(randomizedPlates, updatePlates);
+
+  // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
   const [controlLabels, setControlLabels] = useState<string>('');
 
@@ -30,103 +75,25 @@ const App: React.FC = () => {
   const [plateRows, setPlateRows] = useState<number>(8);
   const [plateColumns, setPlateColumns] = useState<number>(12);
 
-  // File state
-  const [selectedFileName, setSelectedFileName] = useState<string>('');
-
-  // Processing states
-  const [isProcessed, setIsProcessed] = useState<boolean>(false);
-  const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
-  const [plateAssignments, setPlateAssignments] = useState<Map<number, SearchData[]> | undefined>(undefined);
-  const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});
-  const [summaryData, setSummaryData] = useState<SummaryItem[]>([]);
-
   // UI states
-  const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState<boolean>(false);
   const [compactView, setCompactView] = useState<boolean>(true);
   const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
   const [showPlateDetails, setShowPlateDetails] = useState<boolean>(false);
   const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
 
-  // Modal drag states
-  const [modalPosition, setModalPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDraggingModal, setIsDraggingModal] = useState<boolean>(false);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Helper functions
-  const processSearchData = (data: any[], idColumn: string): SearchData[] => {
-    return data
-      .filter((row: any) => row[idColumn])
-      .map((row: any) => ({
-        name: row[idColumn],
-        metadata: Object.keys(row)
-          .filter((key) => key !== idColumn)
-          .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
-      }));
-  };
 
-  const resetProcessingState = () => {
-    setIsProcessed(false);
-    setSelectedCovariates([]);
-    setRandomizedPlates([]);
-    setPlateAssignments(undefined);
-    setCovariateColors({});
-    setSummaryData([]);
-    setShowSummary(false);
-    setSelectedCombination(null);
-  };
+
 
   const resetCovariateState = () => {
-    setIsProcessed(false);
-    setRandomizedPlates([]);
-    setPlateAssignments(undefined);
-    setCovariateColors({});
-    setSummaryData([]);
+    resetRandomization();
+    resetColors();
     setShowSummary(false);
     setSelectedCombination(null);
   };
 
-  // File upload handler
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFileName(file.name);
-      Papa.parse(file, {
-        header: true,
-        complete: (results) => {
-          const headers = results.meta.fields || [];
-          setAvailableColumns(headers);
-          setParsedData(results.data);
 
-          // Auto-select reference column
-          let defaultColumn = headers[0];
-          if (headers.includes('search name')) {
-            defaultColumn = 'search name';
-          } else if (headers.includes('UW_Sample_ID')) {
-            defaultColumn = 'UW_Sample_ID';
-          }
-          setSelectedIdColumn(defaultColumn);
-
-          // Process data with selected ID column
-          const processedSearches = processSearchData(results.data, defaultColumn);
-          setSearches(processedSearches);
-          resetProcessingState();
-        },
-      });
-    }
-  };
-
-  // ID column change handler
-  const handleIdColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newIdColumn = event.target.value;
-    setSelectedIdColumn(newIdColumn);
-
-    if (parsedData.length > 0) {
-      const processedSearches = processSearchData(parsedData, newIdColumn);
-      setSearches(processedSearches);
-      resetProcessingState();
-    }
-  };
 
   // Algorithm selection handler
   const handleAlgorithmChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -154,134 +121,28 @@ const App: React.FC = () => {
     resetCovariateState();
   };
 
-  const generateCovariateColors = useCallback(() => {
-    if (selectedCovariates.length > 0 && searches.length > 0) {
-      // Group searches by covariate combinations and count them
-      const combinationCounts = new Map<string, number>();
-      searches.forEach((search) => {
-        const combination = getCovariateKey(search, selectedCovariates);
-        combinationCounts.set(combination, (combinationCounts.get(combination) || 0) + 1);
-      });
 
-      // Parse control labels (split by comma and trim)
-      const controlLabelsList = controlLabels
-        .split(',')
-        .map(label => label.trim())
-        .filter(label => label.length > 0);
-
-      // Separate control combinations from regular combinations
-      const controlCombinations: string[] = [];
-      const regularCombinations: string[] = [];
-
-      Array.from(combinationCounts.keys()).forEach((combination) => {
-        const isControl = controlLabelsList.length > 0 && controlLabelsList.some(controlLabel =>
-          combination.toLowerCase().includes(controlLabel.toLowerCase())
-        );
-
-        if (isControl) {
-          controlCombinations.push(combination);
-        } else {
-          regularCombinations.push(combination);
-        }
-      });
-
-      // Sort control combinations by count (descending)
-      controlCombinations.sort((a, b) => (combinationCounts.get(b) || 0) - (combinationCounts.get(a) || 0));
-
-      // Sort regular combinations by count (descending)
-      regularCombinations.sort((a, b) => (combinationCounts.get(b) || 0) - (combinationCounts.get(a) || 0));
-
-      // Combine arrays: controls first, then regular combinations
-      const sortedCombinations = [...controlCombinations, ...regularCombinations];
-
-      // Assign colors in the new order
-      const covariateColorsMap: { [key: string]: CovariateColorInfo } = {};
-
-      sortedCombinations.forEach((combination, colorIndex) => {
-        const paletteIndex = colorIndex % BRIGHT_COLOR_PALETTE.length;
-        const cycle = Math.floor(colorIndex / BRIGHT_COLOR_PALETTE.length);
-
-        covariateColorsMap[combination] = {
-          color: BRIGHT_COLOR_PALETTE[paletteIndex],
-          useOutline: cycle === 1, // Second cycle (25-48)
-          useStripes: cycle === 2   // Third cycle (49-72)
-        };
-      });
-
-      return covariateColorsMap;
-    }
-    return {};
-  }, [selectedCovariates, searches, controlLabels]);
-
-  // Generate summary data for the panel
-  const generateSummaryData = useCallback((colors: { [key: string]: CovariateColorInfo }) => {
-    if (selectedCovariates.length > 0 && searches.length > 0) {
-      // Group searches by their covariate combinations using getCovariateKey
-      const combinationsMap = new Map<string, {
-        values: { [key: string]: string };
-        count: number;
-      }>();
-
-      searches.forEach((search) => {
-        const covariateValues: { [key: string]: string } = {};
-        selectedCovariates.forEach((covariate) => {
-          covariateValues[covariate] = search.metadata[covariate] || 'N/A';
-        });
-
-        const combinationKey = getCovariateKey(search, selectedCovariates);
-
-        if (combinationsMap.has(combinationKey)) {
-          const existing = combinationsMap.get(combinationKey)!;
-          existing.count++;
-        } else {
-          combinationsMap.set(combinationKey, {
-            values: covariateValues,
-            count: 1
-          });
-        }
-      });
-
-      // Convert to summary data with colors
-      const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([combinationKey, data]) => {
-        const colorInfo = colors[combinationKey] || { color: '#cccccc', useOutline: false, useStripes: false };
-        return {
-          combination: combinationKey, // Use the same key format as colors
-          values: data.values,
-          count: data.count,
-          color: colorInfo.color,
-          useOutline: colorInfo.useOutline,
-          useStripes: colorInfo.useStripes
-        };
-      });
-
-      // Sort by count (descending) then by combination name
-      summary.sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return a.combination.localeCompare(b.combination);
-      });
-
-      return summary;
-    }
-    return [];
-  }, [selectedCovariates, searches]);
 
   // Main processing handler
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Generate randomized plates using selected algorithm
-      const result = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
-      setRandomizedPlates(result.plates);
-      setPlateAssignments(result.plateAssignments);
+      // Process randomization
+      const success = processRandomization(
+        searches,
+        selectedCovariates,
+        selectedAlgorithm,
+        keepEmptyInLastPlate,
+        plateRows,
+        plateColumns
+      );
 
-      // Generate colors
-      const colors = generateCovariateColors();
-      setCovariateColors(colors);
+      if (success) {
+        // Generate colors
+        const colors = generateCovariateColors(searches, selectedCovariates, controlLabels);
 
-      // Generate summary data
-      const summary = generateSummaryData(colors);
-      setSummaryData(summary);
-
-      setIsProcessed(true);
+        // Generate summary data
+        generateSummaryData(colors, searches, selectedCovariates);
+      }
     }
   };
 
@@ -295,10 +156,15 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Generate new randomized plates with existing colors using selected algorithm
-      const result = randomizeSearches(searches, selectedCovariates, selectedAlgorithm, keepEmptyInLastPlate, plateRows, plateColumns);
-      setRandomizedPlates(result.plates);
-      setPlateAssignments(result.plateAssignments);
+      // Re-randomize with existing colors
+      reRandomize(
+        searches,
+        selectedCovariates,
+        selectedAlgorithm,
+        keepEmptyInLastPlate,
+        plateRows,
+        plateColumns
+      );
     }
   };
 
@@ -321,55 +187,12 @@ const App: React.FC = () => {
     if (!isDraggingModal) {
       setShowPlateDetails(false);
       setSelectedPlateIndex(null);
-      setModalPosition({ x: 0, y: 0 }); // Reset position when closing
+      resetModalPosition(); // Reset position when closing
     }
   };
-
-  // Modal drag handlers
-  const handleModalMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const modalElement = event.currentTarget.closest('[data-modal-content]') as HTMLElement;
-    if (modalElement) {
-      const rect = modalElement.getBoundingClientRect();
-      setIsDraggingModal(true);
-      setDragOffset({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top
-      });
-
-      // If this is the first drag, set initial position to current position
-      if (modalPosition.x === 0 && modalPosition.y === 0) {
-        setModalPosition({
-          x: rect.left,
-          y: rect.top
-        });
-      }
-    }
-  };
-
-  const handleModalMouseMove = useCallback((event: MouseEvent) => {
-    if (isDraggingModal) {
-      const newX = event.clientX - dragOffset.x;
-      const newY = event.clientY - dragOffset.y;
-
-      // Constrain to viewport bounds
-      const maxX = window.innerWidth - 600; // Assuming max modal width
-      const maxY = window.innerHeight - 400; // Assuming max modal height
-
-      setModalPosition({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY))
-      });
-    }
-  }, [isDraggingModal, dragOffset]);
-
-  const handleModalMouseUp = useCallback(() => {
-    setIsDraggingModal(false);
-  }, []);
 
   // Add global mouse event listeners for modal dragging
-  React.useEffect(() => {
+  useEffect(() => {
     if (isDraggingModal) {
       document.addEventListener('mousemove', handleModalMouseMove);
       document.addEventListener('mouseup', handleModalMouseUp);
@@ -380,6 +203,8 @@ const App: React.FC = () => {
     }
   }, [isDraggingModal, handleModalMouseMove, handleModalMouseUp]);
 
+
+
   // Check if a search matches the selected combination
   const isSearchHighlighted = (search: SearchData): boolean => {
     if (!selectedCombination) return false;
@@ -389,47 +214,7 @@ const App: React.FC = () => {
     return searchCombination === selectedCombination;
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (event: DragEvent<HTMLDivElement>, searchName: string) => {
-    setDraggedSearch(searchName);
-  };
 
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-  };
-
-  const handleDrop = (event: DragEvent<HTMLDivElement>, plateIndex: number, rowIndex: number, columnIndex: number) => {
-    event.preventDefault();
-    if (!draggedSearch) return;
-
-    const updatedRandomizedPlates = [...randomizedPlates];
-    const draggedSearchData = searches.find((search) => search.name === draggedSearch);
-    const targetSearchData = updatedRandomizedPlates[plateIndex][rowIndex][columnIndex];
-
-    if (!draggedSearchData) return;
-
-    // Find current position of dragged search
-    let draggedPosition = null;
-    for (let pIndex = 0; pIndex < updatedRandomizedPlates.length; pIndex++) {
-      for (let rIndex = 0; rIndex < updatedRandomizedPlates[pIndex].length; rIndex++) {
-        const cIndex = updatedRandomizedPlates[pIndex][rIndex].findIndex(
-          (s) => s?.name === draggedSearch
-        );
-        if (cIndex !== -1) {
-          draggedPosition = { plateIndex: pIndex, rowIndex: rIndex, columnIndex: cIndex };
-          break;
-        }
-      }
-      if (draggedPosition) break;
-    }
-
-    if (draggedPosition) {
-      // Swap positions
-      updatedRandomizedPlates[draggedPosition.plateIndex][draggedPosition.rowIndex][draggedPosition.columnIndex] = targetSearchData;
-      updatedRandomizedPlates[plateIndex][rowIndex][columnIndex] = draggedSearchData;
-      setRandomizedPlates(updatedRandomizedPlates);
-    }
-  };
 
   const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0;
 

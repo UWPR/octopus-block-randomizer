@@ -1,7 +1,7 @@
 /**
  * PlatesGrid Component
  *
- * Responsibility: Renders a grid layout containing multiple plates
+ * Renders a grid layout containing multiple plates
  *
  * This component:
  * - Takes an array of all randomized plates and renders them in a responsive grid

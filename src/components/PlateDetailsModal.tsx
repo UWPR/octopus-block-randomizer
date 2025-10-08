@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchData, SummaryItem } from '../types';
+import { SearchData } from '../types';
 import { getCovariateKey, CovariateColorInfo } from '../utils';
 
 interface PlateDetailsModalProps {

@@ -40,7 +40,8 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
                     ...(item.useStripes && {
                       background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)`
                     }),
-                    border: item.useOutline ? `3px solid ${item.color}` : styles.colorIndicator.border
+                    border: item.useOutline ? `4px solid ${item.color}` : styles.colorIndicator.border,
+                    boxSizing: 'border-box' as const
                   }}
                 />
                 <span style={styles.summaryCount}>

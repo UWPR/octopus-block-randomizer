@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the enhancements made to the Octopus block randomization app for distributing biological samples across plates.
+This document describes the enhancements made to the Octopus Block Randomization app for distributing biological samples across plates.
 
 
 ## 1. Updated Color Palette
@@ -20,7 +20,7 @@ This document describes the enhancements made to the Octopus block randomization
 
 This approach supports up to 72 unique covariate combinations.
 
-
+---
 
 ## 2. Updated Configuration Form
 
@@ -59,6 +59,7 @@ Option to control how empty cells / wells are handled when sample count < total 
 ### Covariate Display
 - Selected covariates displayed below the **Select Covariates** selection box
 
+---
 
 ## 3. Compact View Implementation
 
@@ -80,7 +81,7 @@ Users can switch between views using the "Compact View" / "Full Size View" butto
   - Sample name prominently displayed
   - All covariate values shown within the plate cell
 
-
+---
 
 ## 4. Plate Details Popup (_only available for the Balanced Block Randomization algorithm_)
 
@@ -104,7 +105,7 @@ For each covariate group, displays:
 
 ![alt text](plateDetailsPopup.png)
 
-
+---
 
 ## 5. "Re-randomize" Button
 
@@ -207,6 +208,7 @@ The original code was refactored, and new components and hooks were created.
 - **useDragAndDrop.ts**: Sample drag-and-drop between wells
 
 
+---
 
 ## Usage
 

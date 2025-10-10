@@ -4,6 +4,7 @@ import ConfigurationForm from './components/ConfigurationForm';
 import SummaryPanel from './components/SummaryPanel';
 import PlateDetailsModal from './components/PlateDetailsModal';
 import PlatesGrid from './components/PlatesGrid';
+import QualityMetricsPanel from './components/QualityMetricsPanel';
 import { SearchData, RandomizationAlgorithm } from './types';
 import { downloadCSV, getCovariateKey } from './utils';
 import { useFileUpload } from './hooks/useFileUpload';
@@ -11,6 +12,7 @@ import { useModalDrag } from './hooks/useModalDrag';
 import { useRandomization } from './hooks/useRandomization';
 import { useCovariateColors } from './hooks/useCovariateColors';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
+import { useQualityMetrics } from './hooks/useQualityMetrics';
 
 
 
@@ -63,6 +65,20 @@ const App: React.FC = () => {
     handleDrop,
   } = useDragAndDrop(randomizedPlates, updatePlates);
 
+  // Quality metrics hook
+  const {
+    metrics,
+    isCalculating,
+    showMetrics,
+    calculateMetrics,
+    resetMetrics,
+    toggleMetrics,
+    qualitySummary,
+    shouldReRandomize
+  } = useQualityMetrics();
+
+
+
   // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
   const [controlLabels, setControlLabels] = useState<string>('');
@@ -83,12 +99,24 @@ const App: React.FC = () => {
   const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
 
 
-
-
+  // Calculate quality metrics when randomization completes
+  useEffect(() => {
+    if (isProcessed && randomizedPlates.length > 0 && plateAssignments && selectedCovariates.length > 0) {
+      calculateMetrics(
+        searches,
+        randomizedPlates,
+        plateAssignments,
+        selectedCovariates,
+        plateRows,
+        plateColumns
+      );
+    }
+  }, [isProcessed, randomizedPlates, plateAssignments, selectedCovariates, plateRows, plateColumns, searches, calculateMetrics]);
 
   const resetCovariateState = () => {
     resetRandomization();
     resetColors();
+    resetMetrics();
     setShowSummary(false);
     setSelectedCombination(null);
   };
@@ -287,9 +315,33 @@ const App: React.FC = () => {
                   {compactView ? 'Full Size View' : 'Compact View'}
                 </button>
 
-                <button onClick={handleReRandomize} style={styles.controlButton}>
-                  Re-randomize
+                <button
+
+                  onClick={handleReRandomize}
+                  style={{
+                    ...styles.controlButton,
+                    ...(shouldReRandomize ? styles.recommendedButton : {})
+                  }}
+                  title={shouldReRandomize ? 'Quality metrics suggest re-randomization' : 'Generate new randomization'}
+                >
+                  {shouldReRandomize ? '🔄 Re-randomize (Recommended)' : 'Re-randomize'}
                 </button>
+
+                {qualitySummary && (
+                  <div style={styles.qualityIndicator}>
+                    <span style={styles.qualityScore}>
+                      Quality: {qualitySummary.overallScore.toFixed(0)}
+                    </span>
+                    <span style={{
+                      ...styles.qualityBadge,
+                      backgroundColor: qualitySummary.qualityLevel === 'excellent' ? '#4caf50' :
+                        qualitySummary.qualityLevel === 'good' ? '#ff9800' :
+                          qualitySummary.qualityLevel === 'fair' ? '#f44336' : '#9e9e9e'
+                    }}>
+                      {qualitySummary.qualityLevel}
+                    </span>
+                  </div>
+                )}
 
                 <button onClick={handleDownloadCSV} style={styles.downloadButton}>
                   Download CSV
@@ -302,6 +354,12 @@ const App: React.FC = () => {
                 onToggleSummary={() => setShowSummary(!showSummary)}
                 selectedCombination={selectedCombination}
                 onSummaryItemClick={handleSummaryItemClick}
+              />
+
+              <QualityMetricsPanel
+                metrics={metrics}
+                show={showMetrics}
+                onToggle={toggleMetrics}
               />
 
 
@@ -429,6 +487,34 @@ const styles = {
     fontWeight: '500',
     color: '#495057',
     transition: 'all 0.2s ease',
+  },
+  recommendedButton: {
+    backgroundColor: '#fff3cd',
+    border: '1px solid #ffeaa7',
+    color: '#856404',
+    fontWeight: '600',
+  },
+  qualityIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 12px',
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #dee2e6',
+    borderRadius: '6px',
+    fontSize: '12px',
+  },
+  qualityScore: {
+    fontWeight: '600',
+    color: '#495057',
+  },
+  qualityBadge: {
+    padding: '2px 6px',
+    borderRadius: '3px',
+    color: '#fff',
+    fontSize: '10px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
   },
 };
 

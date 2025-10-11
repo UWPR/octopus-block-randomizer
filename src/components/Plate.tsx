@@ -16,7 +16,7 @@
  */
 
 import React, { DragEvent, useMemo, useCallback } from 'react';
-import { SearchData, CovariateColorInfo } from '../types';
+import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
 import { getCovariateKey } from '../utils';
 
 // Constants
@@ -75,6 +75,7 @@ interface PlateProps {
   highlightFunction?: (search: SearchData) => boolean;
   numColumns?: number;
   onShowDetails?: (plateIndex: number) => void;
+  plateQuality?: PlateQualityScore;
 }
 
 const Plate: React.FC<PlateProps> = ({
@@ -88,8 +89,16 @@ const Plate: React.FC<PlateProps> = ({
   compact = true,
   highlightFunction,
   numColumns = 12,
-  onShowDetails
+  onShowDetails,
+  plateQuality
 }) => {
+  const getQualityColor = (score: number): string => {
+    if (score >= 80) return '#4caf50';
+    if (score >= 60) return '#ff9800';
+    return '#f44336';
+  };
+
+  const formatScore = (score: number): string => score.toFixed(1);
   // Memoized values to avoid recalculation
   const columns = useMemo(() => generateColumnLabels(numColumns), [numColumns]);
   const currentStyles = useMemo(() => compact ? compactStyles : styles, [compact]);
@@ -177,7 +186,30 @@ const Plate: React.FC<PlateProps> = ({
   return (
     <div style={currentStyles.plate}>
       <div style={currentStyles.plateHeader}>
-        <div style={currentStyles.plateHeading}>Plate {plateIndex + 1}</div>
+        <div style={currentStyles.plateTitleSection}>
+          <div style={currentStyles.plateHeading}>Plate {plateIndex + 1}</div>
+          {plateQuality && (
+            <div style={currentStyles.plateQualityMetrics}>
+              <span style={currentStyles.qualityLabel}>Quality:</span>
+              <span
+                style={{
+                  ...currentStyles.qualityScore,
+                  color: getQualityColor(plateQuality.proportionalAccuracy)
+                }}
+              >
+                Acc: {formatScore(plateQuality.proportionalAccuracy)}
+              </span>
+              <span
+                style={{
+                  ...currentStyles.qualityScore,
+                  color: getQualityColor(plateQuality.entropy)
+                }}
+              >
+                Ent: {formatScore(plateQuality.entropy)}
+              </span>
+            </div>
+          )}
+        </div>
         {onShowDetails && (
           <button
             onClick={() => onShowDetails(plateIndex)}
@@ -237,9 +269,34 @@ const baseStyles = {
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  plateTitleSection: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+    alignItems: 'center',
+    flex: 1,
+  },
   plateHeading: {
     fontWeight: 'bold',
     margin: 0,
+  },
+  plateQualityMetrics: {
+    display: 'flex',
+    gap: '6px',
+    alignItems: 'center',
+  },
+  qualityLabel: {
+    fontSize: '10px',
+    color: '#666',
+    fontWeight: '500',
+  },
+  qualityScore: {
+    fontSize: '10px',
+    fontWeight: '600',
+    padding: '1px 4px',
+    backgroundColor: '#fff',
+    borderRadius: '2px',
+    border: '1px solid #e9ecef',
   },
   detailsButton: {
     background: 'none',

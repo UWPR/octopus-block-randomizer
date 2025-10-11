@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchData, CovariateColorInfo } from '../types';
+import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
 import { getCovariateKey } from '../utils';
 
 interface PlateDetailsModalProps {
@@ -16,6 +16,7 @@ interface PlateDetailsModalProps {
   isDraggingModal: boolean;
   onClose: () => void;
   onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
+  plateQuality?: PlateQualityScore;
 }
 
 const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
@@ -32,7 +33,15 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
   isDraggingModal,
   onClose,
   onMouseDown,
+  plateQuality,
 }) => {
+  const getQualityColor = (score: number): string => {
+    if (score >= 80) return '#4caf50';
+    if (score >= 60) return '#ff9800';
+    return '#f44336';
+  };
+
+  const formatScore = (score: number): string => score.toFixed(1);
   if (!show || plateIndex === null) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -80,6 +89,22 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
               <div style={styles.modalSummary}>
                 <span><strong>Capacity:</strong> {plateRows * plateColumns}</span>
                 <span><strong>Samples:</strong> {plateAssignments.get(plateIndex)!.length}</span>
+                {plateQuality && (
+                  <>
+                    <span>
+                      <strong>Accuracy:</strong>{' '}
+                      <span style={{ color: getQualityColor(plateQuality.proportionalAccuracy) }}>
+                        {formatScore(plateQuality.proportionalAccuracy)}
+                      </span>
+                    </span>
+                    <span>
+                      <strong>Entropy:</strong>{' '}
+                      <span style={{ color: getQualityColor(plateQuality.entropy) }}>
+                        {formatScore(plateQuality.entropy)}
+                      </span>
+                    </span>
+                  </>
+                )}
               </div>
               {(() => {
                 const plateSamples = plateAssignments.get(plateIndex)!;

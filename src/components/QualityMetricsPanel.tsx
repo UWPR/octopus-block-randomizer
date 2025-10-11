@@ -97,44 +97,50 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                 </div>
               </div>
 
-              {/* Metrics Grid */}
+              {/* Summary Metrics Grid */}
               <div style={styles.metricsGrid}>
-                {/* Covariate Groups */}
+                {/* Covariate Group Balance Summary */}
                 <div style={styles.metricSection}>
                   <h4 style={styles.sectionTitle}>Covariate Group Balance</h4>
-                  <div style={styles.covariateList}>
-                    {Object.entries(metrics.covariateGroups).map(([combination, metric]) => (
-                      <div key={combination} style={styles.covariateItem}>
-                        <div style={styles.covariateHeader}>
-                          <div style={styles.combinationInfo}>
-                            <span style={styles.covariateName}>{combination}</span>
-                            <span style={styles.sampleCount}>
-                              ({metric.sampleCount} samples{metric.isSmallGroup ? ' - small group' : ''})
-                            </span>
-                          </div>
-                          <span
-                            style={{
-                              ...styles.assessmentBadge,
-                              backgroundColor: getAssessmentColor(metric.adjustedAssessment)
-                            }}
-                          >
-                            {metric.adjustedAssessment}
-                          </span>
-                        </div>
-                        <div style={styles.covariateDetails}>
-                          <span>CV: {formatScore(metric.cv)}%</span>
-                          <span>p-value: {metric.pValue.toFixed(3)}</span>
-                          {metric.isSmallGroup && <span style={styles.smallGroupNote}>*Adjusted criteria</span>}
-                        </div>
-                      </div>
-                    ))}
+                  <div style={styles.summaryMetrics}>
+                    <div style={styles.metricItem}>
+                      <span style={styles.metricLabel}>Average CV</span>
+                      <span style={styles.metricValue}>
+                        {formatScore(Object.values(metrics.covariateGroups).reduce((sum, g) => sum + g.cv, 0) / Object.values(metrics.covariateGroups).length)}%
+                      </span>
+                    </div>
+                    <div style={styles.metricItem}>
+                      <span style={styles.metricLabel}>Average p-value</span>
+                      <span style={styles.metricValue}>
+                        {(Object.values(metrics.covariateGroups).reduce((sum, g) => sum + g.pValue, 0) / Object.values(metrics.covariateGroups).length).toFixed(3)}
+                      </span>
+                    </div>
+                    <div style={styles.metricItem}>
+                      <span style={styles.metricLabel}>Overall Balance Score</span>
+                      <span style={styles.metricValue}>
+                        {formatScore((() => {
+                          const groups = Object.values(metrics.covariateGroups);
+                          const goodGroups = groups.filter(g => g.adjustedAssessment === 'good').length;
+                          const acceptableGroups = groups.filter(g => g.adjustedAssessment === 'acceptable').length;
+                          const totalGroups = groups.length;
+                          return totalGroups > 0 ? ((goodGroups * 100) + (acceptableGroups * 75)) / totalGroups : 0;
+                        })())}
+                      </span>
+                    </div>
+                    <div style={styles.groupBreakdown}>
+                      <span style={styles.breakdownText}>
+                        {Object.values(metrics.covariateGroups).filter(g => g.adjustedAssessment === 'good').length} good, {' '}
+                        {Object.values(metrics.covariateGroups).filter(g => g.adjustedAssessment === 'acceptable').length} acceptable, {' '}
+                        {Object.values(metrics.covariateGroups).filter(g => g.adjustedAssessment === 'poor').length} poor
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Plate Diversity */}
+                {/* Plate Diversity Summary */}
                 <div style={styles.metricSection}>
                   <h4 style={styles.sectionTitle}>Plate Diversity</h4>
-                  <div style={styles.plateMetrics}>
+                  <div style={styles.summaryMetrics}>
                     <div style={styles.metricItem}>
                       <span style={styles.metricLabel}>Avg Proportional Accuracy</span>
                       <span style={styles.metricValue}>
@@ -147,23 +153,11 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                         {formatScore(metrics.plateDiversity.averageEntropy)}
                       </span>
                     </div>
-
-                    {/* Individual Plate Scores */}
-                    <div style={styles.plateScoresSection}>
-                      <div style={styles.plateScoresTitle}>Individual Plates:</div>
-                      <div style={styles.plateScoresList}>
-                        {metrics.plateDiversity.plateScores.map(score => (
-                          <div key={score.plateIndex} style={styles.plateScoreItem}>
-                            <span style={styles.plateNumber}>P{score.plateIndex + 1}</span>
-                            <span style={styles.plateScore}>
-                              Acc: {formatScore(score.proportionalAccuracy)}
-                            </span>
-                            <span style={styles.plateScore}>
-                              Ent: {formatScore(score.entropy)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                    <div style={styles.metricItem}>
+                      <span style={styles.metricLabel}>Overall Diversity Score</span>
+                      <span style={styles.metricValue}>
+                        {formatScore((metrics.plateDiversity.averageProportionalAccuracy * 0.7) + (metrics.plateDiversity.averageEntropy * 0.3))}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -279,7 +273,7 @@ const styles = {
   },
   metricsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
     gap: '16px',
     marginBottom: '20px',
   },
@@ -295,60 +289,10 @@ const styles = {
     fontWeight: '600',
     color: '#333',
   },
-  covariateList: {
+  summaryMetrics: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '8px',
-  },
-  covariateItem: {
-    padding: '8px',
-    backgroundColor: '#fff',
-    borderRadius: '3px',
-    border: '1px solid #e9ecef',
-  },
-  covariateHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '4px',
-  },
-  combinationInfo: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '2px',
-  },
-  covariateName: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#333',
-  },
-  sampleCount: {
-    fontSize: '10px',
-    color: '#666',
-    fontWeight: '400',
-  },
-  assessmentBadge: {
-    padding: '2px 6px',
-    borderRadius: '3px',
-    color: '#fff',
-    fontSize: '10px',
-    fontWeight: '600',
-    textTransform: 'uppercase' as const,
-  },
-  covariateDetails: {
-    display: 'flex',
-    gap: '12px',
-    fontSize: '10px',
-    color: '#666',
-  },
-  smallGroupNote: {
-    fontStyle: 'italic',
-    color: '#999',
-  },
-  plateMetrics: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '8px',
+    gap: '6px',
   },
   metricItem: {
     display: 'flex',
@@ -366,37 +310,14 @@ const styles = {
     fontWeight: '600',
     color: '#333',
   },
-  plateScoresSection: {
-    marginTop: '8px',
-  },
-  plateScoresTitle: {
-    fontSize: '11px',
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: '4px',
-  },
-  plateScoresList: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: '4px',
-  },
-  plateScoreItem: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    padding: '4px 6px',
-    backgroundColor: '#fff',
+  groupBreakdown: {
+    padding: '4px 8px',
+    backgroundColor: '#e3f2fd',
     borderRadius: '3px',
-    border: '1px solid #e9ecef',
-    fontSize: '9px',
+    fontSize: '11px',
   },
-  plateNumber: {
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: '2px',
-  },
-  plateScore: {
-    color: '#666',
+  breakdownText: {
+    color: '#1565c0',
   },
   recommendationsSection: {
     padding: '12px',

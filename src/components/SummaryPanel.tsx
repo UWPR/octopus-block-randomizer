@@ -1,5 +1,5 @@
 import React from 'react';
-import { SummaryItem } from '../types';
+import { SummaryItem, CovariateGroupMetric } from '../types';
 
 interface SummaryPanelProps {
   summaryData: SummaryItem[];
@@ -7,6 +7,7 @@ interface SummaryPanelProps {
   onToggleSummary: () => void;
   selectedCombination: string | null;
   onSummaryItemClick: (combination: string) => void;
+  covariateGroupMetrics?: { [combination: string]: CovariateGroupMetric };
 }
 
 const SummaryPanel: React.FC<SummaryPanelProps> = ({
@@ -15,7 +16,18 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
   onToggleSummary,
   selectedCombination,
   onSummaryItemClick,
+  covariateGroupMetrics,
 }) => {
+  const getAssessmentColor = (assessment: string): string => {
+    switch (assessment) {
+      case 'good': return '#4caf50';
+      case 'acceptable': return '#ff9800';
+      case 'poor': return '#f44336';
+      default: return '#666';
+    }
+  };
+
+  const formatScore = (score: number): string => score.toFixed(1);
   if (summaryData.length === 0 || !showSummary) return null;
 
   return (
@@ -54,6 +66,27 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
                     <strong>{covariate}:</strong> {value}
                   </div>
                 ))}
+                {covariateGroupMetrics && covariateGroupMetrics[item.combination] && (
+                  <div style={styles.qualityMetrics}>
+                    <span
+                      style={{
+                        ...styles.assessmentBadge,
+                        backgroundColor: getAssessmentColor(covariateGroupMetrics[item.combination].adjustedAssessment)
+                      }}
+                    >
+                      {covariateGroupMetrics[item.combination].adjustedAssessment}
+                    </span>
+                    <span style={styles.metricDetail}>
+                      CV: {formatScore(covariateGroupMetrics[item.combination].cv)}%
+                    </span>
+                    <span style={styles.metricDetail}>
+                      p: {covariateGroupMetrics[item.combination].pValue.toFixed(3)}
+                    </span>
+                    {covariateGroupMetrics[item.combination].isSmallGroup && (
+                      <span style={styles.smallGroupIndicator}>*Small</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -122,6 +155,33 @@ const styles = {
     fontSize: '11px',
     color: '#555',
     lineHeight: '1.2',
+  },
+  qualityMetrics: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: '4px',
+    marginTop: '6px',
+    alignItems: 'center',
+  },
+  assessmentBadge: {
+    padding: '1px 4px',
+    borderRadius: '2px',
+    color: '#fff',
+    fontSize: '9px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
+  },
+  metricDetail: {
+    fontSize: '9px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    padding: '1px 3px',
+    borderRadius: '2px',
+  },
+  smallGroupIndicator: {
+    fontSize: '8px',
+    color: '#999',
+    fontStyle: 'italic',
   },
 };
 

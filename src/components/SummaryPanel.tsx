@@ -77,6 +77,7 @@ const styles = {
   summaryGrid: {
     display: 'flex',
     flexWrap: 'wrap' as const,
+    justifyContent: 'center',
     gap: '8px',
     width: '100%',
   },

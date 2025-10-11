@@ -111,6 +111,37 @@ const App: React.FC = () => {
     }
   }, [isProcessed, randomizedPlates, plateAssignments, selectedCovariates, searches, calculateMetrics]);
 
+  // Reset all state when a new file is uploaded (but not on initial load)
+  useEffect(() => {
+    // Only reset if we have a filename and searches data (indicating a successful file upload)
+    if (selectedFileName && searches.length > 0) {
+      // Reset all application state except the file upload state
+      resetRandomization();
+      resetColors();
+      resetMetrics();
+      resetModalPosition();
+
+      // Reset configuration states
+      setSelectedCovariates([]);
+      setControlLabels('');
+
+      // Reset algorithm selection (keep defaults)
+      setSelectedAlgorithm('balanced');
+      setKeepEmptyInLastPlate(true);
+
+      // Reset plate dimensions (keep defaults)
+      setPlateRows(8);
+      setPlateColumns(12);
+
+      // Reset UI states
+      setShowSummary(false);
+      setCompactView(true);
+      setSelectedCombination(null);
+      setShowPlateDetails(false);
+      setSelectedPlateIndex(null);
+    }
+  }, [selectedFileName, searches.length]); // Trigger when filename changes or searches are loaded
+
   const resetCovariateState = () => {
     resetRandomization();
     resetColors();

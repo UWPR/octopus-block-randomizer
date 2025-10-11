@@ -106,12 +106,10 @@ const App: React.FC = () => {
         searches,
         randomizedPlates,
         plateAssignments,
-        selectedCovariates,
-        plateRows,
-        plateColumns
+        selectedCovariates
       );
     }
-  }, [isProcessed, randomizedPlates, plateAssignments, selectedCovariates, plateRows, plateColumns, searches, calculateMetrics]);
+  }, [isProcessed, randomizedPlates, plateAssignments, selectedCovariates, searches, calculateMetrics]);
 
   const resetCovariateState = () => {
     resetRandomization();
@@ -376,6 +374,7 @@ const App: React.FC = () => {
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onShowDetails={handleShowPlateDetails}
+                qualityMetrics={metrics ?? undefined}
               />
             </>
           )}
@@ -396,6 +395,7 @@ const App: React.FC = () => {
           isDraggingModal={isDraggingModal}
           onClose={handleClosePlateDetails}
           onMouseDown={handleModalMouseDown}
+          plateQuality={selectedPlateIndex !== null ? metrics?.plateDiversity.plateScores.find(score => score.plateIndex === selectedPlateIndex) : undefined}
         />
       </div>
     </div>

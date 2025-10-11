@@ -24,9 +24,7 @@ export function useQualityMetrics() {
     searches: SearchData[],
     randomizedPlates: (SearchData | undefined)[][][],
     plateAssignments: Map<number, SearchData[]> | undefined,
-    selectedCovariates: string[],
-    plateRows: number,
-    plateColumns: number
+    selectedCovariates: string[]
   ) => {
     if (!searches.length || !selectedCovariates.length || !plateAssignments || !plateAssignments.size) {
       setMetrics(null);
@@ -40,6 +38,7 @@ export function useQualityMetrics() {
       const qualityMetrics = calculateQualityMetrics(
         searches,
         plateAssignments,
+        randomizedPlates,
         selectedCovariates
       );
 
@@ -90,24 +89,21 @@ export function useQualityMetrics() {
   }, [metrics]);
 
   /**
-   * Get covariate-specific quality indicators
+   * Get plate-specific quality indicators
    */
-  const covariateQuality = useMemo(() => {
+  const plateQuality = useMemo(() => {
     if (!metrics) return {};
 
-    const quality: { [covariate: string]: { score: number; status: 'good' | 'warning' | 'poor' } } = {};
+    const quality: { [plateIndex: string]: { score: number; status: 'good' | 'warning' | 'poor' } } = {};
 
-    Object.entries(metrics.covariateGroups).forEach(([combination, metric]) => {
+    metrics.plateDiversity.plateScores.forEach((plate) => {
       let status: 'good' | 'warning' | 'poor';
-      if (metric.adjustedAssessment === 'good') status = 'good';
-      else if (metric.adjustedAssessment === 'acceptable') status = 'warning';
+      if (plate.overallScore >= 80) status = 'good';
+      else if (plate.overallScore >= 65) status = 'warning';
       else status = 'poor';
 
-      // Convert CV to a 0-100 score for compatibility
-      const score = Math.max(0, 100 - metric.cv);
-
-      quality[combination] = {
-        score,
+      quality[`plate-${plate.plateIndex}`] = {
+        score: plate.overallScore,
         status
       };
     });
@@ -132,23 +128,19 @@ export function useQualityMetrics() {
     if (!metrics) return null;
 
     const insights = {
-      bestCovariates: [] as string[],
-      worstCovariates: [] as string[],
-      plateRepresentativeness: metrics.plateDiversity.averageProportionalAccuracy,
-      plateDiversityScore: metrics.plateDiversity.averageEntropy,
-      balanceConsistency: metrics.overallQuality.score
+      bestPlates: [] as number[],
+      worstPlates: [] as number[],
+      averageBalanceScore: metrics.plateDiversity.averageBalanceScore,
+      averageRandomizationScore: metrics.plateDiversity.averageRandomizationScore,
+      overallConsistency: metrics.overallQuality.score
     };
 
-    // Find best and worst performing covariate groups
-    const covariateEntries = Object.entries(metrics.covariateGroups)
-      .sort((a, b) => {
-        const scoreA = a[1].adjustedAssessment === 'good' ? 100 : a[1].adjustedAssessment === 'acceptable' ? 75 : 25;
-        const scoreB = b[1].adjustedAssessment === 'good' ? 100 : b[1].adjustedAssessment === 'acceptable' ? 75 : 25;
-        return scoreB - scoreA;
-      });
+    // Find best and worst performing plates
+    const sortedPlates = [...metrics.plateDiversity.plateScores]
+      .sort((a, b) => b.overallScore - a.overallScore);
 
-    insights.bestCovariates = covariateEntries.slice(0, 2).map(([name]) => name);
-    insights.worstCovariates = covariateEntries.slice(-2).map(([name]) => name);
+    insights.bestPlates = sortedPlates.slice(0, 2).map(plate => plate.plateIndex);
+    insights.worstPlates = sortedPlates.slice(-2).map(plate => plate.plateIndex);
 
     return insights;
   }, [metrics]);
@@ -167,7 +159,7 @@ export function useQualityMetrics() {
 
     // Computed values
     qualitySummary,
-    covariateQuality,
+    plateQuality,
     shouldReRandomize,
     performanceInsights,
 

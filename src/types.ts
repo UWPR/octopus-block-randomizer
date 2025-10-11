@@ -28,23 +28,16 @@ export interface CovariateColorInfo {
 }
 
 // Simplified Quality Metrics Types
-export interface CovariateGroupMetric {
-  sampleCount: number;
-  cv: number;
-  pValue: number;
-  isSmallGroup: boolean;
-  adjustedAssessment: 'good' | 'acceptable' | 'poor';
-}
-
 export interface PlateQualityScore {
   plateIndex: number;
-  proportionalAccuracy: number; // 0-100
-  entropy: number; // 0-100 normalized
+  balanceScore: number; // 0-100 (Proportional Accuracy)
+  randomizationScore: number; // 0-100 (Spatial Clustering)
+  overallScore: number; // 0-100 (Average of both)
 }
 
 export interface PlateDiversityMetrics {
-  averageProportionalAccuracy: number; // 0-100
-  averageEntropy: number; // 0-100 normalized
+  averageBalanceScore: number; // 0-100
+  averageRandomizationScore: number; // 0-100
   plateScores: PlateQualityScore[];
 }
 
@@ -55,7 +48,6 @@ export interface OverallQualityAssessment {
 }
 
 export interface QualityMetrics {
-  covariateGroups: { [combination: string]: CovariateGroupMetric };
   plateDiversity: PlateDiversityMetrics;
   overallQuality: OverallQualityAssessment;
 }

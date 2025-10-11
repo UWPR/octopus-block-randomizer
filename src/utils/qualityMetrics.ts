@@ -1,167 +1,23 @@
-import { SearchData, QualityMetrics, CovariateGroupMetric, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../types';
+import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../types';
 import { getCovariateKey, groupByCovariates } from '../utils';
 
 /**
  * Simplified Quality Metrics Calculator
  *
- * Focuses on the two most important aspects of randomization quality:
- * 1. Covariate Group Balance (CV + p-value with small group adjustment)
- * 2. Plate Diversity (Proportional Accuracy + Entropy)
+ * Focuses on two key aspects of plate randomization quality:
+ * 1. Plate Balance Score (Proportional Accuracy)
+ * 2. Plate Randomization Score (Spatial Clustering Analysis)
  */
 
-// Statistical utility functions
+// Utility functions
 const calculateMean = (values: number[]): number =>
   values.reduce((sum, val) => sum + val, 0) / values.length;
 
-const calculateStandardDeviation = (values: number[]): number => {
-  const mean = calculateMean(values);
-  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
-  return Math.sqrt(variance);
-};
-
-const calculateChiSquare = (observed: number[], expected: number[]): { chiSquare: number; pValue: number } => {
-  if (observed.length !== expected.length) {
-    throw new Error(`Observed and expected arrays must have the same length. Got ${observed.length} vs ${expected.length}`);
-  }
-
-  let chiSquare = 0;
-  let validComparisons = 0;
-
-  for (let i = 0; i < observed.length; i++) {
-    if (expected[i] > 0) {
-      chiSquare += Math.pow(observed[i] - expected[i], 2) / expected[i];
-      validComparisons++;
-    }
-  }
-
-  // Simplified p-value calculation
-  const degreesOfFreedom = Math.max(1, validComparisons - 1);
-  const pValue = Math.exp(-chiSquare / (2 * degreesOfFreedom));
-
-  return { chiSquare, pValue };
-};
-
 /**
- * Calculate covariate group metrics with small group adjustment
+ * Calculate plate balance score (Proportional Accuracy)
+ * Measures how well the plate represents overall covariate proportions
  */
-export const calculateCovariateGroupMetrics = (
-  searches: SearchData[],
-  plateAssignments: Map<number, SearchData[]>,
-  selectedCovariates: string[]
-): { [combination: string]: CovariateGroupMetric } => {
-  const result: { [combination: string]: CovariateGroupMetric } = {};
-
-  if (!searches.length || !plateAssignments.size || !selectedCovariates.length) {
-    return result;
-  }
-
-  const combinationGroups = groupByCovariates(searches, selectedCovariates);
-  const numPlates = plateAssignments.size;
-
-  Array.from(combinationGroups.keys()).forEach(combination => {
-    const globalCount = combinationGroups.get(combination)?.length || 0;
-    const expectedPerPlate = globalCount / numPlates;
-    const isSmallGroup = globalCount < numPlates;
-
-    // Calculate actual distribution across plates
-    const actualCounts: number[] = [];
-    const expectedCounts: number[] = [];
-
-    plateAssignments.forEach(plateSamples => {
-      const actualCount = plateSamples.filter(sample =>
-        getCovariateKey(sample, selectedCovariates) === combination
-      ).length;
-
-      actualCounts.push(actualCount);
-      expectedCounts.push(expectedPerPlate);
-    });
-
-    // Calculate CV
-    const mean = calculateMean(actualCounts);
-    const std = calculateStandardDeviation(actualCounts);
-    const cv = mean > 0 ? (std / mean) * 100 : 0;
-
-    // Calculate p-value
-    let pValue = 1;
-    try {
-      const chiSquareResult = calculateChiSquare(actualCounts, expectedCounts);
-      pValue = chiSquareResult.pValue;
-    } catch (error) {
-      console.warn(`Chi-square calculation failed for combination ${combination}:`, error);
-    }
-
-    // Assess quality with small group adjustment
-    const adjustedAssessment = assessCovariateGroup(cv, pValue, isSmallGroup);
-
-    result[combination] = {
-      sampleCount: globalCount,
-      cv,
-      pValue,
-      isSmallGroup,
-      adjustedAssessment
-    };
-  });
-
-  return result;
-};
-
-/**
- * Assess covariate group quality with adjustment for small groups
- */
-const assessCovariateGroup = (
-  cv: number,
-  pValue: number,
-  isSmallGroup: boolean
-): 'good' | 'acceptable' | 'poor' => {
-  if (isSmallGroup) {
-    // Relaxed criteria for small groups (fewer samples than plates)
-    if (pValue >= 0.10) return 'good';      // Less strict p-value threshold
-    if (pValue >= 0.05) return 'acceptable';
-    return 'poor';
-  } else {
-    // Standard criteria for larger groups
-    if (pValue >= 0.05 && cv < 30) return 'good';
-    if (pValue >= 0.05 || cv < 50) return 'acceptable';
-    return 'poor';
-  }
-};
-
-/**
- * Calculate plate entropy (diversity measure)
- */
-const calculatePlateEntropy = (
-  plateSamples: SearchData[],
-  selectedCovariates: string[],
-  totalPossibleCombinations: number
-): number => {
-  if (plateSamples.length === 0) return 0;
-
-  const combinationCounts = new Map<string, number>();
-
-  plateSamples.forEach(sample => {
-    const key = getCovariateKey(sample, selectedCovariates);
-    combinationCounts.set(key, (combinationCounts.get(key) || 0) + 1);
-  });
-
-  let entropy = 0;
-  const totalSamples = plateSamples.length;
-
-  combinationCounts.forEach(count => {
-    const proportion = count / totalSamples;
-    if (proportion > 0) {
-      entropy -= proportion * Math.log2(proportion);
-    }
-  });
-
-  // Normalize to 0-100 scale
-  const maxPossibleEntropy = Math.log2(totalPossibleCombinations);
-  return maxPossibleEntropy > 0 ? (entropy / maxPossibleEntropy) * 100 : 0;
-};
-
-/**
- * Calculate plate proportional accuracy (representativeness measure)
- */
-const calculateProportionalAccuracy = (
+const calculateBalanceScore = (
   plateSamples: SearchData[],
   globalProportions: Map<string, number>,
   selectedCovariates: string[]
@@ -191,131 +47,158 @@ const calculateProportionalAccuracy = (
 };
 
 /**
- * Calculate plate diversity metrics
+ * Calculate spatial clustering score for randomization quality
+ * Measures whether similar samples are clustered together spatially
+ */
+const calculateSpatialClusteringScore = (
+  plateRows: (SearchData | undefined)[][],
+  selectedCovariates: string[]
+): number => {
+  if (plateRows.length === 0) return 0;
+
+  const numRows = plateRows.length;
+  const numCols = plateRows[0]?.length || 0;
+
+  let totalComparisons = 0;
+  let differentNeighbors = 0;
+
+  // Helper function to get neighbors of a cell
+  const getNeighbors = (row: number, col: number): Array<{ row: number, col: number }> => {
+    const neighbors = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue; // Skip self
+        const newRow = row + dr;
+        const newCol = col + dc;
+        if (newRow >= 0 && newRow < numRows && newCol >= 0 && newCol < numCols) {
+          neighbors.push({ row: newRow, col: newCol });
+        }
+      }
+    }
+    return neighbors;
+  };
+
+  // Check each sample against its neighbors
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      const currentSample = plateRows[row][col];
+      if (!currentSample) continue;
+
+      const currentKey = getCovariateKey(currentSample, selectedCovariates);
+      const neighbors = getNeighbors(row, col);
+
+      for (const neighbor of neighbors) {
+        const neighborSample = plateRows[neighbor.row][neighbor.col];
+        if (!neighborSample) continue;
+
+        const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
+        totalComparisons++;
+
+        if (currentKey !== neighborKey) {
+          differentNeighbors++;
+        }
+      }
+    }
+  }
+
+  if (totalComparisons === 0) return 100; // No neighbors to compare
+
+  // Higher percentage of different neighbors = better randomization
+  return (differentNeighbors / totalComparisons) * 100;
+};
+
+/**
+ * Calculate plate diversity metrics (Balance + Randomization scores)
  */
 export const calculatePlateDiversityMetrics = (
   searches: SearchData[],
   plateAssignments: Map<number, SearchData[]>,
+  randomizedPlates: (SearchData | undefined)[][][],
   selectedCovariates: string[]
 ): PlateDiversityMetrics => {
-  const combinationGroups = groupByCovariates(searches, selectedCovariates);
-  const totalPossibleCombinations = combinationGroups.size;
+  if (!searches.length || !plateAssignments.size || !selectedCovariates.length) {
+    return {
+      averageBalanceScore: 0,
+      averageRandomizationScore: 0,
+      plateScores: []
+    };
+  }
 
+  const combinationGroups = groupByCovariates(searches, selectedCovariates);
   const plateScores: PlateQualityScore[] = [];
 
-  // Convert combination groups to counts for proportional accuracy calculation
+  // Convert combination groups to counts for balance calculation
   const globalCombinationCounts = new Map<string, number>();
   combinationGroups.forEach((samples, combination) => {
     globalCombinationCounts.set(combination, samples.length);
   });
 
   plateAssignments.forEach((plateSamples, plateIndex) => {
-    const entropy = calculatePlateEntropy(plateSamples, selectedCovariates, totalPossibleCombinations);
-    const proportionalAccuracy = calculateProportionalAccuracy(plateSamples, globalCombinationCounts, selectedCovariates);
+    // Calculate balance score (proportional accuracy)
+    const balanceScore = calculateBalanceScore(plateSamples, globalCombinationCounts, selectedCovariates);
+
+    // Calculate randomization score (spatial clustering)
+    const plateRows = randomizedPlates[plateIndex] || [];
+    const randomizationScore = calculateSpatialClusteringScore(plateRows, selectedCovariates);
+
+    // Overall score is average of both metrics
+    const overallScore = (balanceScore + randomizationScore) / 2;
 
     plateScores.push({
       plateIndex,
-      proportionalAccuracy,
-      entropy
+      balanceScore,
+      randomizationScore,
+      overallScore
     });
   });
 
-  const averageProportionalAccuracy = calculateMean(plateScores.map(score => score.proportionalAccuracy));
-  const averageEntropy = calculateMean(plateScores.map(score => score.entropy));
+  const averageBalanceScore = calculateMean(plateScores.map(score => score.balanceScore));
+  const averageRandomizationScore = calculateMean(plateScores.map(score => score.randomizationScore));
 
   return {
-    averageProportionalAccuracy,
-    averageEntropy,
+    averageBalanceScore,
+    averageRandomizationScore,
     plateScores
   };
 };
 
 /**
- * Generate recommendations based on quality metrics
+ * Calculate overall quality assessment
  */
-const generateRecommendations = (
-  covariateGroups: { [combination: string]: CovariateGroupMetric },
+export const calculateOverallQuality = (
   plateDiversity: PlateDiversityMetrics
-): string[] => {
+): OverallQualityAssessment => {
   const recommendations: string[] = [];
 
-  // Check covariate groups
-  const poorGroups = Object.entries(covariateGroups).filter(([_, metric]) => metric.adjustedAssessment === 'poor');
-  const acceptableGroups = Object.entries(covariateGroups).filter(([_, metric]) => metric.adjustedAssessment === 'acceptable');
-
-  if (poorGroups.length > 0) {
-    recommendations.push(`${poorGroups.length} covariate combination(s) show poor balance - consider re-randomization`);
-
-    // Identify specific issues
-    poorGroups.forEach(([combination, metric]) => {
-      if (metric.isSmallGroup) {
-        recommendations.push(`Small group "${combination}" (${metric.sampleCount} samples) shows significant imbalance`);
-      } else {
-        recommendations.push(`Large group "${combination}" shows systematic imbalance (CV: ${metric.cv.toFixed(1)}%, p: ${metric.pValue.toFixed(3)})`);
-      }
-    });
+  // Check plate balance
+  if (plateDiversity.averageBalanceScore < 70) {
+    recommendations.push(`Low plate balance (${plateDiversity.averageBalanceScore.toFixed(1)}) - plates may not represent overall population well`);
   }
 
-  if (acceptableGroups.length > 0 && poorGroups.length === 0) {
-    recommendations.push(`${acceptableGroups.length} covariate combination(s) show acceptable but not optimal balance`);
-  }
-
-  // Check plate diversity
-  if (plateDiversity.averageProportionalAccuracy < 70) {
-    recommendations.push(`Low plate representativeness (${plateDiversity.averageProportionalAccuracy.toFixed(1)}) - plates may not represent overall population well`);
-  }
-
-  if (plateDiversity.averageEntropy < 50) {
-    recommendations.push(`Low plate diversity (${plateDiversity.averageEntropy.toFixed(1)}) - some plates may be dominated by few combinations`);
+  // Check randomization quality
+  if (plateDiversity.averageRandomizationScore < 70) {
+    recommendations.push(`Poor spatial randomization (${plateDiversity.averageRandomizationScore.toFixed(1)}) - similar samples may be clustered together`);
   }
 
   // Identify problematic plates
   const poorPlates = plateDiversity.plateScores.filter(score =>
-    score.proportionalAccuracy < 60 || score.entropy < 40
+    score.balanceScore < 60 || score.randomizationScore < 60
   );
 
   if (poorPlates.length > 0) {
-    const plateNumbers = poorPlates.map(plate => plate.plateIndex + 1).join(', ');
-    recommendations.push(`Plates ${plateNumbers} show poor quality - review their composition`);
+    const plateNumbers = poorPlates.map(p => p.plateIndex + 1).join(', ');
+    recommendations.push(`Plates ${plateNumbers} have poor quality scores - consider re-randomizing`);
   }
 
-  if (recommendations.length === 0) {
-    recommendations.push('Randomization quality is excellent - ready for experiment');
-  }
-
-  return recommendations;
-};
-
-/**
- * Calculate overall quality assessment
- */
-const calculateOverallQuality = (
-  covariateGroups: { [combination: string]: CovariateGroupMetric },
-  plateDiversity: PlateDiversityMetrics
-): OverallQualityAssessment => {
-  // Calculate covariate quality score
-  const groupAssessments = Object.values(covariateGroups);
-  const goodGroups = groupAssessments.filter(g => g.adjustedAssessment === 'good').length;
-  const acceptableGroups = groupAssessments.filter(g => g.adjustedAssessment === 'acceptable').length;
-  const totalGroups = groupAssessments.length;
-
-  const covariateScore = totalGroups > 0 ?
-    ((goodGroups * 100) + (acceptableGroups * 75)) / totalGroups : 0;
-
-  // Calculate plate quality score (weighted toward proportional accuracy)
-  const plateScore = (plateDiversity.averageProportionalAccuracy * 0.7) + (plateDiversity.averageEntropy * 0.3);
-
-  // Overall score (covariate balance more important)
-  const overallScore = (covariateScore * 0.6) + (plateScore * 0.4);
+  // Calculate overall score (equal weight to balance and randomization)
+  const overallScore = (plateDiversity.averageBalanceScore + plateDiversity.averageRandomizationScore) / 2;
 
   // Determine quality level
   let level: 'excellent' | 'good' | 'fair' | 'poor';
-  if (overallScore >= 90) level = 'excellent';
+  if (overallScore >= 85) level = 'excellent';
   else if (overallScore >= 75) level = 'good';
-  else if (overallScore >= 60) level = 'fair';
+  else if (overallScore >= 65) level = 'fair';
   else level = 'poor';
-
-  const recommendations = generateRecommendations(covariateGroups, plateDiversity);
 
   return {
     score: Math.round(overallScore),
@@ -325,19 +208,24 @@ const calculateOverallQuality = (
 };
 
 /**
- * Main function to calculate simplified quality metrics
+ * Main function to calculate all quality metrics
  */
 export const calculateQualityMetrics = (
   searches: SearchData[],
   plateAssignments: Map<number, SearchData[]>,
+  randomizedPlates: (SearchData | undefined)[][][],
   selectedCovariates: string[]
 ): QualityMetrics => {
-  const covariateGroups = calculateCovariateGroupMetrics(searches, plateAssignments, selectedCovariates);
-  const plateDiversity = calculatePlateDiversityMetrics(searches, plateAssignments, selectedCovariates);
-  const overallQuality = calculateOverallQuality(covariateGroups, plateDiversity);
+  const plateDiversity = calculatePlateDiversityMetrics(
+    searches,
+    plateAssignments,
+    randomizedPlates,
+    selectedCovariates
+  );
+
+  const overallQuality = calculateOverallQuality(plateDiversity);
 
   return {
-    covariateGroups,
     plateDiversity,
     overallQuality
   };

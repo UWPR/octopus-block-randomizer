@@ -99,64 +99,51 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
 
               {/* Summary Metrics Grid */}
               <div style={styles.metricsGrid}>
-                {/* Covariate Group Balance Summary */}
+                {/* Plate Balance Summary */}
                 <div style={styles.metricSection}>
-                  <h4 style={styles.sectionTitle}>Covariate Group Balance</h4>
+                  <h4 style={styles.sectionTitle}>Plate Balance</h4>
                   <div style={styles.summaryMetrics}>
                     <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Average CV</span>
+                      <span style={styles.metricLabel}>Average Balance Score</span>
                       <span style={styles.metricValue}>
-                        {formatScore(Object.values(metrics.covariateGroups).reduce((sum, g) => sum + g.cv, 0) / Object.values(metrics.covariateGroups).length)}%
+                        {formatScore(metrics.plateDiversity.averageBalanceScore)}
                       </span>
                     </div>
                     <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Average p-value</span>
+                      <span style={styles.metricLabel}>Best Plate</span>
                       <span style={styles.metricValue}>
-                        {(Object.values(metrics.covariateGroups).reduce((sum, g) => sum + g.pValue, 0) / Object.values(metrics.covariateGroups).length).toFixed(3)}
+                        {formatScore(Math.max(...metrics.plateDiversity.plateScores.map(p => p.balanceScore)))}
                       </span>
                     </div>
                     <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Overall Balance Score</span>
+                      <span style={styles.metricLabel}>Worst Plate</span>
                       <span style={styles.metricValue}>
-                        {formatScore((() => {
-                          const groups = Object.values(metrics.covariateGroups);
-                          const goodGroups = groups.filter(g => g.adjustedAssessment === 'good').length;
-                          const acceptableGroups = groups.filter(g => g.adjustedAssessment === 'acceptable').length;
-                          const totalGroups = groups.length;
-                          return totalGroups > 0 ? ((goodGroups * 100) + (acceptableGroups * 75)) / totalGroups : 0;
-                        })())}
-                      </span>
-                    </div>
-                    <div style={styles.groupBreakdown}>
-                      <span style={styles.breakdownText}>
-                        {Object.values(metrics.covariateGroups).filter(g => g.adjustedAssessment === 'good').length} good, {' '}
-                        {Object.values(metrics.covariateGroups).filter(g => g.adjustedAssessment === 'acceptable').length} acceptable, {' '}
-                        {Object.values(metrics.covariateGroups).filter(g => g.adjustedAssessment === 'poor').length} poor
+                        {formatScore(Math.min(...metrics.plateDiversity.plateScores.map(p => p.balanceScore)))}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Plate Diversity Summary */}
+                {/* Plate Randomization Summary */}
                 <div style={styles.metricSection}>
-                  <h4 style={styles.sectionTitle}>Plate Diversity</h4>
+                  <h4 style={styles.sectionTitle}>Plate Randomization</h4>
                   <div style={styles.summaryMetrics}>
                     <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Avg Proportional Accuracy</span>
+                      <span style={styles.metricLabel}>Average Randomization Score</span>
                       <span style={styles.metricValue}>
-                        {formatScore(metrics.plateDiversity.averageProportionalAccuracy)}
+                        {formatScore(metrics.plateDiversity.averageRandomizationScore)}
                       </span>
                     </div>
                     <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Avg Entropy (Diversity)</span>
+                      <span style={styles.metricLabel}>Best Plate</span>
                       <span style={styles.metricValue}>
-                        {formatScore(metrics.plateDiversity.averageEntropy)}
+                        {formatScore(Math.max(...metrics.plateDiversity.plateScores.map(p => p.randomizationScore)))}
                       </span>
                     </div>
                     <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Overall Diversity Score</span>
+                      <span style={styles.metricLabel}>Worst Plate</span>
                       <span style={styles.metricValue}>
-                        {formatScore((metrics.plateDiversity.averageProportionalAccuracy * 0.7) + (metrics.plateDiversity.averageEntropy * 0.3))}
+                        {formatScore(Math.min(...metrics.plateDiversity.plateScores.map(p => p.randomizationScore)))}
                       </span>
                     </div>
                   </div>

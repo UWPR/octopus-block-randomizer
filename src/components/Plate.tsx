@@ -194,18 +194,18 @@ const Plate: React.FC<PlateProps> = ({
               <span
                 style={{
                   ...currentStyles.qualityScore,
-                  color: getQualityColor(plateQuality.proportionalAccuracy)
+                  color: getQualityColor(plateQuality.balanceScore)
                 }}
               >
-                Acc: {formatScore(plateQuality.proportionalAccuracy)}
+                Bal: {formatScore(plateQuality.balanceScore)}
               </span>
               <span
                 style={{
                   ...currentStyles.qualityScore,
-                  color: getQualityColor(plateQuality.entropy)
+                  color: getQualityColor(plateQuality.randomizationScore)
                 }}
               >
-                Ent: {formatScore(plateQuality.entropy)}
+                Rand: {formatScore(plateQuality.randomizationScore)}
               </span>
             </div>
           )}

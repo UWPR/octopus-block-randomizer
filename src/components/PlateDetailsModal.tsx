@@ -92,15 +92,15 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                 {plateQuality && (
                   <>
                     <span>
-                      <strong>Accuracy:</strong>{' '}
-                      <span style={{ color: getQualityColor(plateQuality.proportionalAccuracy) }}>
-                        {formatScore(plateQuality.proportionalAccuracy)}
+                      <strong>Balance:</strong>{' '}
+                      <span style={{ color: getQualityColor(plateQuality.balanceScore) }}>
+                        {formatScore(plateQuality.balanceScore)}
                       </span>
                     </span>
                     <span>
-                      <strong>Entropy:</strong>{' '}
-                      <span style={{ color: getQualityColor(plateQuality.entropy) }}>
-                        {formatScore(plateQuality.entropy)}
+                      <strong>Randomization:</strong>{' '}
+                      <span style={{ color: getQualityColor(plateQuality.randomizationScore) }}>
+                        {formatScore(plateQuality.randomizationScore)}
                       </span>
                     </span>
                   </>

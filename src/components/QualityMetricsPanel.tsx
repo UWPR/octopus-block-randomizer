@@ -4,13 +4,13 @@ import { QualityMetrics } from '../types';
 interface QualityMetricsPanelProps {
   metrics: QualityMetrics | null;
   show: boolean;
-  onToggle: () => void;
+  onClose: () => void;
 }
 
 const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
   metrics,
   show,
-  onToggle
+  onClose
 }) => {
   const getQualityColor = (level: string): string => {
     switch (level) {
@@ -43,27 +43,29 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
 
   const formatScore = (score: number): string => score.toFixed(1);
 
-  return (
-    <div style={styles.container}>
-      <button
-        onClick={onToggle}
-        style={styles.toggleButton}
-      >
-        {show ? '▼ Hide' : '▶ Show'} Quality Assessment
-        {metrics && (
-          <span style={styles.qualityBadge}>
-            {getQualityIcon(metrics.overallQuality.level)} {metrics.overallQuality.score}
-          </span>
-        )}
-        {!metrics && (
-          <span style={styles.loadingBadge}>
-            ⏳ Calculating...
-          </span>
-        )}
-      </button>
+  if (!show) return null;
 
-      {show && (
-        <div style={styles.panel}>
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  return (
+    <div style={styles.modalOverlay} onClick={handleOverlayClick}>
+      <div style={styles.modalContent}>
+        <div style={styles.modalHeader}>
+          <h3 style={styles.modalTitle}>Quality Assessment</h3>
+          <button
+            onClick={onClose}
+            style={styles.modalCloseButton}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            ×
+          </button>
+        </div>
+        <div style={styles.modalBody}>
           {!metrics && (
             <div style={styles.loadingMessage}>
               <div style={styles.loadingIcon}>⏳</div>
@@ -73,7 +75,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
           )}
 
           {metrics && (
-            <>
+            <div style={styles.panel}>
               {/* Overall Quality Summary */}
               <div style={styles.summarySection}>
                 <div style={styles.overallScore}>
@@ -163,49 +165,75 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                   </ul>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
 
 const styles = {
-  container: {
-    width: '90%',
-    marginBottom: '20px',
+  modalOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
-  toggleButton: {
-    width: '100%',
-    padding: '12px 16px',
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #dee2e6',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#495057',
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    width: '90%',
+    maxWidth: '800px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
+  modalHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    transition: 'all 0.2s ease',
+    padding: '16px 20px',
+    borderBottom: '1px solid #e0e0e0',
+    backgroundColor: '#f8f9fa',
+    flexShrink: 0,
   },
-  qualityBadge: {
-    fontSize: '12px',
-    fontWeight: '600',
+  modalTitle: {
+    margin: 0,
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#333',
   },
-  loadingBadge: {
-    fontSize: '12px',
-    fontWeight: '600',
+  modalCloseButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '24px',
+    cursor: 'pointer',
     color: '#666',
+    padding: '4px',
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '4px',
+    transition: 'background-color 0.2s ease',
+  },
+  modalBody: {
+    padding: '20px',
+    overflow: 'auto',
+    flex: 1,
   },
   panel: {
-    backgroundColor: '#fff',
-    border: '1px solid #dee2e6',
-    borderTop: 'none',
-    borderRadius: '0 0 6px 6px',
-    padding: '16px',
+    fontWeight: '600',
   },
   loadingMessage: {
     textAlign: 'center' as const,

@@ -111,15 +111,7 @@ export function useQualityMetrics() {
     return quality;
   }, [metrics]);
 
-  /**
-   * Check if re-randomization is recommended
-   */
-  const shouldReRandomize = useMemo(() => {
-    if (!metrics) return false;
 
-    return metrics.overallQuality.score < 60 ||
-      metrics.overallQuality.recommendations.some(rec => rec.includes('re-randomization'));
-  }, [metrics]);
 
   /**
    * Get performance insights
@@ -160,7 +152,6 @@ export function useQualityMetrics() {
     // Computed values
     qualitySummary,
     plateQuality,
-    shouldReRandomize,
     performanceInsights,
 
     // Convenience getters

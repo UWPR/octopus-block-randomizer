@@ -187,7 +187,7 @@ export const calculateOverallQuality = (
 
   if (poorPlates.length > 0) {
     const plateNumbers = poorPlates.map(p => p.plateIndex + 1).join(', ');
-    recommendations.push(`Plates ${plateNumbers} have poor quality scores - consider re-randomizing`);
+    recommendations.push(`Plates ${plateNumbers} have poor quality scores`);
   }
 
   // Calculate overall score (equal weight to balance and randomization)

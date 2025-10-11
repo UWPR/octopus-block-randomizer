@@ -73,8 +73,7 @@ const App: React.FC = () => {
     calculateMetrics,
     resetMetrics,
     toggleMetrics,
-    qualitySummary,
-    shouldReRandomize
+    qualitySummary
   } = useQualityMetrics();
 
 
@@ -328,6 +327,29 @@ const App: React.FC = () => {
           {isProcessed && randomizedPlates.length > 0 && (
             <>
               <div style={styles.viewControls}>
+                {metrics && (
+                  <button
+                    onClick={toggleMetrics}
+                    style={styles.qualityButton}
+                  >
+                    <span style={styles.qualityButtonText}>Quality</span>
+                    <div style={styles.qualityButtonIndicators}>
+                      <span style={styles.qualityScore}>
+                        {metrics.overallQuality.score}
+                      </span>
+                      <span style={{
+                        ...styles.qualityBadge,
+                        backgroundColor:
+                          metrics.overallQuality.level === 'excellent' ? '#4caf50' :
+                          metrics.overallQuality.level === 'good' ? '#ff9800' :
+                          metrics.overallQuality.level === 'fair' ? '#f44336' : '#9e9e9e'
+                      }}>
+                        {metrics.overallQuality.level.charAt(0).toUpperCase() + metrics.overallQuality.level.slice(1)}
+                      </span>
+                    </div>
+                  </button>
+                )}
+
                 {summaryData.length > 0 && (
                   <button
                     onClick={() => setShowSummary(!showSummary)}
@@ -345,32 +367,12 @@ const App: React.FC = () => {
                 </button>
 
                 <button
-
                   onClick={handleReRandomize}
-                  style={{
-                    ...styles.controlButton,
-                    ...(shouldReRandomize ? styles.recommendedButton : {})
-                  }}
-                  title={shouldReRandomize ? 'Quality metrics suggest re-randomization' : 'Generate new randomization'}
+                  style={styles.controlButton}
+                  title="Generate new randomization"
                 >
-                  {shouldReRandomize ? '🔄 Re-randomize (Recommended)' : 'Re-randomize'}
+                  Re-randomize
                 </button>
-
-                {qualitySummary && (
-                  <div style={styles.qualityIndicator}>
-                    <span style={styles.qualityScore}>
-                      Quality: {qualitySummary.overallScore.toFixed(0)}
-                    </span>
-                    <span style={{
-                      ...styles.qualityBadge,
-                      backgroundColor: qualitySummary.qualityLevel === 'excellent' ? '#4caf50' :
-                        qualitySummary.qualityLevel === 'good' ? '#ff9800' :
-                          qualitySummary.qualityLevel === 'fair' ? '#f44336' : '#9e9e9e'
-                    }}>
-                      {qualitySummary.qualityLevel}
-                    </span>
-                  </div>
-                )}
 
                 <button onClick={handleDownloadCSV} style={styles.downloadButton}>
                   Download CSV
@@ -385,11 +387,7 @@ const App: React.FC = () => {
                 onSummaryItemClick={handleSummaryItemClick}
               />
 
-              <QualityMetricsPanel
-                metrics={metrics}
-                show={showMetrics}
-                onToggle={toggleMetrics}
-              />
+
 
 
 
@@ -427,6 +425,13 @@ const App: React.FC = () => {
           onClose={handleClosePlateDetails}
           onMouseDown={handleModalMouseDown}
           plateQuality={selectedPlateIndex !== null ? metrics?.plateDiversity.plateScores.find(score => score.plateIndex === selectedPlateIndex) : undefined}
+        />
+
+        {/* Quality Assessment Modal */}
+        <QualityMetricsPanel
+          metrics={metrics}
+          show={showMetrics}
+          onClose={toggleMetrics}
         />
       </div>
     </div>
@@ -508,6 +513,29 @@ const styles = {
     fontWeight: '500',
     transition: 'background-color 0.3s ease',
   },
+  qualityButton: {
+    padding: '8px 12px',
+    backgroundColor: '#e3f2fd',
+    border: '1px solid #bbdefb',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#1565c0',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  qualityButtonText: {
+    fontSize: '14px',
+    fontWeight: '500',
+  },
+  qualityButtonIndicators: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
   summaryToggle: {
     padding: '10px 16px',
     backgroundColor: '#f8f9fa',
@@ -518,12 +546,6 @@ const styles = {
     fontWeight: '500',
     color: '#495057',
     transition: 'all 0.2s ease',
-  },
-  recommendedButton: {
-    backgroundColor: '#fff3cd',
-    border: '1px solid #ffeaa7',
-    color: '#856404',
-    fontWeight: '600',
   },
   qualityIndicator: {
     display: 'flex',

@@ -22,7 +22,6 @@ interface PlatesGridProps {
   covariateColors: { [key: string]: CovariateColorInfo };
   selectedCovariates: string[];
   plateColumns: number;
-  selectedAlgorithm: string;
   highlightFunction?: (search: SearchData) => boolean;
   onDragStart: (event: DragEvent<HTMLDivElement>, searchName: string) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
@@ -37,7 +36,6 @@ const PlatesGrid: React.FC<PlatesGridProps> = ({
   covariateColors,
   selectedCovariates,
   plateColumns,
-  selectedAlgorithm,
   highlightFunction,
   onDragStart,
   onDragOver,
@@ -62,7 +60,7 @@ const PlatesGrid: React.FC<PlatesGridProps> = ({
             compact={compactView}
             highlightFunction={highlightFunction}
             numColumns={plateColumns}
-            onShowDetails={selectedAlgorithm === 'balanced' ? onShowDetails : undefined}
+            onShowDetails={onShowDetails}
             plateQuality={qualityMetrics?.plateDiversity.plateScores.find(score => score.plateIndex === plateIndex)}
           />
         </div>

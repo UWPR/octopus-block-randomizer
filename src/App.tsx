@@ -397,7 +397,6 @@ const App: React.FC = () => {
                 covariateColors={covariateColors}
                 selectedCovariates={selectedCovariates}
                 plateColumns={plateColumns}
-                selectedAlgorithm={selectedAlgorithm}
                 highlightFunction={isSearchHighlighted}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}

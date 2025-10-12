@@ -2,7 +2,12 @@ import { SearchData } from '../types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils';
 
 // Original greedy algorithm (refactored)
-export function greedyRandomization(searches: SearchData[], selectedCovariates: string[]): (SearchData | undefined)[][][] {
+export function greedyRandomization(
+    searches: SearchData[], 
+    selectedCovariates: string[]): {
+    plates: (SearchData | undefined)[][][];
+    plateAssignments?: Map<number, SearchData[]>;
+} {
     const platesNeeded = Math.ceil(searches.length / 96);
     let plates = Array.from({ length: platesNeeded }, () =>
         Array.from({ length: 8 }, () => new Array(12).fill(undefined))
@@ -54,7 +59,24 @@ export function greedyRandomization(searches: SearchData[], selectedCovariates: 
         }
     }
 
-    return plates;
+    // Calculate plateAssignments by extracting samples from the 3D plates array
+    const plateAssignments = new Map<number, SearchData[]>();
+    plates.forEach((plate, plateIndex) => {
+        const plateSamples: SearchData[] = [];
+        plate.forEach(row => {
+            row.forEach(cell => {
+                if (cell !== undefined) {
+                    plateSamples.push(cell);
+                }
+            });
+        });
+        plateAssignments.set(plateIndex, plateSamples);
+    });
+
+    return {
+        plates,
+        plateAssignments
+    };
 }
 
 // Legacy functions for backward compatibility

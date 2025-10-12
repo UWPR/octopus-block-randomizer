@@ -93,10 +93,7 @@ export function randomizeSearches(
             return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
         case 'greedy':
         default:
-            const greedyPlates = greedyRandomization(searches, selectedCovariates);
-            return {
-                plates: greedyPlates
-            };
+            return greedyRandomization(searches, selectedCovariates);
     }
 }
 

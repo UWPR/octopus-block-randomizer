@@ -87,7 +87,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             onChange={onAlgorithmChange}
             style={styles.compactSelect}
           >
-            <option value="balanced">Balanced Block Randomization</option>
+            <option value="balanced">Balanced Randomization</option>
             <option value="greedy">Greedy Randomization</option>
           </select>
           <small style={styles.algorithmDescription}>

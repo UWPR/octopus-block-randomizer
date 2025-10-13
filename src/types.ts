@@ -33,6 +33,14 @@ export interface PlateQualityScore {
   balanceScore: number; // 0-100 (Proportional Accuracy)
   randomizationScore: number; // 0-100 (Spatial Clustering)
   overallScore: number; // 0-100 (Average of both)
+  covariateGroupBalance: { [combination: string]: {
+    actualCount: number;
+    expectedCount: number;
+    actualProportion: number;
+    expectedProportion: number;
+    relativeDeviation: number;
+    weightedDeviation: number;
+    balanceScore: number } };
 }
 
 export interface PlateDiversityMetrics {

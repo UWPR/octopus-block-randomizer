@@ -1,7 +1,6 @@
 import React from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
 import { getCovariateKey } from '../utils';
-import { calculateCovariateGroupBalance } from '../utils/qualityMetrics';
 
 interface PlateDetailsModalProps {
   show: boolean;
@@ -110,7 +109,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
 
               {(() => {
                 const plateSamples = plateAssignments.get(plateIndex)!;
-                const groupBalance = calculateCovariateGroupBalance(plateSamples, searches, selectedCovariates);
+                const groupBalance = plateQuality?.covariateGroupBalance || {};
                 const covariateDistribution = new Map<string, number>();
 
                 // Calculate distribution for this plate
@@ -200,15 +199,24 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                               </div>
                               {balance && (
                                 <div style={styles.balanceInfo}>
-                                  <span style={{
+                                  <div style={{
                                     ...styles.balanceScore,
                                     color: getQualityColor(balance.balanceScore)
                                   }}>
                                     Balance: {balance.balanceScore}
-                                  </span>
-                                  <span style={styles.balanceDetails}>
-                                    Expected: {balance.expectedCount.toFixed(1)} • Deviation: {(balance.relativeDeviation * 100).toFixed(1)}%
-                                  </span>
+                                  </div>
+                                  <div style={styles.balanceDetailLine}>
+                                    Expected Proportion: {balance.expectedProportion.toFixed(4)}
+                                  </div>
+                                  <div style={styles.balanceDetailLine}>
+                                    Actual Proportion: {balance.actualProportion.toFixed(4)}
+                                  </div>
+                                  <div style={styles.balanceDetailLine}>
+                                    Deviation: {(balance.relativeDeviation * 100).toFixed(4)}%
+                                  </div>
+                                  <div style={styles.balanceDetailLine}>
+                                    Weighted Deviation: {(balance.weightedDeviation * 100).toFixed(4)}%
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -302,7 +310,7 @@ const styles = {
   balanceScore: {
     fontSize: '11px',
     fontWeight: '600',
-    padding: '1px 4px',
+    padding: '1px 0px',
     backgroundColor: '#f8f9fa',
     borderRadius: '2px',
   },
@@ -310,6 +318,12 @@ const styles = {
     padding: '1px 4px',
     fontSize: '10px',
     color: '#666',
+  },
+  balanceDetailLine: {
+    fontSize: '10px',
+    color: '#666',
+    lineHeight: '1.3',
+    textAlign: 'left' as const,
   },
   covariateDistribution: {
     display: 'flex',
@@ -385,9 +399,9 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '2px',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     minWidth: '120px',
-    textAlign: 'right' as const,
+    textAlign: 'left' as const,
   },
   noDataMessage: {
     textAlign: 'center' as const,

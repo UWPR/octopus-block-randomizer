@@ -470,7 +470,7 @@ const compactStyles = {
   },
   plateHeading: {
     ...baseStyles.plateHeading,
-    fontSize: '12px',
+    fontSize: '14px',
     textAlign: 'center' as const,
     flex: 1,
   },

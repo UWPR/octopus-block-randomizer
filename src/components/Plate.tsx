@@ -286,12 +286,12 @@ const baseStyles = {
     alignItems: 'center',
   },
   qualityLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     color: '#666',
     fontWeight: '500',
   },
   qualityScore: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: '600',
     padding: '1px 4px',
     backgroundColor: '#fff',

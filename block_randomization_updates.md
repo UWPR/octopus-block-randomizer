@@ -10,15 +10,15 @@ This document describes the enhancements made to the Octopus Block Randomization
 - **Palette Size**: Expanded to 24 distinct, bright colors organized into 4 subgroups for better visual separation
 - **Color Assignment Strategy**: Colors are assigned based on sample counts (descending order), with priority given to control/reference samples
 
-- **Handling Large Numbers of Covariate Groups**: When the number of unique covariate groups exceeds 24, the following approach is used:
+- **Handling Large Numbers of Covariate Groups**: When the number of unique covariate groups exceeds 24, the colors are recycled, and the following approach is used for display:
 
-| Cycle | Color Range | Display Style |
-|-------|------------|---------------|
-| 1 | Colors 1-24 | **Solid fill** with the assigned color |
-| 2 | Colors 25-48 | **Outline only** using the assigned color (transparent fill) |
-| 3 | Colors 49-72 | **Diagonal stripes** pattern using the assigned color |
+|  |  |
+|-------------|---------------|
+| Groups 1-24 | **Solid fill** with the assigned color |
+| Groups 25-48 | **Outline only** using the assigned color (transparent fill) |
+| Groups 49-72 | **Diagonal stripes** pattern using the assigned color |
 
-This approach supports up to 72 unique covariate combinations.
+This approach supports up to 72 unique covariate groups.
 
 ---
 
@@ -95,7 +95,7 @@ Click the information icon ("i") in the header of any plate. The draggable popup
 
 For each covariate group, displays:
 
-| Component | Description |
+|  |  |
 |-----------|-------------|
 | **Color Indicator** | 16×16px color box matching plate display |
 | **Combination Details** | All covariate values in the group |
@@ -229,3 +229,11 @@ The original code was refactored, and new components and hooks were created.
 5. **Export**: Download CSV with plate assignments
 
 ---
+| Metric | 15 Samples | 18 Samples | Impact |
+|--------|------------|------------|---------|
+| Expected per plate | 3.0 | 3.6 | Higher baseline |
+| Actual distribution | [2,4,3,1,5] | [2,4,3,4,5] | More balanced |
+| Chi-squared (χ²) | 3.32 | 1.43 | Lower (better) |
+| P-value | 0.66 | 0.84 | Higher (better) |
+| CV | 47.1% | 28.3% | Lower (better) |
+| Balance Score | 5.8 | 43.4 | Much better |

@@ -1,3 +1,4 @@
+import { log } from 'console';
 import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../types';
 import { getCovariateKey, groupByCovariates } from '../utils';
 
@@ -14,8 +15,59 @@ const calculateMean = (values: number[]): number =>
   values.reduce((sum, val) => sum + val, 0) / values.length;
 
 /**
- * Calculate plate balance score (Proportional Accuracy)
+ * Calculate balance for individual covariate groups on a specific plate
+ * Returns detailed breakdown of each group's balance
+ */
+export const calculateCovariateGroupBalance = (
+  plateSamples: SearchData[],
+  allSamples: SearchData[],
+  selectedCovariates: string[]
+): { [combination: string]: { actualCount: number; expectedCount: number; actualProportion: number; expectedProportion: number; relativeDeviation: number; balanceScore: number } } => {
+  if (plateSamples.length === 0 || allSamples.length === 0) return {};
+
+  const plateCombinations = groupByCovariates(plateSamples, selectedCovariates);
+  const globalCombinations = groupByCovariates(allSamples, selectedCovariates);
+  const plateSize = plateSamples.length;
+  const totalSamples = allSamples.length;
+
+  const result: { [combination: string]: { actualCount: number; expectedCount: number; actualProportion: number; expectedProportion: number; relativeDeviation: number; balanceScore: number } } = {};
+
+  globalCombinations.forEach((globalSamples, combination) => {
+    const actualCount = plateCombinations.get(combination)?.length || 0;
+    const expectedCount = (globalSamples.length / totalSamples) * plateSize;
+    const actualProportion = actualCount / plateSize;
+    const expectedProportion = globalSamples.length / totalSamples;
+
+    // Calculate relative percent deviation
+    let relativeDeviation: number;
+    if (expectedProportion > 0) {
+      relativeDeviation = Math.abs(actualProportion - expectedProportion) / expectedProportion;
+    } else {
+      relativeDeviation = actualProportion > 0 ? 1 : 0;
+    }
+
+    // Convert to individual balance score for this group
+    const cappedDeviation = Math.min(relativeDeviation, 1.0);
+    const balanceScore = Math.round(Math.max(0, 100 - (cappedDeviation * 100)));
+
+    result[combination] = {
+      actualCount,
+      expectedCount,
+      actualProportion,
+      expectedProportion,
+      relativeDeviation,
+      balanceScore
+    };
+  });
+
+  return result;
+};
+
+/**
+ * Calculate plate balance score using Weighted Relative Percent Deviation
  * Measures how well the plate represents overall covariate proportions
+ * Uses relative deviation: |actual - expected| / expected for each group
+ * Weighted by global proportion: larger population groups have more influence
  */
 const calculateBalanceScore = (
   plateSamples: SearchData[],
@@ -27,23 +79,45 @@ const calculateBalanceScore = (
   const plateCombinations = groupByCovariates(plateSamples, selectedCovariates);
   const plateSize = plateSamples.length;
 
-  let totalDeviation = 0;
   let validComparisons = 0;
+
+  let totalWeightedDeviation = 0;
+  let totalWeight = 0;
 
   globalProportions.forEach((globalCount, combination) => {
     const actualCount = plateCombinations.get(combination)?.length || 0;
     const actualProportion = actualCount / plateSize;
     const expectedProportion = globalCount / Array.from(globalProportions.values()).reduce((sum, count) => sum + count, 0);
 
-    const deviation = Math.abs(actualProportion - expectedProportion);
-    totalDeviation += deviation;
+    // Calculate relative percent deviation
+    let relativeDeviation: number;
+    if (expectedProportion > 0) {
+      // Normal case: calculate relative deviation as percentage
+      relativeDeviation = Math.abs(actualProportion - expectedProportion) / expectedProportion;
+    } else {
+      // Edge case: expected is 0, so any actual samples represent infinite deviation
+      relativeDeviation = actualProportion > 0 ? 1 : 0;
+    }
+
+    // Weight by global proportion (larger population groups have more influence)
+    const weight = expectedProportion;
+    totalWeightedDeviation += relativeDeviation * weight;
+    totalWeight += weight;
     validComparisons++;
   });
 
-  if (validComparisons === 0) return 0;
+  if (validComparisons === 0 || totalWeight === 0) return 0;
 
-  const averageDeviation = totalDeviation / validComparisons;
-  return Math.max(0, 100 - (averageDeviation * 100));
+  // Weighted average relative deviation (larger groups have more influence)
+  const weightedAverageDeviation = totalWeightedDeviation / totalWeight;
+
+  // Convert to balance score (0-100 scale):
+  // - 0% weighted deviation = 100 (perfect balance)
+  // - 50% weighted deviation = 50 (moderate balance)
+  // - 100% weighted deviation = 0 (poor balance)
+  // Cap at 100% deviation to prevent negative scores
+  const cappedDeviation = Math.min(weightedAverageDeviation, 1.0);
+  return Math.round(Math.max(0, 100 - (cappedDeviation * 100)));
 };
 
 /**
@@ -134,6 +208,7 @@ export const calculatePlateDiversityMetrics = (
   });
 
   plateAssignments.forEach((plateSamples, plateIndex) => {
+    console.log(`Calculating metrics for plate ${plateIndex + 1} with ${plateSamples.length} samples`);
     // Calculate balance score (proportional accuracy)
     const balanceScore = calculateBalanceScore(plateSamples, globalCombinationCounts, selectedCovariates);
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
 import { getCovariateKey } from '../utils';
+import { calculateCovariateGroupBalance } from '../utils/qualityMetrics';
 
 interface PlateDetailsModalProps {
   show: boolean;
@@ -106,8 +107,10 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                   </>
                 )}
               </div>
+
               {(() => {
                 const plateSamples = plateAssignments.get(plateIndex)!;
+                const groupBalance = calculateCovariateGroupBalance(plateSamples, searches, selectedCovariates);
                 const covariateDistribution = new Map<string, number>();
 
                 // Calculate distribution for this plate
@@ -127,16 +130,26 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                   <div style={styles.covariateDistribution}>
                     {Array.from(globalDistribution.entries())
                       .sort((a, b) => {
-                        // Sort by count on plate (descending), then by global count (descending)
-                        const countA = covariateDistribution.get(a[0]) || 0;
-                        const countB = covariateDistribution.get(b[0]) || 0;
-                        if (countB !== countA) return countB - countA;
-                        return b[1] - a[1];
+                        // Sort by: 1) total samples in group (descending), 2) samples in plate (descending), 3) group name (ascending)
+                        const globalCountA = a[1];
+                        const globalCountB = b[1];
+                        const plateCountA = covariateDistribution.get(a[0]) || 0;
+                        const plateCountB = covariateDistribution.get(b[0]) || 0;
+
+                        // First: sort by total samples in the covariate group (descending)
+                        if (globalCountB !== globalCountA) return globalCountB - globalCountA;
+
+                        // Second: sort by samples in this plate (descending)
+                        if (plateCountB !== plateCountA) return plateCountB - plateCountA;
+
+                        // Third: sort by group name (ascending)
+                        return a[0].localeCompare(b[0]);
                       })
                       .map(([combination, globalCount]) => {
                         const count = covariateDistribution.get(combination) || 0;
                         const colorInfo = covariateColors[combination] || { color: '#cccccc', useOutline: false, useStripes: false };
                         const percentage = globalCount > 0 ? ((count / globalCount) * 100).toFixed(1) : '0.0';
+                        const balance = groupBalance[combination];
 
                         return (
                           <div key={combination} style={{
@@ -156,34 +169,48 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                               }}
                             />
                             <div style={styles.distributionText}>
-                              <div style={{
-                                ...styles.distributionCombination,
-                                ...(count === 0 ? { color: '#999' } : {})
-                              }}>
-                                {selectedCovariates.map((cov, idx) => {
-                                  const values = combination.split('|');
-                                  return (
-                                    <span key={cov}>
-                                      <strong>{cov}:</strong> {values[idx] || 'N/A'}
-                                      {idx < selectedCovariates.length - 1 && ' • '}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                              <div style={styles.distributionStats}>
-                                <span style={{
-                                  ...styles.distributionCount,
+                              <div style={styles.covariateInfo}>
+                                <div style={styles.distributionStats}>
+                                  <span style={{
+                                    ...styles.distributionCount,
+                                    ...(count === 0 ? { color: '#999' } : {})
+                                  }}>
+                                    {count}/{globalCount}
+                                  </span>
+                                  <span style={{
+                                    ...styles.distributionPercentage,
+                                    ...(count === 0 ? { color: '#999' } : {})
+                                  }}>
+                                    ({percentage}%)
+                                  </span>
+                                </div>
+                                <div style={{
+                                  ...styles.distributionCombination,
                                   ...(count === 0 ? { color: '#999' } : {})
                                 }}>
-                                  {count}/{globalCount}
-                                </span>
-                                <span style={{
-                                  ...styles.distributionPercentage,
-                                  ...(count === 0 ? { color: '#999' } : {})
-                                }}>
-                                  ({percentage}%)
-                                </span>
+                                  {selectedCovariates.map((cov, idx) => {
+                                    const values = combination.split('|');
+                                    return (
+                                      <div key={cov} style={styles.covariateItem}>
+                                        <strong>{cov}:</strong> {values[idx] || 'N/A'}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
+                              {balance && (
+                                <div style={styles.balanceInfo}>
+                                  <span style={{
+                                    ...styles.balanceScore,
+                                    color: getQualityColor(balance.balanceScore)
+                                  }}>
+                                    Balance: {balance.balanceScore}
+                                  </span>
+                                  <span style={styles.balanceDetails}>
+                                    Expected: {balance.expectedCount.toFixed(1)} • Deviation: {(balance.relativeDeviation * 100).toFixed(1)}%
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -212,7 +239,7 @@ const styles = {
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'top',
     zIndex: 1000,
   },
   modalContent: {
@@ -272,6 +299,18 @@ const styles = {
     borderRadius: '4px',
     fontSize: '12px',
   },
+  balanceScore: {
+    fontSize: '11px',
+    fontWeight: '600',
+    padding: '1px 4px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '2px',
+  },
+  balanceDetails: {
+    padding: '1px 4px',
+    fontSize: '10px',
+    color: '#666',
+  },
   covariateDistribution: {
     display: 'flex',
     flexDirection: 'column' as const,
@@ -279,7 +318,7 @@ const styles = {
   },
   distributionItem: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'top',
     gap: '8px',
     padding: '6px 8px',
     backgroundColor: '#f8f9fa',
@@ -305,19 +344,33 @@ const styles = {
     flex: 1,
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '8px',
+    alignItems: 'flex-start',
+    gap: '12px',
+  },
+  covariateInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+    flex: 1,
   },
   distributionCombination: {
     fontSize: '12px',
     color: '#333',
     flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  covariateItem: {
+    fontSize: '12px',
+    lineHeight: '1.2',
   },
   distributionStats: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
     flexShrink: 0,
+    marginBottom: '4px',
   },
   distributionCount: {
     fontSize: '12px',
@@ -327,6 +380,14 @@ const styles = {
   distributionPercentage: {
     fontSize: '11px',
     color: '#666',
+  },
+  balanceInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+    alignItems: 'flex-end',
+    minWidth: '120px',
+    textAlign: 'right' as const,
   },
   noDataMessage: {
     textAlign: 'center' as const,

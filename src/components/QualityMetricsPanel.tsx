@@ -76,79 +76,78 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
 
           {metrics && (
             <div style={styles.panel}>
-              {/* Overall Quality Summary */}
-              <div style={styles.summarySection}>
-                <div style={styles.overallScore}>
-                  <div style={styles.scoreCircle}>
-                    <div
-                      style={{
-                        ...styles.scoreValue,
-                        color: getQualityColor(metrics.overallQuality.level)
-                      }}
-                    >
+              {/* Compact Quality Summary */}
+              <div style={styles.compactSummarySection}>
+                <div style={styles.compactOverallScore}>
+                  <div style={styles.compactScoreValue}>
+                    <span style={{
+                      ...styles.compactScore,
+                      color: getQualityColor(metrics.overallQuality.level)
+                    }}>
                       {metrics.overallQuality.score}
-                    </div>
-                    <div style={styles.scoreLabel}>Overall Quality</div>
-                  </div>
-                  <div style={styles.qualityLevel}>
-                    <span style={styles.qualityIcon}>{getQualityIcon(metrics.overallQuality.level)}</span>
-                    <span style={styles.qualityText}>
-                      {metrics.overallQuality.level.charAt(0).toUpperCase() + metrics.overallQuality.level.slice(1)} Quality
                     </span>
+                    <span style={styles.compactScoreLabel}>Overall Quality</span>
+                  </div>
+                </div>
+                <div style={styles.compactAverageScores}>
+                  <div style={styles.compactScoreItem}>
+                    <span style={styles.compactItemLabel}>Avg Balance:</span>
+                    <span style={styles.compactItemValue}>{formatScore(metrics.plateDiversity.averageBalanceScore)}</span>
+                  </div>
+                  <div style={styles.compactScoreItem}>
+                    <span style={styles.compactItemLabel}>Avg Randomization:</span>
+                    <span style={styles.compactItemValue}>{formatScore(metrics.plateDiversity.averageRandomizationScore)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Summary Metrics Grid */}
-              <div style={styles.metricsGrid}>
-                {/* Plate Balance Summary */}
-                <div style={styles.metricSection}>
-                  <h4 style={styles.sectionTitle}>Plate Balance</h4>
-                  <div style={styles.summaryMetrics}>
-                    <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Average Balance Score</span>
-                      <span style={styles.metricValue}>
-                        {formatScore(metrics.plateDiversity.averageBalanceScore)}
-                      </span>
-                    </div>
-                    <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Best Plate</span>
-                      <span style={styles.metricValue}>
-                        {formatScore(Math.max(...metrics.plateDiversity.plateScores.map(p => p.balanceScore)))}
-                      </span>
-                    </div>
-                    <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Worst Plate</span>
-                      <span style={styles.metricValue}>
-                        {formatScore(Math.min(...metrics.plateDiversity.plateScores.map(p => p.balanceScore)))}
-                      </span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Plate Randomization Summary */}
-                <div style={styles.metricSection}>
-                  <h4 style={styles.sectionTitle}>Plate Randomization</h4>
-                  <div style={styles.summaryMetrics}>
-                    <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Average Randomization Score</span>
-                      <span style={styles.metricValue}>
-                        {formatScore(metrics.plateDiversity.averageRandomizationScore)}
-                      </span>
-                    </div>
-                    <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Best Plate</span>
-                      <span style={styles.metricValue}>
-                        {formatScore(Math.max(...metrics.plateDiversity.plateScores.map(p => p.randomizationScore)))}
-                      </span>
-                    </div>
-                    <div style={styles.metricItem}>
-                      <span style={styles.metricLabel}>Worst Plate</span>
-                      <span style={styles.metricValue}>
-                        {formatScore(Math.min(...metrics.plateDiversity.plateScores.map(p => p.randomizationScore)))}
-                      </span>
-                    </div>
-                  </div>
+
+              {/* Individual Plate Scores */}
+              <div style={styles.plateScoresSection}>
+                <h4 style={styles.sectionTitle}>Individual Plate Scores</h4>
+                <div style={styles.plateScoresGrid}>
+                  {metrics.plateDiversity.plateScores
+                    .sort((a, b) => a.plateIndex - b.plateIndex) // Sort numerically by plate index
+                    .map((plate) => (
+                      <div key={plate.plateIndex} style={styles.plateScoreCard}>
+                        <div style={styles.plateScoreHeader}>
+                          <span style={styles.plateNumber}>Plate {plate.plateIndex + 1}</span>
+                          <span style={{
+                            ...styles.overallScoreBadge,
+                            backgroundColor:
+                              plate.overallScore >= 80 ? '#4caf50' :
+                                plate.overallScore >= 65 ? '#ff9800' : '#f44336'
+                          }}>
+                            {formatScore(plate.overallScore)}
+                          </span>
+                        </div>
+                        <div style={styles.plateScoreDetails}>
+                          <div style={styles.scoreItem}>
+                            <span style={styles.scoreLabel}>Balance:</span>
+                            <span style={{
+                              ...styles.scoreValue,
+                              color:
+                                plate.balanceScore >= 80 ? '#4caf50' :
+                                  plate.balanceScore >= 65 ? '#ff9800' : '#f44336'
+                            }}>
+                              {formatScore(plate.balanceScore)}
+                            </span>
+                          </div>
+                          <div style={styles.scoreItem}>
+                            <span style={styles.scoreLabel}>Randomization:</span>
+                            <span style={{
+                              ...styles.scoreValue,
+                              color:
+                                plate.randomizationScore >= 80 ? '#4caf50' :
+                                  plate.randomizationScore >= 65 ? '#ff9800' : '#f44336'
+                            }}>
+                              {formatScore(plate.randomizationScore)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </div>
 
@@ -249,40 +248,52 @@ const styles = {
     color: '#999',
     marginTop: '8px',
   },
-  summarySection: {
+  compactSummarySection: {
     marginBottom: '20px',
     padding: '16px',
     backgroundColor: '#f8f9fa',
     borderRadius: '6px',
-  },
-  overallScore: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: '20px',
   },
-  scoreCircle: {
+  compactOverallScore: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  compactScoreValue: {
     textAlign: 'center' as const,
   },
-  scoreValue: {
-    fontSize: '32px',
+  compactScore: {
+    fontSize: '24px',
     fontWeight: 'bold',
     display: 'block',
   },
-  scoreLabel: {
-    fontSize: '12px',
+  compactScoreLabel: {
+    fontSize: '11px',
     color: '#666',
-    marginTop: '4px',
+    marginTop: '2px',
   },
-  qualityLevel: {
+
+  compactAverageScores: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  compactScoreItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
   },
-  qualityIcon: {
-    fontSize: '24px',
+  compactItemLabel: {
+    fontSize: '12px',
+    color: '#666',
+    minWidth: '100px',
   },
-  qualityText: {
-    fontSize: '18px',
+  compactItemValue: {
+    fontSize: '12px',
     fontWeight: '600',
     color: '#333',
   },
@@ -333,6 +344,56 @@ const styles = {
   },
   breakdownText: {
     color: '#1565c0',
+  },
+  plateScoresSection: {
+    marginBottom: '20px',
+  },
+  plateScoresGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gap: '12px',
+  },
+  plateScoreCard: {
+    padding: '12px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '6px',
+    border: '1px solid #e9ecef',
+  },
+  plateScoreHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  plateNumber: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#333',
+  },
+  overallScoreBadge: {
+    padding: '2px 8px',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
+  plateScoreDetails: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  scoreItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scoreLabel: {
+    fontSize: '12px',
+    color: '#666',
+  },
+  scoreValue: {
+    fontSize: '12px',
+    fontWeight: '600',
   },
   recommendationsSection: {
     padding: '12px',

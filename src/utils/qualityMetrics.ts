@@ -1,4 +1,3 @@
-import { log } from 'console';
 import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../types';
 import { getCovariateKey, groupByCovariates } from '../utils';
 

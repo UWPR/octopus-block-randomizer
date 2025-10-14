@@ -93,7 +93,7 @@ Option to control how empty cells / wells are handled when sample count < total 
 Quality assement includes scores that evaluates the balance and randomization quality of plate assignments. Quality scores are calculated automatically and updated in real-time as users make changes. The following scores are calculated:
 
 #### __Balance Score__ (0-100)
-- **Purpose**: Measures how well each plate represents the overall population
+- **Purpose**: The balance score evaluates whether each plate contains a representative sample of the overall population based on selected covariates
 - **Calculation**: Based on relative deviation from expected covariate group proportions
 - **Weighting**: Larger covariate groups have more influence on the score
 - **Real-time**: Updates when all plates or single plates are re-randomized, and when samples are moved between or within plates
@@ -267,26 +267,57 @@ Both re-randomization methods automatically trigger:
 ## Quality Score Calculation Details
 
 ### Balance Score
+The balance score evaluates whether each plate contains a representative sample of the overall population based on selected covariates.
+
 For each covariate group on each plate:
 ```
-Expected Count = (Group Size / Total Samples) × Plate Capacity
-Relative Deviation = |Actual - Expected| / Expected
-Group Balance Score = max(0, 100 - (Relative Deviation × 100))
+Actual Count = Number of samples from this group on this plate
+Expected Proportion = Group Size / Total Samples
+Actual Proportion = Actual Count / Plate Capacity
+Relative Deviation = |Actual Proportion - Expected Proportion| / Expected Proportion
+Balance Score = max(0, 100 - (Relative Deviation × 100))
 ```
 
 Overall plate balance uses weighted averaging:
 ```
-Weight = Expected Proportion (group size / total samples)
-Weighted Deviation = Relative Deviation × Weight
-Plate Balance Score = max(0, 100 - (Sum of Weighted Deviations × 100))
+For each covariate group:
+  Weight = Expected Proportion (group size / total samples)
+  Weighted Deviation = Relative Deviation × Weight
+  TotalWeight += Weight;
+
+Weighted Average Deviation = (Sum of Weighted Deviations) / TotalWeight
+Plate Balance Score = max(0, 100 - (Weighted Average Deviation × 100))
+
 ```
 
 ### Randomization Score
+The randomization score measures spatial clustering to ensure similar samples are not grouped together on the plate.
 For each sample position:
-1. **Identify Neighbors**: All adjacent positions (8-directional)
-2. **Compare Profiles**: Check if neighbors have different covariate combinations
+1. **Identify Neighbors**: All adjacent positions (8-directional: up, down, left, right, diagonals)
+2. **Compare Covariate Keys**: Check if neighbor represents a different covariate group
+3. **Count Different Neighbors**: Tally neighbors which represent different covariate groups
 3. **Calculate Ratio**: Different neighbors / Total neighbor comparisons
 4. **Scale to 0-100**: Higher percentage = better randomization
+
+#### Score Calculation
+```
+Total Comparisons = Sum of all neighbor-to-neighbor comparisons
+Different Neighbors = Count of neighbors representing different covariate groups
+
+Randomization Score = (Different Neighbors / Total Comparisons) × 100
+```
+
+### Plate-Level Overall Score
+```
+Plate Overall Score = (Balance Score + Randomization Score) / 2
+```
+
+### Experiment-Level Scores
+```
+Average Balance Score = Mean of all plate balance scores
+Average Randomization Score = Mean of all plate randomization scores
+Overall Experiment Score = (Average Balance + Average Randomization) / 2
+```
 
 
 ### Quality Score Interpretation
@@ -301,61 +332,6 @@ For each sample position:
 | 0-59 | Very Poor | Major problems affecting study validity |
 
 ---
----
-
-
-
-## Implementation Files
-
-The original code was refactored, and new components and hooks were created to support the enhanced functionality including new randomization algorithm, quality scoring, individual plate re-randomization, and improved user interface.
-
-### Core Components
-
-- **App.tsx**: Main application managing state, interactions, and quality metrics integration
-- **ConfigurationForm.tsx**: Enhanced form with algorithm selection, plate dimensions, and control sample options
-- **Plate.tsx**: Individual plate rendering with compact/full views, quality scores display, and re-randomization buttons
-- **PlatesGrid.tsx**: Grid layout management for multiple plates with quality metrics integration
-- **SummaryPanel.tsx**: Covariate groups summary with interactive highlighting and sorting
-- **PlateDetailsModal.tsx**: Draggable modal with enhanced covariate distribution, quality metrics, and real-time balance information
-- **QualityMetricsPanel.tsx**: Quality assessment modal displaying overall scores, individual plate metrics, and recommendations
-- **FileUploadSection.tsx**: File upload interface with validation and column detection
-
-### Algorithm Files
-
-- **balancedRandomization.ts**: Advanced balanced randomization with two-level distribution
-- **greedyRandomization.ts**: Original greedy algorithm implementation (legacy support)
-- **utils.ts**: Shared utilities including expanded color palette, covariate grouping, and CSV export functionality
-
-### Quality Assessment System
-
-- **qualityMetrics.ts**: Core quality calculation engine with balance and randomization scoring
-- **useQualityMetrics.ts**: Hook for managing quality state, calculations, and real-time updates
-
-### Custom Hooks
-
-- **useCovariateColors.ts**: Advanced color assignment with priority handling and pattern support (solid/outline/stripes)
-- **useRandomization.ts**: Randomization coordination with individual plate re-randomization and algorithm-specific behavior
-- **useModalDrag.ts**: Draggable modal functionality with position management
-- **useDragAndDrop.ts**: Sample drag-and-drop with automatic quality recalculation
-- **useFileUpload.ts**: File upload management with CSV parsing and column detection
-
-### Type Definitions
-
-- **types.ts**: Comprehensive TypeScript interfaces including:
-  - `SearchData`: Sample metadata structure
-  - `QualityMetrics`: Quality assessment data structures
-  - `PlateQualityScore`: Individual plate quality information
-  - `CovariateColorInfo`: Color assignment and pattern definitions
-  - `RandomizationAlgorithm`: Algorithm type definitions
-
-### Utility Functions
-
-- **Color Management**: 24-color palette with recycling and pattern support
-- **Quality Calculations**: Balance scoring, spatial analysis, and weighted averaging
-- **Data Processing**: Covariate grouping, sample distribution, and CSV handling
-- **UI Helpers**: Drag and drop coordination, modal positioning, and state management
-
-
 ---
 
 ## Usage

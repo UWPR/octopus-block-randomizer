@@ -45,12 +45,12 @@ Users can choose between two randomization strategies:
 - Comma-separated list of labels (e.g., "Control, QC, Reference")
 - Covariate groups containing these labels receive priority in color assignment - brighter colors assigned to make them more recognizable.
 
-### Plate Dimensions (_only available for the Balanced Block Randomization algorithm_)
+### Plate Dimensions (_only available for the Balanced Randomization algorithm_)
 - **Rows**: Configurable from 1-16 (default: 8)
 - **Columns**: Configurable from 1-24 (default: 12)
 - **Display**: Shows calculated plate capacity (rows × columns)
 
-### Empty Cell Distribution (_only available for the Balanced Block Randomization algorithm_)
+### Empty Cell Distribution (_only available for the Balanced Randomization algorithm_)
 Option to control how empty cells / wells are handled when sample count < total capacity:
 
 - **Keep empty cells in last plate** (default checked): All empty cells are assigned to the final plate
@@ -94,30 +94,29 @@ Quality assement includes scores that evaluates the balance and randomization qu
 
 #### __Balance Score__ (0-100)
 - **Purpose**: Measures how well each plate represents the overall population
-- **Calculation**: Based on relative deviation from expected covariate proportions
+- **Calculation**: Based on relative deviation from expected covariate group proportions
 - **Weighting**: Larger covariate groups have more influence on the score
 - **Real-time**: Updates when all plates or single plates are re-randomized, and when samples are moved between or within plates
 
 #### __Randomization Score__ (0-100)
 - **Purpose**: Measures spatial clustering and randomness of sample placement
 - **Calculation**: Analyzes neighbor relationships to detect clustering patterns
-- **Method**: Counts samples with different covariate profiles among spatial neighbors
+- **Method**: Counts samples from different covariate groups among spatial neighbors
 - **Real-time**: Updates when samples are repositioned on plates
 
 ### Quality Score Display
 
 #### __Overall Quality Button__
 Located in the main control panel, shows:
-- **Overall Score**: Average of balance and randomization scores
+- **Overall Score**: Average of **balance** and **randomization** scores
 - **Quality Level**: Excellent (85+), Good (75-84), Fair (65-74), Poor (<65)
 
 ![Quality Button](qualityButton.png)
 
-#### __Quality Assessment Modal__
+#### __Quality Assessment Popup__
 Accessible via the quality button, provides:
 - **Experiment Summary**: Overall scores and quality level
 - **Individual Plate Scores**: Detailed breakdown for each plate
-- **Recommendations**: Suggestions for improvement when scores are low
 
 ![Quality Assessment Modal](QualityAssessmentModal.png)
 
@@ -153,42 +152,6 @@ Users can switch between views using the **Compact View** / **Full Size View** b
 
 ---
 
-## 4. Plate Details Popup
-
-Click the information icon ("i") in the header of any plate. The draggable popup displays the following:
-
-#### Summary Statistics
-- **Capacity**: Total number of  cells / wells in the plate
-- **Samples**: Number of samples actually placed in the plate
-- **Plate Scores**: Balance and Randomization
-
-#### Covariate Distribution Table
-
-For each covariate group, displays:
-
-|  |  |
-|-----------|-------------|
-| **Color Indicator** | 16×16px color box matching plate display |
-| **Combination Details** | All covariate values in the group |
-| **Count Ratio** | Samples in this plate / Total samples in group |
-| **Percentage** | Percentage of group's samples on this plate |
-
-
-![alt text](plateDetailsPopup.png)
-
----
-
-## 5. "Re-randomize" Button
-
-Generates a new randomization while preserving:
-  - Current covariate selections
-  - Algorithm choice
-  - Plate dimensions
-  - Color assignments
-  - Empty space distribution settings
-
----
-
 ## 6. Covariate Groups Summary Panel
 
 The summary panel provides an overview of all unique covariate groups.
@@ -210,13 +173,54 @@ The summary panel provides an overview of all unique covariate groups.
 
 ---
 
-## 7. Interactive Highlighting
 
-Click any covariate group in the summary panel to highlight (blue border; glowing effect) all samples belonging to that group in all the plates.
+## 7. Plate Details Popup
+
+Click the information icon ("i") in the header of any plate. The draggable popup displays comprehensive information about the selected plate:
+
+![alt text](plateDetailsPopup.png)
+
+#### Header Section
+- **Plate Title**: "Plate X Details" with plate number
+- **Close Button**: X button to close the modal
+- **Draggable**: Modal can be repositioned by dragging the header
+
+#### Summary Statistics
+- **Capacity**: Total number of cells / wells in the plate
+- **Samples**: Number of samples actually placed in the plate
+- **Quality Scores**: Balance and randomization scores
+
+#### Covariate Distribution
+
+The modal shows each covariate group with detailed information arranged in two columns:
+
+**Left Column - Covariate Information:**
+- **Color Indicator**: 16×16px color box matching plate display
+- **Sample Proportions**: Shows count of samples from a covariate group in the plate / total samples in the covariate group.
+- **Covariate Details**: All covariate values displayed on separate lines
+  - Format: `Set: Training`, `Focus_Area: FA2`, etc.
+
+
+**Right Column - Quality Metrics:**
+- **Balance Score**: Individual balance score (0-100) with color coding
+- **Expected Count**: Expected number of samples (with decimals)
+- **Actual Count**: Actual number of samples on this plate
+- **Deviation**: Percentage deviation from expected count
+- **Weighted Deviation**: The weighted deviation value used in overall balance calculation
+
+#### Real-time Updates
+- All quality scores update automatically when samples are moved
+- Covariate groups selected in the **Covariate Summary" view are highlighted in the popup
+
+---
+
+## 8. Interactive Highlighting
+
+Clicking a covariate group in the summary panel highlights (blue border; glowing effect) all samples belonging to that group in all the plates.
 
 - **Persistence**: Highlighting persists when switching between views
-- **Modal sync**: selected group also highlighted in plate details popup
-- **Toggle**: Click the same group again to remove highlighting
+- **Plate Details popup sync**: selected group also highlighted in plate details popup
+- **Toggle**: Clicking the same group again removes the highlighting
 
 ![alt text](selectedCovariateGroup.png)
 ![alt text](cellHighlighted-Plate.png)
@@ -224,12 +228,21 @@ Click any covariate group in the summary panel to highlight (blue border; glowin
 
 ---
 
+## 9. "Re-randomize" Button
 
+Generates a new randomization while preserving:
+  - Current covariate selections
+  - Algorithm choice
+  - Plate dimensions
+  - Color assignments
+  - Empty space distribution settings
+
+---
 
 
 ### Quality Score Calculation Details
 
-#### Balance Score Methodology
+#### Balance Score
 For each covariate group on each plate:
 ```
 Expected Count = (Group Size / Total Samples) × Plate Capacity
@@ -244,7 +257,7 @@ Weighted Deviation = Relative Deviation × Weight
 Plate Balance Score = max(0, 100 - (Sum of Weighted Deviations × 100))
 ```
 
-#### Randomization Score Methodology
+#### Randomization Score
 For each sample position:
 1. **Identify Neighbors**: All adjacent positions (8-directional)
 2. **Compare Profiles**: Check if neighbors have different covariate combinations
@@ -253,7 +266,6 @@ For each sample position:
 
 #### Edge Case Handling
 - **Small Groups**: Groups with <1 expected sample per plate use fractional calculations
-- **Empty Groups**: Automatically receive perfect scores if no samples exist globally
 - **Non-divisible Counts**: Uses fractional expected counts for precise calculations
 
 ### Quality Score Interpretation
@@ -267,12 +279,7 @@ For each sample position:
 | 60-69 | Poor | Significant issues requiring attention |
 | 0-59 | Very Poor | Major problems affecting study validity |
 
-#### When to Re-randomize
-Consider re-randomization when:
-- Overall experiment score < 70
-- Any individual plate score < 60
-- Critical covariate groups show severe imbalance (>50% deviation)
-- Multiple plates have poor randomization scores
+
 
 ### Real-time Quality Updates
 
@@ -304,7 +311,7 @@ The plate details modal now includes:
   - Expected count (fractional precision)
   - Actual count on the plate
   - Deviation percentage from expected
-  - Weight (influence on overall balance score)
+  - Weighted Deviation (used in overall balance calculation)
 - **Sorting**: Covariate groups sorted by total samples → plate samples → name
 - **Real-time Updates**: Reflects current quality metrics
 

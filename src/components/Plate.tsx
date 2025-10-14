@@ -76,6 +76,7 @@ interface PlateProps {
   numColumns?: number;
   onShowDetails?: (plateIndex: number) => void;
   plateQuality?: PlateQualityScore;
+  onReRandomizePlate?: (plateIndex: number) => void;
 }
 
 const Plate: React.FC<PlateProps> = ({
@@ -90,7 +91,8 @@ const Plate: React.FC<PlateProps> = ({
   highlightFunction,
   numColumns = 12,
   onShowDetails,
-  plateQuality
+  plateQuality,
+  onReRandomizePlate
 }) => {
   const getQualityColor = (score: number): string => {
     if (score >= 80) return '#4caf50';
@@ -186,9 +188,31 @@ const Plate: React.FC<PlateProps> = ({
   return (
     <div style={currentStyles.plate}>
       <div style={currentStyles.plateHeader}>
-        <div style={currentStyles.plateTitleSection}>
+        <div style={currentStyles.plateTitleRow}>
           <div style={currentStyles.plateHeading}>Plate {plateIndex + 1}</div>
-          {plateQuality && (
+          <div style={currentStyles.plateButtons}>
+            {onReRandomizePlate && (
+              <button
+                onClick={() => onReRandomizePlate(plateIndex)}
+                style={currentStyles.reRandomizeButton}
+                title="Re-randomize this plate"
+              >
+                <div style={currentStyles.reRandomizeIcon}>R</div>
+              </button>
+            )}
+            {onShowDetails && (
+              <button
+                onClick={() => onShowDetails(plateIndex)}
+                style={currentStyles.detailsButton}
+                title="Show plate details"
+              >
+                <div style={currentStyles.detailsIcon}>i</div>
+              </button>
+            )}
+          </div>
+        </div>
+        {plateQuality && (
+          <div style={currentStyles.plateQualityRow}>
             <div style={currentStyles.plateQualityMetrics}>
               <span style={currentStyles.qualityLabel}>Quality:</span>
               <span
@@ -208,16 +232,7 @@ const Plate: React.FC<PlateProps> = ({
                 Rand: {formatScore(plateQuality.randomizationScore)}
               </span>
             </div>
-          )}
-        </div>
-        {onShowDetails && (
-          <button
-            onClick={() => onShowDetails(plateIndex)}
-            style={currentStyles.detailsButton}
-            title="Show plate details"
-          >
-            <div style={currentStyles.detailsIcon}>i</div>
-          </button>
+          </div>
         )}
       </div>
       <div style={currentStyles.grid}>
@@ -266,16 +281,28 @@ const Plate: React.FC<PlateProps> = ({
 const baseStyles = {
   plateHeader: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  plateTitleSection: {
-    display: 'flex',
     flexDirection: 'column' as const,
     gap: '4px',
-    alignItems: 'center',
-    flex: 1,
+    width: '100%',
   },
+  plateTitleRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  plateQualityRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  plateButtons: {
+    display: 'flex',
+    gap: '0px',
+    alignItems: 'center',
+  },
+
   plateHeading: {
     fontWeight: 'bold',
     margin: 0,
@@ -313,6 +340,21 @@ const baseStyles = {
     justifyContent: 'center',
     fontWeight: 'bold',
     fontStyle: 'italic',
+  },
+  reRandomizeButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+  },
+  reRandomizeIcon: {
+    borderRadius: '50%',
+    backgroundColor: '#2196f3',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold',
   },
   grid: {
     display: 'flex',
@@ -398,6 +440,20 @@ const styles = {
     height: '18px',
     fontSize: '12px',
   },
+  reRandomizeButton: {
+    ...baseStyles.reRandomizeButton,
+    padding: '2px',
+    borderRadius: '4px',
+  },
+  reRandomizeIcon: {
+    ...baseStyles.reRandomizeIcon,
+    width: '18px',
+    height: '18px',
+    fontSize: '14px',
+  },
+  plateTitleRow: baseStyles.plateTitleRow,
+  plateQualityRow: baseStyles.plateQualityRow,
+  plateButtons: baseStyles.plateButtons,
   grid: {
     ...baseStyles.grid,
     gap: '10px',
@@ -485,6 +541,20 @@ const compactStyles = {
     height: '14px',
     fontSize: '10px',
   },
+  reRandomizeButton: {
+    ...baseStyles.reRandomizeButton,
+    padding: '1px',
+    borderRadius: '2px',
+  },
+  reRandomizeIcon: {
+    ...baseStyles.reRandomizeIcon,
+    width: '14px',
+    height: '14px',
+    fontSize: '12px',
+  },
+  plateTitleRow: baseStyles.plateTitleRow,
+  plateQualityRow: baseStyles.plateQualityRow,
+  plateButtons: baseStyles.plateButtons,
   grid: {
     ...baseStyles.grid,
     gap: '2px',

@@ -44,6 +44,7 @@ const App: React.FC = () => {
     plateAssignments,
     processRandomization,
     reRandomize,
+    reRandomizeSinglePlate,
     resetRandomization,
     updatePlates,
   } = useRandomization();
@@ -98,7 +99,7 @@ const App: React.FC = () => {
   const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
 
 
-  // Calculate quality metrics when randomization completes
+  // Calculate quality metrics when randomization completes or plates change
   useEffect(() => {
     if (isProcessed && randomizedPlates.length > 0 && plateAssignments && selectedCovariates.length > 0) {
       calculateMetrics(
@@ -221,6 +222,22 @@ const App: React.FC = () => {
         plateRows,
         plateColumns
       );
+    }
+  };
+
+  // Single plate re-randomization handler
+  const handleReRandomizePlate = (plateIndex: number) => {
+    if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      reRandomizeSinglePlate(
+        plateIndex,
+        searches,
+        selectedCovariates,
+        selectedAlgorithm,
+        keepEmptyInLastPlate,
+        plateRows,
+        plateColumns
+      );
+      // Quality metrics will be recalculated automatically via useEffect
     }
   };
 
@@ -402,6 +419,7 @@ const App: React.FC = () => {
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onShowDetails={handleShowPlateDetails}
+                onReRandomizePlate={handleReRandomizePlate}
                 qualityMetrics={metrics ?? undefined}
               />
             </>

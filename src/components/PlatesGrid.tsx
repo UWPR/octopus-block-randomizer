@@ -27,6 +27,7 @@ interface PlatesGridProps {
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>, plateIndex: number, rowIndex: number, columnIndex: number) => void;
   onShowDetails?: (plateIndex: number) => void;
+  onReRandomizePlate?: (plateIndex: number) => void;
   qualityMetrics?: QualityMetrics;
 }
 
@@ -41,6 +42,7 @@ const PlatesGrid: React.FC<PlatesGridProps> = ({
   onDragOver,
   onDrop,
   onShowDetails,
+  onReRandomizePlate,
   qualityMetrics,
 }) => {
   if (randomizedPlates.length === 0) return null;
@@ -61,6 +63,7 @@ const PlatesGrid: React.FC<PlatesGridProps> = ({
             highlightFunction={highlightFunction}
             numColumns={plateColumns}
             onShowDetails={onShowDetails}
+            onReRandomizePlate={onReRandomizePlate}
             plateQuality={qualityMetrics?.plateDiversity.plateScores.find(score => score.plateIndex === plateIndex)}
           />
         </div>

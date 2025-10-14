@@ -76,7 +76,8 @@ const calculatePlateBalance = (
     const groupBalanceScore = Math.round(Math.max(0, 100 - (cappedDeviation * 100)));
 
     // Accumulate weighted deviation for overall score (weight by global proportion)
-    const weight = 1; // expectedProportion;
+    // const weight = 1; // expectedProportion;
+    const weight = expectedProportion;
     const weightedDeviation = relativeDeviation * weight;
     totalWeightedDeviation += weightedDeviation;
     totalWeight += weight;

@@ -61,7 +61,7 @@ Option to control how empty cells / wells are handled when sample count < total 
 
 ---
 
-## 3. New Balanced Block Randomization Algorithm
+## 3. New Balanced Randomization Algorithm
 
 
 #### Two-Level Distribution
@@ -88,12 +88,55 @@ Option to control how empty cells / wells are handled when sample count < total 
 
 ---
 
-## 4. Compact View Implementation
+## 4. Quality Metrics
+
+Quality assement includes scores that evaluates the balance and randomization quality of plate assignments. Quality scores are calculated automatically and updated in real-time as users make changes. The following scores are calculated:
+
+#### __Balance Score__ (0-100)
+- **Purpose**: Measures how well each plate represents the overall population
+- **Calculation**: Based on relative deviation from expected covariate proportions
+- **Weighting**: Larger covariate groups have more influence on the score
+- **Real-time**: Updates when all plates or single plates are re-randomized, and when samples are moved between or within plates
+
+#### __Randomization Score__ (0-100)
+- **Purpose**: Measures spatial clustering and randomness of sample placement
+- **Calculation**: Analyzes neighbor relationships to detect clustering patterns
+- **Method**: Counts samples with different covariate profiles among spatial neighbors
+- **Real-time**: Updates when samples are repositioned on plates
+
+### Quality Score Display
+
+#### __Overall Quality Button__
+Located in the main control panel, shows:
+- **Overall Score**: Average of balance and randomization scores
+- **Quality Level**: Excellent (85+), Good (75-84), Fair (65-74), Poor (<65)
+
+![Quality Button](qualityButton.png)
+
+#### __Quality Assessment Modal__
+Accessible via the quality button, provides:
+- **Experiment Summary**: Overall scores and quality level
+- **Individual Plate Scores**: Detailed breakdown for each plate
+- **Recommendations**: Suggestions for improvement when scores are low
+
+![Quality Assessment Modal](QualityAssessmentModal.png)
+
+#### __Individual Plate Headers__
+Each plate displays:
+- **Bal**: Balance score for that specific plate
+- **Rand**: Randomization score for that specific plate
+
+![Plate Quality in Header](PlateQualityHeader.png)
+
+---
+
+## 5. Compact View Implementation
 
 The original full-size plate view made it difficult to visualize sample distribution patterns across multiple plates simultaneously, especially when working with many plates. A compact view was added to enable quick overview of sample distribution over multiple plates.
 Users can switch between views using the **Compact View** / **Full Size View** button in the control panel.
 
 ![alt text](compactPlates.png)
+
 
 #### Compact View (Default)
 - **Cell Size**: 18×16 pixels per cell
@@ -117,6 +160,7 @@ Click the information icon ("i") in the header of any plate. The draggable popup
 #### Summary Statistics
 - **Capacity**: Total number of  cells / wells in the plate
 - **Samples**: Number of samples actually placed in the plate
+- **Plate Scores**: Balance and Randomization
 
 #### Covariate Distribution Table
 
@@ -181,46 +225,7 @@ Click any covariate group in the summary panel to highlight (blue border; glowin
 ---
 
 
-## 8. Quality Scoring System
 
-The application includes a comprehensive quality assessment system that evaluates both the balance and randomization quality of plate assignments. Quality scores are calculated automatically and updated in real-time as users make changes.
-
-### Quality Metrics Overview
-
-The system provides two primary quality scores:
-
-#### Balance Score (0-100)
-- **Purpose**: Measures how well each plate represents the overall population
-- **Calculation**: Based on relative deviation from expected covariate proportions
-- **Weighting**: Larger covariate groups have more influence on the score
-- **Real-time**: Updates when samples are moved between or within plates
-
-#### Randomization Score (0-100)
-- **Purpose**: Measures spatial clustering and randomness of sample placement
-- **Calculation**: Analyzes neighbor relationships to detect clustering patterns
-- **Method**: Counts samples with different covariate profiles among spatial neighbors
-- **Real-time**: Updates when samples are repositioned on plates
-
-### Quality Score Display
-
-#### Overall Quality Button
-Located in the main control panel, shows:
-- **Overall Score**: Average of balance and randomization scores
-- **Quality Level**: Excellent (85+), Good (75-84), Fair (65-74), Poor (<65)
-- **Color Coding**: Green (excellent), Orange (good/fair), Red (poor)
-
-#### Individual Plate Headers
-Each plate displays:
-- **Bal**: Balance score for that specific plate
-- **Rand**: Randomization score for that specific plate
-- **Color Coding**: Scores colored by quality level
-
-#### Quality Assessment Modal
-Accessible via the quality button, provides:
-- **Experiment Summary**: Overall scores and quality level
-- **Individual Plate Scores**: Detailed breakdown for each plate
-- **Recommendations**: Suggestions for improvement when scores are low
-- **Sorting**: Plates sorted by overall quality (lowest first)
 
 ### Quality Score Calculation Details
 

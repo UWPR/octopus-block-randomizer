@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the enhancements made to the Octopus Block Randomization app for distributing biological samples across plates.
+This document describes the enhancements made to the Octopus Block Randomization app for distributing samples across plates.
 
 
 ## 1. Updated Color Palette
@@ -43,7 +43,7 @@ Users can choose between two randomization strategies:
 
 ### Control/Reference Sample Field
 - Comma-separated list of labels (e.g., "Control, QC, Reference")
-- Covariate groups containing these labels receive priority in color assignment - brigher colors assigned to make them more recognizable.
+- Covariate groups containing these labels receive priority in color assignment - brighter colors assigned to make them more recognizable.
 
 ### Plate Dimensions (_only available for the Balanced Block Randomization algorithm_)
 - **Rows**: Configurable from 1-16 (default: 8)
@@ -53,7 +53,7 @@ Users can choose between two randomization strategies:
 ### Empty Cell Distribution (_only available for the Balanced Block Randomization algorithm_)
 Option to control how empty cells / wells are handled when sample count < total capacity:
 
-- **Keep empty spots in last plate** (default checked): All empty cells are assigned to the final plate
+- **Keep empty cells in last plate** (default checked): All empty cells are assigned to the final plate
 - **Distribute evenly** (unchecked): Empty cells spread across all plates
 
 ### Covariate Display
@@ -61,15 +61,42 @@ Option to control how empty cells / wells are handled when sample count < total 
 
 ---
 
-## 3. Compact View Implementation
+## 3. New Balanced Block Randomization Algorithm
+
+
+#### Two-Level Distribution
+1. **Plate Level**: Distributes samples proportionally across all plates
+2. **Row Level**: Distributes samples proportionally within each plate's rows
+
+
+##### Phase 1: Proportional Placement
+- Calculates expected minimum samples per covariate group
+- Adjusts for varying plate capacities
+- Places base allocation across all blocks (plates or rows)
+
+##### Phase 2A: Unplaced Groups
+- Handles covariate groups too small for Phase 1
+- Distributes samples across available capacity
+- Largest covariate groups processed first
+
+##### Phase 2B: Overflow Handling
+- Places remaining samples from Phase 1
+- Uses prioritization strategies:
+  - **Plate level**: Prioritizes full-capacity plates
+  - **Row level**: Prioritizes rows with fewer samples of the group
+
+
+---
+
+## 4. Compact View Implementation
 
 The original full-size plate view made it difficult to visualize sample distribution patterns across multiple plates simultaneously, especially when working with many plates. A compact view was added to enable quick overview of sample distribution over multiple plates.
-Users can switch between views using the "Compact View" / "Full Size View" button in the control panel.
+Users can switch between views using the **Compact View** / **Full Size View** button in the control panel.
 
 ![alt text](compactPlates.png)
 
 #### Compact View (Default)
-- **Cell Size**: 18×16 pixels per well
+- **Cell Size**: 18×16 pixels per cell
 - Hover tooltip shows:
   - Sample name
   - Cell / well position (e.g., A05)
@@ -83,7 +110,7 @@ Users can switch between views using the "Compact View" / "Full Size View" butto
 
 ---
 
-## 4. Plate Details Popup (_only available for the Balanced Block Randomization algorithm_)
+## 4. Plate Details Popup
 
 Click the information icon ("i") in the header of any plate. The draggable popup displays the following:
 
@@ -154,32 +181,146 @@ Click any covariate group in the summary panel to highlight (blue border; glowin
 ---
 
 
-## 8. New Balanced Block Randomization Algorithm
+## 8. Quality Scoring System
 
+The application includes a comprehensive quality assessment system that evaluates both the balance and randomization quality of plate assignments. Quality scores are calculated automatically and updated in real-time as users make changes.
 
-#### Two-Level Distribution
-1. **Plate Level**: Distributes samples proportionally across all plates
-2. **Row Level**: Distributes samples proportionally within each plate's rows
+### Quality Metrics Overview
 
+The system provides two primary quality scores:
 
-##### Phase 1: Proportional Placement
-- Calculates expected minimum samples per covariate group
-- Adjusts for varying plate capacities
-- Places base allocation across all blocks (plates or rows)
+#### Balance Score (0-100)
+- **Purpose**: Measures how well each plate represents the overall population
+- **Calculation**: Based on relative deviation from expected covariate proportions
+- **Weighting**: Larger covariate groups have more influence on the score
+- **Real-time**: Updates when samples are moved between or within plates
 
-##### Phase 2A: Unplaced Groups
-- Handles covariate groups too small for Phase 1
-- Distributes samples across available capacity
-- Largest covariate groups processed first
+#### Randomization Score (0-100)
+- **Purpose**: Measures spatial clustering and randomness of sample placement
+- **Calculation**: Analyzes neighbor relationships to detect clustering patterns
+- **Method**: Counts samples with different covariate profiles among spatial neighbors
+- **Real-time**: Updates when samples are repositioned on plates
 
-##### Phase 2B: Overflow Handling
-- Places remaining samples from Phase 1
-- Uses prioritization strategies:
-  - **Plate level**: Prioritizes full-capacity plates
-  - **Row level**: Prioritizes rows with fewer samples of the group
+### Quality Score Display
 
+#### Overall Quality Button
+Located in the main control panel, shows:
+- **Overall Score**: Average of balance and randomization scores
+- **Quality Level**: Excellent (85+), Good (75-84), Fair (65-74), Poor (<65)
+- **Color Coding**: Green (excellent), Orange (good/fair), Red (poor)
+
+#### Individual Plate Headers
+Each plate displays:
+- **Bal**: Balance score for that specific plate
+- **Rand**: Randomization score for that specific plate
+- **Color Coding**: Scores colored by quality level
+
+#### Quality Assessment Modal
+Accessible via the quality button, provides:
+- **Experiment Summary**: Overall scores and quality level
+- **Individual Plate Scores**: Detailed breakdown for each plate
+- **Recommendations**: Suggestions for improvement when scores are low
+- **Sorting**: Plates sorted by overall quality (lowest first)
+
+### Quality Score Calculation Details
+
+#### Balance Score Methodology
+For each covariate group on each plate:
+```
+Expected Count = (Group Size / Total Samples) × Plate Capacity
+Relative Deviation = |Actual - Expected| / Expected
+Group Balance Score = max(0, 100 - (Relative Deviation × 100))
+```
+
+Overall plate balance uses weighted averaging:
+```
+Weight = Expected Proportion (group size / total samples)
+Weighted Deviation = Relative Deviation × Weight
+Plate Balance Score = max(0, 100 - (Sum of Weighted Deviations × 100))
+```
+
+#### Randomization Score Methodology
+For each sample position:
+1. **Identify Neighbors**: All adjacent positions (8-directional)
+2. **Compare Profiles**: Check if neighbors have different covariate combinations
+3. **Calculate Ratio**: Different neighbors / Total neighbor comparisons
+4. **Scale to 0-100**: Higher percentage = better randomization
+
+#### Edge Case Handling
+- **Small Groups**: Groups with <1 expected sample per plate use fractional calculations
+- **Empty Groups**: Automatically receive perfect scores if no samples exist globally
+- **Non-divisible Counts**: Uses fractional expected counts for precise calculations
+
+### Quality Score Interpretation
+
+#### Score Ranges
+| Range | Level | Interpretation |
+|-------|-------|----------------|
+| 90-100 | Excellent | Near-perfect distribution/randomization |
+| 80-89 | Good | Minor deviations, generally acceptable |
+| 70-79 | Fair | Noticeable but manageable imbalances |
+| 60-69 | Poor | Significant issues requiring attention |
+| 0-59 | Very Poor | Major problems affecting study validity |
+
+#### When to Re-randomize
+Consider re-randomization when:
+- Overall experiment score < 70
+- Any individual plate score < 60
+- Critical covariate groups show severe imbalance (>50% deviation)
+- Multiple plates have poor randomization scores
+
+### Real-time Quality Updates
+
+#### Automatic Recalculation
+Quality scores are automatically recalculated when:
+- **Initial Randomization**: Scores calculated after plate generation
+- **Re-randomization**: Full recalculation after using "Re-randomize" button
+- **Individual Plate Re-randomization**: Scores update after using plate "R" button
+- **Manual Drag & Drop**: Real-time updates when samples are moved
+- **Cross-plate Movement**: Both affected plates recalculated
+
+#### Performance Optimization
+- **Single-pass Calculation**: Efficient algorithms for both balance and randomization
+- **Incremental Updates**: Only affected plates recalculated during manual changes
+- **Cached Results**: Avoids redundant calculations during UI updates
+
+### Plate-specific Quality Features
+
+#### Individual Plate Re-randomization
+Each plate includes an "R" button that:
+- **Balanced Algorithm**: Shuffles samples within rows only (preserves balance)
+- **Other Algorithms**: Shuffles all samples across the entire plate
+- **Quality Update**: Automatically recalculates scores after re-randomization
+
+#### Plate Details Modal Enhancement
+The plate details modal now includes:
+- **Balance Information**: For each covariate group shows:
+  - Balance score (0-100) with color coding
+  - Expected count (fractional precision)
+  - Actual count on the plate
+  - Deviation percentage from expected
+  - Weight (influence on overall balance score)
+- **Sorting**: Covariate groups sorted by total samples → plate samples → name
+- **Real-time Updates**: Reflects current quality metrics
+
+### Quality-driven Workflow
+
+#### Recommended Process
+1. **Generate Initial Randomization**: Review overall quality scores
+2. **Identify Problem Plates**: Focus on plates with scores < 70
+3. **Use Targeted Re-randomization**: Click "R" on specific problematic plates
+4. **Manual Fine-tuning**: Drag samples to optimize spatial arrangement
+5. **Monitor Real-time Feedback**: Watch scores improve with each adjustment
+6. **Validate Final Result**: Ensure acceptable quality before export
+
+#### Quality vs. Balance Trade-offs
+- **Small Groups**: Perfect balance may be impossible; focus on larger groups
+- **Spatial vs. Balance**: Sometimes spatial randomization conflicts with balance
+- **Acceptable Thresholds**: Document any accepted deviations with scientific justification
 
 ---
+
+
 
 ## Implementation Files
 

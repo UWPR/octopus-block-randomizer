@@ -33,11 +33,11 @@ The configuration form includes new options:
 ### Algorithm Selection
 Users can choose between two randomization strategies:
 
-1. **Balanced Block Randomization**
+1. **Balanced Randomization** (_New_)
    - Proportionally distributes samples across plates
    - Maintains balance within plate rows
 
-2. **Greedy Algorithm** (legacy)
+2. **Greedy Algorithm** (_Legacy_)
    - Original algorithm implementation
    - Places samples iteratively with tolerance-based placement
 
@@ -228,21 +228,45 @@ Clicking a covariate group in the summary panel highlights (blue border; glowing
 
 ---
 
-## 9. "Re-randomize" Button
+## 9. Re-randomization
 
-Generates a new randomization while preserving:
-  - Current covariate selections
-  - Algorithm choice
-  - Plate dimensions
-  - Color assignments
-  - Empty space distribution settings
+The application provides two methods for re-randomizing samples to improve quality scores or generate alternative arrangements:
+
+### Global Re-randomization ("Re-randomize" Button)
+
+The main "Re-randomize" button in the control panel generates a completely new sample placement and randomization for all plates while preserving:
+
+![alt text](RerandomizeButton.png)
+
+- Current covariate selections
+- Algorithm choice
+- Plate dimensions
+- Color assignments
+- Empty space distribution settings
+
+### Individual Plate Re-randomization ("R" Button)
+
+Each plate header includes an "R" button that re-randomizes only that specific plate.
+
+![alt text](PlateRerandomizeButton.png)
+
+#### Algorithm-Specific Behavior:
+- **Balanced Randomization**: Shuffles samples within each row only (preserves balanced distribution in rows)
+- **Other Algorithms**: Shuffles all samples across the entire plate
+
+### Quality Score Updates
+
+Both re-randomization methods automatically trigger:
+- Recalculation of quality scores
+- Real-time update of plate headers and quality button
+- Refresh of quality assessment popup data
 
 ---
+---
 
+## Quality Score Calculation Details
 
-### Quality Score Calculation Details
-
-#### Balance Score
+### Balance Score
 For each covariate group on each plate:
 ```
 Expected Count = (Group Size / Total Samples) × Plate Capacity
@@ -257,16 +281,13 @@ Weighted Deviation = Relative Deviation × Weight
 Plate Balance Score = max(0, 100 - (Sum of Weighted Deviations × 100))
 ```
 
-#### Randomization Score
+### Randomization Score
 For each sample position:
 1. **Identify Neighbors**: All adjacent positions (8-directional)
 2. **Compare Profiles**: Check if neighbors have different covariate combinations
 3. **Calculate Ratio**: Different neighbors / Total neighbor comparisons
 4. **Scale to 0-100**: Higher percentage = better randomization
 
-#### Edge Case Handling
-- **Small Groups**: Groups with <1 expected sample per plate use fractional calculations
-- **Non-divisible Counts**: Uses fractional expected counts for precise calculations
 
 ### Quality Score Interpretation
 
@@ -279,86 +300,60 @@ For each sample position:
 | 60-69 | Poor | Significant issues requiring attention |
 | 0-59 | Very Poor | Major problems affecting study validity |
 
-
-
-### Real-time Quality Updates
-
-#### Automatic Recalculation
-Quality scores are automatically recalculated when:
-- **Initial Randomization**: Scores calculated after plate generation
-- **Re-randomization**: Full recalculation after using "Re-randomize" button
-- **Individual Plate Re-randomization**: Scores update after using plate "R" button
-- **Manual Drag & Drop**: Real-time updates when samples are moved
-- **Cross-plate Movement**: Both affected plates recalculated
-
-#### Performance Optimization
-- **Single-pass Calculation**: Efficient algorithms for both balance and randomization
-- **Incremental Updates**: Only affected plates recalculated during manual changes
-- **Cached Results**: Avoids redundant calculations during UI updates
-
-### Plate-specific Quality Features
-
-#### Individual Plate Re-randomization
-Each plate includes an "R" button that:
-- **Balanced Algorithm**: Shuffles samples within rows only (preserves balance)
-- **Other Algorithms**: Shuffles all samples across the entire plate
-- **Quality Update**: Automatically recalculates scores after re-randomization
-
-#### Plate Details Modal Enhancement
-The plate details modal now includes:
-- **Balance Information**: For each covariate group shows:
-  - Balance score (0-100) with color coding
-  - Expected count (fractional precision)
-  - Actual count on the plate
-  - Deviation percentage from expected
-  - Weighted Deviation (used in overall balance calculation)
-- **Sorting**: Covariate groups sorted by total samples → plate samples → name
-- **Real-time Updates**: Reflects current quality metrics
-
-### Quality-driven Workflow
-
-#### Recommended Process
-1. **Generate Initial Randomization**: Review overall quality scores
-2. **Identify Problem Plates**: Focus on plates with scores < 70
-3. **Use Targeted Re-randomization**: Click "R" on specific problematic plates
-4. **Manual Fine-tuning**: Drag samples to optimize spatial arrangement
-5. **Monitor Real-time Feedback**: Watch scores improve with each adjustment
-6. **Validate Final Result**: Ensure acceptable quality before export
-
-#### Quality vs. Balance Trade-offs
-- **Small Groups**: Perfect balance may be impossible; focus on larger groups
-- **Spatial vs. Balance**: Sometimes spatial randomization conflicts with balance
-- **Acceptable Thresholds**: Document any accepted deviations with scientific justification
-
+---
 ---
 
 
 
 ## Implementation Files
 
-The original code was refactored, and new components and hooks were created.
+The original code was refactored, and new components and hooks were created to support the enhanced functionality including new randomization algorithm, quality scoring, individual plate re-randomization, and improved user interface.
 
 ### Core Components
 
-- **App.tsx**: Main application for managing state and interactions
-- **ConfigurationForm.tsx**: Enhanced form with all new options
-- **Plate.tsx**: Rendering logic for individual plates (both full-size and compact views)
-- **PlatesGrid.tsx**: Grid layout management for multiple plates
-- **SummaryPanel.tsx**: Covariate groups summary visualization
-- **PlateDetailsModal.tsx**: Draggable modal with covariate group distribution details for the plate
+- **App.tsx**: Main application managing state, interactions, and quality metrics integration
+- **ConfigurationForm.tsx**: Enhanced form with algorithm selection, plate dimensions, and control sample options
+- **Plate.tsx**: Individual plate rendering with compact/full views, quality scores display, and re-randomization buttons
+- **PlatesGrid.tsx**: Grid layout management for multiple plates with quality metrics integration
+- **SummaryPanel.tsx**: Covariate groups summary with interactive highlighting and sorting
+- **PlateDetailsModal.tsx**: Draggable modal with enhanced covariate distribution, quality metrics, and real-time balance information
+- **QualityMetricsPanel.tsx**: Quality assessment modal displaying overall scores, individual plate metrics, and recommendations
+- **FileUploadSection.tsx**: File upload interface with validation and column detection
 
 ### Algorithm Files
 
-- **balancedRandomization.ts**: New balanced block randomization implementation
-- **greedyRandomization.ts**: Original algorithm (legacy)
-- **utils.ts**: Shared utilities including color palette and helper functions
+- **balancedRandomization.ts**: Advanced balanced randomization with two-level distribution
+- **greedyRandomization.ts**: Original greedy algorithm implementation (legacy support)
+- **utils.ts**: Shared utilities including expanded color palette, covariate grouping, and CSV export functionality
+
+### Quality Assessment System
+
+- **qualityMetrics.ts**: Core quality calculation engine with balance and randomization scoring
+- **useQualityMetrics.ts**: Hook for managing quality state, calculations, and real-time updates
 
 ### Custom Hooks
 
-- **useCovariateColors.ts**: Color assignment and management
-- **useRandomization.ts**: Randomization process coordination
-- **useModalDrag.ts**: Draggable modal functionality
-- **useDragAndDrop.ts**: Sample drag-and-drop between wells
+- **useCovariateColors.ts**: Advanced color assignment with priority handling and pattern support (solid/outline/stripes)
+- **useRandomization.ts**: Randomization coordination with individual plate re-randomization and algorithm-specific behavior
+- **useModalDrag.ts**: Draggable modal functionality with position management
+- **useDragAndDrop.ts**: Sample drag-and-drop with automatic quality recalculation
+- **useFileUpload.ts**: File upload management with CSV parsing and column detection
+
+### Type Definitions
+
+- **types.ts**: Comprehensive TypeScript interfaces including:
+  - `SearchData`: Sample metadata structure
+  - `QualityMetrics`: Quality assessment data structures
+  - `PlateQualityScore`: Individual plate quality information
+  - `CovariateColorInfo`: Color assignment and pattern definitions
+  - `RandomizationAlgorithm`: Algorithm type definitions
+
+### Utility Functions
+
+- **Color Management**: 24-color palette with recycling and pattern support
+- **Quality Calculations**: Balance scoring, spatial analysis, and weighted averaging
+- **Data Processing**: Covariate grouping, sample distribution, and CSV handling
+- **UI Helpers**: Drag and drop coordination, modal positioning, and state management
 
 
 ---
@@ -380,13 +375,3 @@ The original code was refactored, and new components and hooks were created.
    - Click covariate groups in summary view to highlight samples in plates
    - Inspect individual plates using details modal
 5. **Export**: Download CSV with plate assignments
-
----
-| Metric | 15 Samples | 18 Samples | Impact |
-|--------|------------|------------|---------|
-| Expected per plate | 3.0 | 3.6 | Higher baseline |
-| Actual distribution | [2,4,3,1,5] | [2,4,3,4,5] | More balanced |
-| Chi-squared (χ²) | 3.32 | 1.43 | Lower (better) |
-| P-value | 0.66 | 0.84 | Higher (better) |
-| CV | 47.1% | 28.3% | Lower (better) |
-| Balance Score | 5.8 | 43.4 | Much better |

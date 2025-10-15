@@ -107,9 +107,7 @@ Quality assement includes scores that evaluates the balance and randomization qu
 ### Quality Score Display
 
 #### __Overall Quality Button__
-Located in the main control panel, shows:
-- **Overall Score**: Average of **balance** and **randomization** scores
-- **Quality Level**: Excellent (85+), Good (75-84), Fair (65-74), Poor (<65)
+Located in the main control panel, shows the overall score, and quality level
 
 ![Quality Button](qualityButton.png)
 
@@ -119,6 +117,7 @@ Accessible via the quality button, provides:
 - **Individual Plate Scores**: Detailed breakdown for each plate
 
 ![Quality Assessment Modal](QualityAssessmentModal.png)
+
 
 #### __Individual Plate Headers__
 Each plate displays:
@@ -180,9 +179,9 @@ Click the information icon ("i") in the header of any plate. The draggable popup
 
 ![alt text](plateDetailsPopup.png)
 
+
 #### Header Section
 - **Plate Title**: "Plate X Details" with plate number
-- **Close Button**: X button to close the modal
 - **Draggable**: Modal can be repositioned by dragging the header
 
 #### Summary Statistics
@@ -249,6 +248,7 @@ The main "Re-randomize" button in the control panel generates a completely new s
 Each plate header includes an "R" button that re-randomizes only that specific plate.
 
 ![alt text](PlateRerandomizeButton.png)
+
 
 #### Algorithm-Specific Behavior:
 - **Balanced Randomization**: Shuffles samples within each row only (preserves balanced distribution in rows)
@@ -320,16 +320,15 @@ Overall Experiment Score = (Average Balance + Average Randomization) / 2
 ```
 
 
-### Quality Score Interpretation
+### Quality Scores
 
-#### Score Ranges
-| Range | Level | Interpretation |
-|-------|-------|----------------|
-| 90-100 | Excellent | Near-perfect distribution/randomization |
-| 80-89 | Good | Minor deviations, generally acceptable |
-| 70-79 | Fair | Noticeable but manageable imbalances |
-| 60-69 | Poor | Significant issues requiring attention |
-| 0-59 | Very Poor | Major problems affecting study validity |
+| Range | Level |
+|-------|-------|
+| 90-100 | Excellent |
+| 80-89 | Good |
+| 70-79 | Fair |
+| 60-69 | Poor |
+| 0-59 | Bad |
 
 ---
 ---
@@ -338,11 +337,11 @@ Overall Experiment Score = (Average Balance + Average Randomization) / 2
 
 1. **Upload CSV**: File containing sample metadata
 2. **Configure**:
-   - Select ID column
+   - Select ID column ("_UW_Sample_ID_" or "_search name_" are chosen by default)
    - Choose covariates for balancing
    - (Optional) Enter control sample labels
-   - Select randomization algorithm
-   - Set plate dimensions
+   - Select randomization algorithm (default: _Balanced Randomization_)
+   - Set plate dimensions (default: 8 x 12)
    - Choose empty space distribution strategy
 3. **Generate**: Click "Generate Randomized Plates"
 4. **Review**:

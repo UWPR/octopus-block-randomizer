@@ -1,6 +1,6 @@
 import React from 'react';
 import { QualityMetrics } from '../types';
-import { getQualityColor, getQualityLevelColor, formatScore } from '../utils';
+import { getQualityColor, getQualityLevelColor, getQualityLevel, getCompactQualityLevel, formatScore } from '../utils';
 
 interface QualityMetricsPanelProps {
   metrics: QualityMetrics | null;
@@ -53,23 +53,52 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
               <div style={styles.compactSummarySection}>
                 <div style={styles.compactOverallScore}>
                   <div style={styles.compactScoreValue}>
+
                     <span style={{
                       ...styles.compactScore,
                       color: getQualityLevelColor(metrics.overallQuality.level)
                     }}>
-                      {metrics.overallQuality.score}
+                      {formatScore(metrics.overallQuality.score)}
                     </span>
-                    <span style={styles.compactScoreLabel}>Overall Quality</span>
+                    <span style={{
+                      ...styles.fullQualityBadge,
+                      backgroundColor: getQualityLevelColor(metrics.overallQuality.level)
+                    }}>
+                      {metrics.overallQuality.level.charAt(0).toUpperCase() + metrics.overallQuality.level.slice(1)}
+                    </span>
                   </div>
+
                 </div>
                 <div style={styles.compactAverageScores}>
                   <div style={styles.compactScoreItem}>
                     <span style={styles.compactItemLabel}>Avg Balance:</span>
-                    <span style={styles.compactItemValue}>{formatScore(metrics.plateDiversity.averageBalanceScore)}</span>
+                    <span style={{
+                      ...styles.compactItemValue,
+                      color: getQualityColor(metrics.plateDiversity.averageBalanceScore)
+                    }}>
+                      {formatScore(metrics.plateDiversity.averageBalanceScore)}
+                    </span>
+                    <span style={{
+                      ...styles.qualityBadge,
+                      backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageBalanceScore))
+                    }}>
+                      {getCompactQualityLevel(metrics.plateDiversity.averageBalanceScore)}
+                    </span>
                   </div>
                   <div style={styles.compactScoreItem}>
                     <span style={styles.compactItemLabel}>Avg Randomization:</span>
-                    <span style={styles.compactItemValue}>{formatScore(metrics.plateDiversity.averageRandomizationScore)}</span>
+                    <span style={{
+                      ...styles.compactItemValue,
+                      color: getQualityColor(metrics.plateDiversity.averageRandomizationScore)
+                    }}>
+                      {formatScore(metrics.plateDiversity.averageRandomizationScore)}
+                    </span>
+                    <span style={{
+                      ...styles.qualityBadge,
+                      backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageRandomizationScore))
+                    }}>
+                      {getCompactQualityLevel(metrics.plateDiversity.averageRandomizationScore)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -86,12 +115,20 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                       <div key={plate.plateIndex} style={styles.plateScoreCard}>
                         <div style={styles.plateScoreHeader}>
                           <span style={styles.plateNumber}>Plate {plate.plateIndex + 1}</span>
-                          <span style={{
-                            ...styles.overallScoreBadge,
-                            backgroundColor: getQualityColor(plate.overallScore)
-                          }}>
-                            {formatScore(plate.overallScore)}
-                          </span>
+                          <div style={styles.overallScoreContainer}>
+                            <span style={{
+                              ...styles.fullQualityBadge,
+                              backgroundColor: getQualityLevelColor(getQualityLevel(plate.overallScore))
+                            }}>
+                              {getQualityLevel(plate.overallScore)}
+                            </span>
+                            <span style={{
+                              ...styles.overallScoreValue,
+                              color: getQualityColor(plate.overallScore)
+                            }}>
+                              {formatScore(plate.overallScore)}
+                            </span>
+                          </div>
                         </div>
                         <div style={styles.plateScoreDetails}>
                           <div style={styles.scoreItem}>
@@ -100,7 +137,13 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                               ...styles.scoreValue,
                               color: getQualityColor(plate.balanceScore)
                             }}>
-                              {formatScore(plate.balanceScore)}
+                              <span style={{
+                                ...styles.qualityBadge,
+                                backgroundColor: getQualityLevelColor(getQualityLevel(plate.balanceScore))
+                              }}>
+                                {getQualityLevel(plate.balanceScore).charAt(0).toUpperCase()}
+                              </span>
+                              {' '}{formatScore(plate.balanceScore)}
                             </span>
                           </div>
                           <div style={styles.scoreItem}>
@@ -109,7 +152,13 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                               ...styles.scoreValue,
                               color: getQualityColor(plate.randomizationScore)
                             }}>
-                              {formatScore(plate.randomizationScore)}
+                              <span style={{
+                                ...styles.qualityBadge,
+                                backgroundColor: getQualityLevelColor(getQualityLevel(plate.randomizationScore))
+                              }}>
+                                {getQualityLevel(plate.randomizationScore).charAt(0).toUpperCase()}
+                              </span>
+                              {' '}{formatScore(plate.randomizationScore)}
                             </span>
                           </div>
                         </div>
@@ -156,8 +205,8 @@ const styles = {
     backgroundColor: '#fff',
     borderRadius: '8px',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-    width: '90%',
-    maxWidth: '800px',
+    width: '80%',
+    maxWidth: '600px',
     maxHeight: '90vh',
     overflow: 'hidden',
     display: 'flex',
@@ -167,26 +216,26 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 20px',
+    padding: '8px 16px',
     borderBottom: '1px solid #e0e0e0',
     backgroundColor: '#f8f9fa',
     flexShrink: 0,
   },
   modalTitle: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: '700',
     color: '#333',
   },
   modalCloseButton: {
     background: 'none',
     border: 'none',
-    fontSize: '24px',
+    fontSize: '20px',
     cursor: 'pointer',
     color: '#666',
-    padding: '4px',
-    width: '32px',
-    height: '32px',
+    padding: '2px',
+    width: '24px',
+    height: '24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,7 +243,7 @@ const styles = {
     transition: 'background-color 0.2s ease',
   },
   modalBody: {
-    padding: '20px',
+    padding: '16px',
     overflow: 'auto',
     flex: 1,
   },
@@ -344,6 +393,26 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
   },
+  overallScoreContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  overallQualityBadge: {
+    padding: '2px 4px',
+    borderRadius: '3px',
+    color: '#fff',
+    fontSize: '11px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
+    display: 'inline-block',
+    minWidth: '14px',
+    textAlign: 'center' as const,
+  },
+  overallScoreValue: {
+    fontSize: '13px',
+    fontWeight: '600',
+  },
   plateScoreDetails: {
     display: 'flex',
     flexDirection: 'column' as const,
@@ -377,6 +446,27 @@ const styles = {
     color: '#1565c0',
     marginBottom: '4px',
     lineHeight: '1.4',
+  },
+  qualityBadge: {
+    padding: '1px 3px',
+    borderRadius: '2px',
+    color: '#fff',
+    fontSize: '9px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
+    display: 'inline-block',
+    minWidth: '12px',
+    textAlign: 'center' as const,
+  },
+  fullQualityBadge: {
+    padding: '2px 6px',
+    borderRadius: '3px',
+    color: '#fff',
+    fontSize: '10px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
+    display: 'inline-block',
+    marginLeft: '6px',
   },
 };
 

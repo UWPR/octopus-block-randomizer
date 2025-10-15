@@ -1,6 +1,6 @@
 import React from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
-import { getCovariateKey, getQualityColor, getQualityLevel, getQualityLevelColor, formatScore } from '../utils';
+import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils';
 
 interface PlateDetailsModalProps {
   show: boolean;
@@ -95,9 +95,9 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                       {' '}
                       <span style={{
                         ...styles.qualityBadge,
-                        backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.balanceScore))
+                        backgroundColor: getQualityColor(plateQuality.balanceScore)
                       }}>
-                        {getQualityLevel(plateQuality.balanceScore).charAt(0).toUpperCase() + getQualityLevel(plateQuality.balanceScore).slice(1)}
+                        {getCompactQualityLevel(plateQuality.balanceScore)}
                       </span>
                     </span>
                     <span>
@@ -108,9 +108,9 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                       {' '}
                       <span style={{
                         ...styles.qualityBadge,
-                        backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.randomizationScore))
+                        backgroundColor: getQualityColor(plateQuality.randomizationScore)
                       }}>
-                        {getQualityLevel(plateQuality.randomizationScore).charAt(0).toUpperCase() + getQualityLevel(plateQuality.randomizationScore).slice(1)}
+                        {getCompactQualityLevel(plateQuality.randomizationScore)}
                       </span>
                     </span>
                   </>
@@ -215,9 +215,9 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                                   }}>
                                     <span style={{
                                       ...styles.qualityBadge,
-                                      backgroundColor: getQualityLevelColor(getQualityLevel(balance.balanceScore))
+                                      backgroundColor: getQualityColor(balance.balanceScore)
                                     }}>
-                                      {getQualityLevel(balance.balanceScore).charAt(0).toUpperCase()}
+                                      {getCompactQualityLevel(balance.balanceScore)}
                                     </span>
                                     {' '}Balance: {balance.balanceScore}
                                   </div>

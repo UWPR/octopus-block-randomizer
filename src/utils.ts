@@ -186,9 +186,10 @@ export const getQualityLevelColor = (level: QualityLevel): string => {
     case 'bad': return '#f44336';           // Dark Red
     default: return '#666';                 // Gray
   }
-};/**
- *
- Get quality level for a given score
+};
+
+/**
+ * Get quality level for a given score
  * @param score - Quality score (0-100)
  * @returns Quality level
  */
@@ -210,4 +211,41 @@ export const getQualityLevel = (score: number): QualityLevel => {
  */
 export const formatScore = (score: number): string => {
   return score.toFixed(1);
+};
+
+/**
+ * Get compact quality level (first letter) for a given score
+ * @param score - Quality score (0-100)
+ * @returns Single uppercase letter representing quality level
+ */
+export const getCompactQualityLevel = (score: number): string => {
+  return getQualityLevel(score).charAt(0).toUpperCase();
+};
+
+/**
+ * Get compact quality level from quality level string
+ * @param level - Quality level string
+ * @returns Single uppercase letter representing quality level
+ */
+export const getCompactQualityLevelFromString = (level: QualityLevel): string => {
+  return level.charAt(0).toUpperCase();
+};
+
+/**
+ * Get full quality level name (capitalized) for a given score
+ * @param score - Quality score (0-100)
+ * @returns Capitalized quality level name
+ */
+export const getFullQualityLevel = (score: number): string => {
+  const level = getQualityLevel(score);
+  return level.charAt(0).toUpperCase() + level.slice(1);
+};
+
+/**
+ * Get full quality level name from quality level string
+ * @param level - Quality level string
+ * @returns Capitalized quality level name
+ */
+export const getFullQualityLevelFromString = (level: QualityLevel): string => {
+  return level.charAt(0).toUpperCase() + level.slice(1);
 };

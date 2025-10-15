@@ -5,6 +5,7 @@ import SummaryPanel from './components/SummaryPanel';
 import PlateDetailsModal from './components/PlateDetailsModal';
 import PlatesGrid from './components/PlatesGrid';
 import QualityMetricsPanel from './components/QualityMetricsPanel';
+import QualityLegend from './components/QualityLegend';
 import { SearchData, RandomizationAlgorithm } from './types';
 import { downloadCSV, getCovariateKey, getQualityLevelColor, formatScore } from './utils';
 import { useFileUpload } from './hooks/useFileUpload';
@@ -402,9 +403,7 @@ const App: React.FC = () => {
                 onSummaryItemClick={handleSummaryItemClick}
               />
 
-
-
-
+              <QualityLegend />
 
               <PlatesGrid
                 randomizedPlates={randomizedPlates}

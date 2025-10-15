@@ -17,7 +17,7 @@
 
 import React, { DragEvent, useMemo, useCallback } from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
-import { getCovariateKey, getQualityColor, getQualityLevel, getQualityLevelColor, formatScore } from '../utils';
+import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils';
 
 // Constants
 const DIMENSIONS = {
@@ -219,9 +219,9 @@ const Plate: React.FC<PlateProps> = ({
               >
                 <span style={{
                   ...currentStyles.qualityBadge,
-                  backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.balanceScore))
+                  backgroundColor: getQualityColor(plateQuality.balanceScore)
                 }}>
-                  {getQualityLevel(plateQuality.balanceScore).charAt(0).toUpperCase()}
+                  {getCompactQualityLevel(plateQuality.balanceScore)}
                 </span>
                 {' '}Bal: {formatScore(plateQuality.balanceScore)}
               </span>
@@ -233,9 +233,9 @@ const Plate: React.FC<PlateProps> = ({
               >
                 <span style={{
                   ...currentStyles.qualityBadge,
-                  backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.randomizationScore))
+                  backgroundColor: getQualityColor(plateQuality.randomizationScore)
                 }}>
-                  {getQualityLevel(plateQuality.randomizationScore).charAt(0).toUpperCase()}
+                  {getCompactQualityLevel(plateQuality.randomizationScore)}
                 </span>
                 {' '}Rand: {formatScore(plateQuality.randomizationScore)}
               </span>

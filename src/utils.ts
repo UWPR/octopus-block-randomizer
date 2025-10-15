@@ -40,13 +40,6 @@ export const BRIGHT_COLOR_PALETTE = [
     '#FF69B4', // Hot Pink
 ];
 
-// Algorithm descriptions for UI
-export const ALGORITHM_DESCRIPTIONS = {
-  balanced_spatial: 'Balanced Spatial Randomization - Proportional distribution across plates with spatial optimization',
-  balanced: 'Balanced Randomization - Proportional distribution across plates and within plate rows',
-  greedy: 'Greedy Randomization'
-};
-
 // Utility functions
 export function shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];

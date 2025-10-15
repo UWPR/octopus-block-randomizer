@@ -1,6 +1,5 @@
 import React from 'react';
-import { RandomizationAlgorithm } from '../types';
-import { ALGORITHM_DESCRIPTIONS } from '../utils';
+import { RandomizationAlgorithm, getAlgorithmName, getAlgorithmDescription, getAlgorithmsInDisplayOrder } from '../types';
 
 interface ConfigurationFormProps {
   availableColumns: string[];
@@ -87,12 +86,14 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             onChange={onAlgorithmChange}
             style={styles.compactSelect}
           >
-            <option value="balanced_spatial">Balanced Spatial Randomization</option>
-            <option value="balanced">Balanced Block Randomization</option>
-            <option value="greedy">Greedy Randomization</option>
+            {getAlgorithmsInDisplayOrder().map((algorithm) => (
+              <option key={algorithm} value={algorithm}>
+                {getAlgorithmName(algorithm)}
+              </option>
+            ))}
           </select>
           <small style={styles.algorithmDescription}>
-            {ALGORITHM_DESCRIPTIONS[selectedAlgorithm]}
+            {getAlgorithmDescription(selectedAlgorithm)}
           </small>
         </div>
 

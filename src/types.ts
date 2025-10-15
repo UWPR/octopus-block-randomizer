@@ -2,7 +2,38 @@ export interface SearchData {
     name: string;
     metadata: { [key: string]: string };
 }
-export type RandomizationAlgorithm = 'balanced' | 'balanced_spatial' | 'greedy';
+
+// Algorithm configuration with descriptions
+export const ALGORITHM_CONFIG = {
+    balanced: {
+        name: 'Balanced Block Randomization',
+        description: 'Proportional distribution across plates and within plate rows'
+    },
+    balanced_spatial: {
+        name: 'Balanced Spatial Randomization', 
+        description: 'Proportional distribution across plates with spatial optimization with plates'
+    },
+    greedy: {
+        name: 'Greedy Randomization',
+        description: 'Greedy Randomization'
+    }
+} as const;
+
+export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;
+
+// Utility functions for algorithm configuration
+export const getAlgorithmName = (algorithm: RandomizationAlgorithm): string => 
+    ALGORITHM_CONFIG[algorithm].name;
+
+export const getAlgorithmDescription = (algorithm: RandomizationAlgorithm): string => 
+    ALGORITHM_CONFIG[algorithm].description;
+
+export const getAllAlgorithms = (): RandomizationAlgorithm[] => 
+    Object.keys(ALGORITHM_CONFIG) as RandomizationAlgorithm[];
+
+// Get algorithms in UI display order (most advanced first)
+export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] => 
+    ['balanced_spatial', 'balanced', 'greedy'] as RandomizationAlgorithm[];
 
 export interface RandomizationOptions {
     algorithm: RandomizationAlgorithm;

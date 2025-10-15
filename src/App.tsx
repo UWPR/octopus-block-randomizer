@@ -6,7 +6,7 @@ import PlateDetailsModal from './components/PlateDetailsModal';
 import PlatesGrid from './components/PlatesGrid';
 import QualityMetricsPanel from './components/QualityMetricsPanel';
 import { SearchData, RandomizationAlgorithm } from './types';
-import { downloadCSV, getCovariateKey } from './utils';
+import { downloadCSV, getCovariateKey, getQualityLevelColor, formatScore } from './utils';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useModalDrag } from './hooks/useModalDrag';
 import { useRandomization } from './hooks/useRandomization';
@@ -352,14 +352,12 @@ const App: React.FC = () => {
                     <span style={styles.qualityButtonText}>Quality</span>
                     <div style={styles.qualityButtonIndicators}>
                       <span style={styles.qualityScore}>
-                        {metrics.overallQuality.score}
+                        {formatScore(metrics.overallQuality.score)}
                       </span>
                       <span style={{
                         ...styles.qualityBadge,
                         backgroundColor:
-                          metrics.overallQuality.level === 'excellent' ? '#4caf50' :
-                          metrics.overallQuality.level === 'good' ? '#ff9800' :
-                          metrics.overallQuality.level === 'fair' ? '#f44336' : '#9e9e9e'
+                          getQualityLevelColor(metrics.overallQuality.level)
                       }}>
                         {metrics.overallQuality.level.charAt(0).toUpperCase() + metrics.overallQuality.level.slice(1)}
                       </span>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
-import { getCovariateKey } from '../utils';
+import { getCovariateKey, getQualityColor, getQualityLevel, getQualityLevelColor, formatScore } from '../utils';
 
 interface PlateDetailsModalProps {
   show: boolean;
@@ -35,13 +35,9 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
   onMouseDown,
   plateQuality,
 }) => {
-  const getQualityColor = (score: number): string => {
-    if (score >= 80) return '#4caf50';
-    if (score >= 60) return '#ff9800';
-    return '#f44336';
-  };
 
-  const formatScore = (score: number): string => score.toFixed(1);
+
+
   if (!show || plateIndex === null) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -96,11 +92,25 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                       <span style={{ color: getQualityColor(plateQuality.balanceScore) }}>
                         {formatScore(plateQuality.balanceScore)}
                       </span>
+                      {' '}
+                      <span style={{
+                        ...styles.qualityBadge,
+                        backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.balanceScore))
+                      }}>
+                        {getQualityLevel(plateQuality.balanceScore).charAt(0).toUpperCase() + getQualityLevel(plateQuality.balanceScore).slice(1)}
+                      </span>
                     </span>
                     <span>
                       <strong>Randomization:</strong>{' '}
                       <span style={{ color: getQualityColor(plateQuality.randomizationScore) }}>
                         {formatScore(plateQuality.randomizationScore)}
+                      </span>
+                      {' '}
+                      <span style={{
+                        ...styles.qualityBadge,
+                        backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.randomizationScore))
+                      }}>
+                        {getQualityLevel(plateQuality.randomizationScore).charAt(0).toUpperCase() + getQualityLevel(plateQuality.randomizationScore).slice(1)}
                       </span>
                     </span>
                   </>
@@ -203,7 +213,13 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                                     ...styles.balanceScore,
                                     color: getQualityColor(balance.balanceScore)
                                   }}>
-                                    Balance: {balance.balanceScore}
+                                    <span style={{
+                                      ...styles.qualityBadge,
+                                      backgroundColor: getQualityLevelColor(getQualityLevel(balance.balanceScore))
+                                    }}>
+                                      {getQualityLevel(balance.balanceScore).charAt(0).toUpperCase()}
+                                    </span>
+                                    {' '}Balance: {balance.balanceScore}
                                   </div>
                                   <div style={styles.balanceDetailLine}>
                                     Expected Proportion: {balance.expectedProportion.toFixed(4)}
@@ -408,6 +424,14 @@ const styles = {
     color: '#666',
     fontStyle: 'italic',
     padding: '20px',
+  },
+  qualityBadge: {
+    padding: '2px 6px',
+    borderRadius: '3px',
+    color: '#fff',
+    fontSize: '10px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
   },
 };
 

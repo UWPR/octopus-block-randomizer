@@ -1,5 +1,6 @@
 import React from 'react';
 import { QualityMetrics } from '../types';
+import { getQualityColor, getQualityLevelColor, formatScore } from '../utils';
 
 interface QualityMetricsPanelProps {
   metrics: QualityMetrics | null;
@@ -12,36 +13,8 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
   show,
   onClose
 }) => {
-  const getQualityColor = (level: string): string => {
-    switch (level) {
-      case 'excellent': return '#4caf50';
-      case 'good': return '#ff9800';
-      case 'fair': return '#f44336';
-      case 'poor': return '#9e9e9e';
-      default: return '#666';
-    }
-  };
 
-  const getQualityIcon = (level: string): string => {
-    switch (level) {
-      case 'excellent': return '🟢';
-      case 'good': return '🟡';
-      case 'fair': return '🟠';
-      case 'poor': return '🔴';
-      default: return '⚪';
-    }
-  };
 
-  const getAssessmentColor = (assessment: string): string => {
-    switch (assessment) {
-      case 'good': return '#4caf50';
-      case 'acceptable': return '#ff9800';
-      case 'poor': return '#f44336';
-      default: return '#666';
-    }
-  };
-
-  const formatScore = (score: number): string => score.toFixed(1);
 
   if (!show) return null;
 
@@ -82,7 +55,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                   <div style={styles.compactScoreValue}>
                     <span style={{
                       ...styles.compactScore,
-                      color: getQualityColor(metrics.overallQuality.level)
+                      color: getQualityLevelColor(metrics.overallQuality.level)
                     }}>
                       {metrics.overallQuality.score}
                     </span>
@@ -115,9 +88,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                           <span style={styles.plateNumber}>Plate {plate.plateIndex + 1}</span>
                           <span style={{
                             ...styles.overallScoreBadge,
-                            backgroundColor:
-                              plate.overallScore >= 80 ? '#4caf50' :
-                                plate.overallScore >= 65 ? '#ff9800' : '#f44336'
+                            backgroundColor: getQualityColor(plate.overallScore)
                           }}>
                             {formatScore(plate.overallScore)}
                           </span>
@@ -127,9 +98,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                             <span style={styles.scoreLabel}>Balance:</span>
                             <span style={{
                               ...styles.scoreValue,
-                              color:
-                                plate.balanceScore >= 80 ? '#4caf50' :
-                                  plate.balanceScore >= 65 ? '#ff9800' : '#f44336'
+                              color: getQualityColor(plate.balanceScore)
                             }}>
                               {formatScore(plate.balanceScore)}
                             </span>
@@ -138,9 +107,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                             <span style={styles.scoreLabel}>Randomization:</span>
                             <span style={{
                               ...styles.scoreValue,
-                              color:
-                                plate.randomizationScore >= 80 ? '#4caf50' :
-                                  plate.randomizationScore >= 65 ? '#ff9800' : '#f44336'
+                              color: getQualityColor(plate.randomizationScore)
                             }}>
                               {formatScore(plate.randomizationScore)}
                             </span>

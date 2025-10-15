@@ -46,7 +46,7 @@ export const testSimplifiedQualityMetrics = () => {
       selectedCovariates
     );
 
-    console.log('Simplified Quality Metrics Test Results:');
+    console.log('Quality Metrics Test Results:');
     console.log('Overall Score:', metrics.overallQuality.score);
     console.log('Quality Level:', metrics.overallQuality.level);
     console.log('Recommendations:', metrics.overallQuality.recommendations);
@@ -67,7 +67,7 @@ export const validateSimplifiedQualityMetricsInputs = (
   randomizedPlates: (SearchData | undefined)[][][],
   selectedCovariates: string[]
 ) => {
-  console.log('Simplified Quality Metrics Input Validation:');
+  console.log('Quality Metrics Input Validation:');
   console.log('- Searches count:', searches.length);
   console.log('- Plates count:', plateAssignments.size);
   console.log('- Randomized plates count:', randomizedPlates.length);

@@ -1,4 +1,4 @@
-import { SearchData, RandomizationAlgorithm } from './types';
+import { SearchData, RandomizationAlgorithm, QualityLevel } from './types';
 import Papa from 'papaparse';
 import { balancedBlockRandomization } from './algorithms/balancedRandomization';
 import { greedyRandomization } from './algorithms/greedyRandomization';
@@ -162,3 +162,52 @@ export function getColumnNumber(searchName: string, randomizedPlates: (SearchDat
     }
     return '';
 }
+/**
+
+ * Get color for quality score based on standardized thresholds
+ * @param score - Quality score (0-100)
+ * @returns Hex color code
+ */
+export const getQualityColor = (score: number): string => {
+  return getQualityLevelColor(getQualityLevel(score));
+};
+
+/**
+ * Get color for quality level string
+ * @param level - Quality level ('excellent', 'good', 'fair', 'poor', 'bad')
+ * @returns Hex color code
+ */
+export const getQualityLevelColor = (level: QualityLevel): string => {
+  switch (level) {
+    case 'excellent': return '#4caf50';      // Green
+    case 'good': return '#9ACD32';           // Greenish Yellow
+    case 'fair': return '#ff9800';          // Orange
+    case 'poor': return '#D2691E';          // Red
+    case 'bad': return '#f44336';           // Dark Red
+    default: return '#666';                 // Gray
+  }
+};/**
+ *
+ Get quality level for a given score
+ * @param score - Quality score (0-100)
+ * @returns Quality level
+ */
+export const getQualityLevel = (score: number): QualityLevel => {
+  // Round to 1 decimal place to match display formatting
+  const roundedScore = Math.round(score * 10) / 10;
+
+  if (roundedScore >= 90) return 'excellent';
+  if (roundedScore >= 80) return 'good';
+  if (roundedScore >= 70) return 'fair';
+  if (roundedScore >= 60) return 'poor';
+  return 'bad';
+};
+
+/**
+ * Format a quality score for display with consistent decimal precision
+ * @param score - Quality score (0-100)
+ * @returns Formatted score string with 1 decimal place
+ */
+export const formatScore = (score: number): string => {
+  return score.toFixed(1);
+};

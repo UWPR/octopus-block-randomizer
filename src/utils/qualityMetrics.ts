@@ -1,5 +1,5 @@
-import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../types';
-import { getCovariateKey, groupByCovariates } from '../utils';
+import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment, QualityLevel } from '../types';
+import { getCovariateKey, groupByCovariates, getQualityLevel } from '../utils';
 
 /**
  * Simplified Quality Metrics Calculator
@@ -44,14 +44,17 @@ const calculatePlateBalance = (
   const plateSize = plateSamples.length;
   const totalSamples = allSamples.length;
 
-  const groupDetails: { [combination: string]: {
-    actualCount: number;
-    expectedCount: number;
-    actualProportion: number;
-    expectedProportion: number;
-    relativeDeviation: number;
-    weightedDeviation: number;
-    balanceScore: number } } = {};
+  const groupDetails: {
+    [combination: string]: {
+      actualCount: number;
+      expectedCount: number;
+      actualProportion: number;
+      expectedProportion: number;
+      relativeDeviation: number;
+      weightedDeviation: number;
+      balanceScore: number
+    }
+  } = {};
 
   let totalWeightedDeviation = 0;
   let totalWeight = 0;
@@ -252,15 +255,11 @@ export const calculateOverallQuality = (
   // Calculate overall score (equal weight to balance and randomization)
   const overallScore = (plateDiversity.averageBalanceScore + plateDiversity.averageRandomizationScore) / 2;
 
-  // Determine quality level
-  let level: 'excellent' | 'good' | 'fair' | 'poor';
-  if (overallScore >= 85) level = 'excellent';
-  else if (overallScore >= 75) level = 'good';
-  else if (overallScore >= 65) level = 'fair';
-  else level = 'poor';
+  // Determine quality level using centralized function
+  const level = getQualityLevel(overallScore);
 
   return {
-    score: Math.round(overallScore),
+    score: Math.round(overallScore * 10) / 10, // Round to 1 decimal place
     level,
     recommendations
   };

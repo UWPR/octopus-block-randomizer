@@ -17,7 +17,7 @@
 
 import React, { DragEvent, useMemo, useCallback } from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
-import { getCovariateKey } from '../utils';
+import { getCovariateKey, getQualityColor, getQualityLevel, getQualityLevelColor, formatScore } from '../utils';
 
 // Constants
 const DIMENSIONS = {
@@ -94,13 +94,9 @@ const Plate: React.FC<PlateProps> = ({
   plateQuality,
   onReRandomizePlate
 }) => {
-  const getQualityColor = (score: number): string => {
-    if (score >= 80) return '#4caf50';
-    if (score >= 60) return '#ff9800';
-    return '#f44336';
-  };
 
-  const formatScore = (score: number): string => score.toFixed(1);
+
+
   // Memoized values to avoid recalculation
   const columns = useMemo(() => generateColumnLabels(numColumns), [numColumns]);
   const currentStyles = useMemo(() => compact ? compactStyles : styles, [compact]);
@@ -221,7 +217,13 @@ const Plate: React.FC<PlateProps> = ({
                   color: getQualityColor(plateQuality.balanceScore)
                 }}
               >
-                Bal: {formatScore(plateQuality.balanceScore)}
+                <span style={{
+                  ...currentStyles.qualityBadge,
+                  backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.balanceScore))
+                }}>
+                  {getQualityLevel(plateQuality.balanceScore).charAt(0).toUpperCase()}
+                </span>
+                {' '}Bal: {formatScore(plateQuality.balanceScore)}
               </span>
               <span
                 style={{
@@ -229,7 +231,13 @@ const Plate: React.FC<PlateProps> = ({
                   color: getQualityColor(plateQuality.randomizationScore)
                 }}
               >
-                Rand: {formatScore(plateQuality.randomizationScore)}
+                <span style={{
+                  ...currentStyles.qualityBadge,
+                  backgroundColor: getQualityLevelColor(getQualityLevel(plateQuality.randomizationScore))
+                }}>
+                  {getQualityLevel(plateQuality.randomizationScore).charAt(0).toUpperCase()}
+                </span>
+                {' '}Rand: {formatScore(plateQuality.randomizationScore)}
               </span>
             </div>
           </div>
@@ -324,6 +332,15 @@ const baseStyles = {
     backgroundColor: '#fff',
     borderRadius: '2px',
     border: '1px solid #e9ecef',
+  },
+  qualityBadge: {
+    padding: '1px 3px',
+    borderRadius: '2px',
+    color: '#fff',
+    fontSize: '9px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
+    display: 'inline-block',
   },
   detailsButton: {
     background: 'none',

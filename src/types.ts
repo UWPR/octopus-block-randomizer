@@ -27,20 +27,25 @@ export interface CovariateColorInfo {
     useStripes: boolean;
 }
 
-// Simplified Quality Metrics Types
+// Quality Metrics Levels
+export type QualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'bad';
+
 export interface PlateQualityScore {
   plateIndex: number;
   balanceScore: number; // 0-100 (Proportional Accuracy)
   randomizationScore: number; // 0-100 (Spatial Clustering)
   overallScore: number; // 0-100 (Average of both)
-  covariateGroupBalance: { [combination: string]: {
-    actualCount: number;
-    expectedCount: number;
-    actualProportion: number;
-    expectedProportion: number;
-    relativeDeviation: number;
-    weightedDeviation: number;
-    balanceScore: number } };
+  covariateGroupBalance: {
+    [combination: string]: {
+      actualCount: number;
+      expectedCount: number;
+      actualProportion: number;
+      expectedProportion: number;
+      relativeDeviation: number;
+      weightedDeviation: number;
+      balanceScore: number
+    }
+  };
 }
 
 export interface PlateDiversityMetrics {
@@ -51,19 +56,11 @@ export interface PlateDiversityMetrics {
 
 export interface OverallQualityAssessment {
   score: number; // 0-100
-  level: 'excellent' | 'good' | 'fair' | 'poor';
+  level: QualityLevel;
   recommendations: string[];
 }
 
 export interface QualityMetrics {
   plateDiversity: PlateDiversityMetrics;
   overallQuality: OverallQualityAssessment;
-}
-
-
-
-export interface DistributionAnalysis {
-  expected: { [key: string]: number };
-  actual: { [key: string]: number };
-  plateDistributions: { [plateIndex: number]: { [key: string]: number } };
 }

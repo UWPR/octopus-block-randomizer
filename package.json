@@ -1,8 +1,8 @@
 {
   "name": "octopus-block-randomizer",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "homepage": "https://mriffle.github.io/octopus-block-randomizer",
+  "homepage": "https://uwpr.github.io/octopus-block-randomizer",
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",

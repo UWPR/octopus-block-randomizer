@@ -1,6 +1,6 @@
 import { SearchData, RandomizationAlgorithm, QualityLevel } from './types';
 import Papa from 'papaparse';
-import { balancedBlockRandomization } from './algorithms/balancedRandomization';
+import { balancedBlockRandomization, balancedSpatialRandomization } from './algorithms/balancedRandomization';
 import { greedyRandomization } from './algorithms/greedyRandomization';
 
 // Bright color palette with 24 distinct colors in 4 randomized subgroups
@@ -42,7 +42,8 @@ export const BRIGHT_COLOR_PALETTE = [
 
 // Algorithm descriptions for UI
 export const ALGORITHM_DESCRIPTIONS = {
-  balanced: 'Balanced Block Randomization - Proportional distribution across plates and within plate rows',
+  balanced_spatial: 'Balanced Spatial Randomization - Proportional distribution across plates with spatial optimization',
+  balanced: 'Balanced Randomization - Proportional distribution across plates and within plate rows',
   greedy: 'Greedy Randomization'
 };
 
@@ -91,6 +92,8 @@ export function randomizeSearches(
     switch (algorithm) {
         case 'balanced':
             return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
+        case 'balanced_spatial':
+            return balancedSpatialRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
         case 'greedy':
         default:
             return greedyRandomization(searches, selectedCovariates);

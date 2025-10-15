@@ -255,7 +255,7 @@ export const calculateOverallQuality = (
   // Calculate overall score (equal weight to balance and randomization)
   const overallScore = (plateDiversity.averageBalanceScore + plateDiversity.averageRandomizationScore) / 2;
 
-  // Determine quality level using centralized function
+  // Determine quality level using utility function
   const level = getQualityLevel(overallScore);
 
   return {

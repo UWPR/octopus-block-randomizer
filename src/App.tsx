@@ -18,6 +18,9 @@ import { useQualityMetrics } from './hooks/useQualityMetrics';
 
 
 const App: React.FC = () => {
+
+  const defaultAlgorithm = "balanced_spatial";
+
   // File upload hook
   const {
     searches,
@@ -85,7 +88,7 @@ const App: React.FC = () => {
   const [controlLabels, setControlLabels] = useState<string>('');
 
   // Algorithm selection
-  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>('balanced');
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>(defaultAlgorithm);
   const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
 
   // Plate dimensions
@@ -127,7 +130,7 @@ const App: React.FC = () => {
       setControlLabels('');
 
       // Reset algorithm selection (keep defaults)
-      setSelectedAlgorithm('balanced');
+      setSelectedAlgorithm(defaultAlgorithm);
       setKeepEmptyInLastPlate(true);
 
       // Reset plate dimensions (keep defaults)

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SearchData, RandomizationAlgorithm } from '../types';
 import { randomizeSearches } from '../utils';
+import { optimizeSpatialRandomization } from '../algorithms/balancedRandomization';
 
 export function useRandomization() {
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
@@ -130,6 +131,9 @@ export function useRandomization() {
 
     if (!currentPlate || currentPlate.length === 0) return false;
 
+    const plateSamples = plateAssignments.get(plateIndex) || [];
+    if (plateSamples.length === 0) return false;
+
     if (selectedAlgorithm === 'balanced') {
       // For balanced randomization: shuffle samples within each row only
       const newPlate = currentPlate.map(row => {
@@ -156,11 +160,21 @@ export function useRandomization() {
       });
 
       updatedRandomizedPlates[plateIndex] = newPlate;
-    } else {
-      // For other algorithms: shuffle the entire plate
-      const plateSamples = plateAssignments.get(plateIndex) || [];
+    } else if (selectedAlgorithm === 'balanced_spatial') {
+      // For balanced spatial randomization: use greedy spatial optimization
+      console.log(`Re-randomizing plate ${plateIndex + 1} using spatial optimization with ${plateSamples.length} samples`);
 
-      if (plateSamples.length === 0) return false;
+      const spatiallyOptimizedPlate = optimizeSpatialRandomization(
+        plateSamples,
+        plateRows,
+        plateColumns,
+        selectedCovariates
+      );
+
+      updatedRandomizedPlates[plateIndex] = spatiallyOptimizedPlate;
+    } else {
+      // For other algorithms (greedy): shuffle the entire plate
+      console.log(`Re-randomizing plate ${plateIndex + 1} using simple shuffling with ${plateSamples.length} samples`);
 
       // Create a new empty plate
       const newPlate: (SearchData | undefined)[][] = Array(plateRows)

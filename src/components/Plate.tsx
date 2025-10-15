@@ -312,7 +312,7 @@ const baseStyles = {
   },
 
   plateHeading: {
-    fontWeight: 'bold',
+    fontWeight: '600',
     margin: 0,
   },
   plateQualityMetrics: {

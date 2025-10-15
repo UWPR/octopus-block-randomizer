@@ -1,4 +1,4 @@
-import { SearchData, RandomizationAlgorithm, QualityLevel } from './types';
+import { SearchData, RandomizationAlgorithm, QualityLevel, QUALITY_LEVEL_CONFIG } from './types';
 import Papa from 'papaparse';
 import { balancedBlockRandomization, balancedSpatialRandomization } from './algorithms/balancedRandomization';
 import { greedyRandomization } from './algorithms/greedyRandomization';
@@ -174,14 +174,7 @@ export const getQualityColor = (score: number): string => {
  * @returns Hex color code
  */
 export const getQualityLevelColor = (level: QualityLevel): string => {
-  switch (level) {
-    case 'excellent': return '#4caf50';      // Green
-    case 'good': return '#9ACD32';           // Greenish Yellow
-    case 'fair': return '#ff9800';          // Orange
-    case 'poor': return '#D2691E';          // Red
-    case 'bad': return '#f44336';           // Dark Red
-    default: return '#666';                 // Gray
-  }
+  return QUALITY_LEVEL_CONFIG[level].color;
 };
 
 /**
@@ -193,10 +186,14 @@ export const getQualityLevel = (score: number): QualityLevel => {
   // Round to 1 decimal place to match display formatting
   const roundedScore = Math.round(score * 10) / 10;
 
-  if (roundedScore >= 90) return 'excellent';
-  if (roundedScore >= 80) return 'good';
-  if (roundedScore >= 70) return 'fair';
-  if (roundedScore >= 60) return 'poor';
+  // Find the quality level that matches the score
+  for (const [levelKey, config] of Object.entries(QUALITY_LEVEL_CONFIG)) {
+    if (roundedScore >= config.lowScore && roundedScore <= config.highScore) {
+      return levelKey as QualityLevel;
+    }
+  }
+  
+  // Fallback to 'bad' if no match found
   return 'bad';
 };
 
@@ -215,7 +212,7 @@ export const formatScore = (score: number): string => {
  * @returns Single uppercase letter representing quality level
  */
 export const getCompactQualityLevel = (score: number): string => {
-  return getQualityLevel(score).charAt(0).toUpperCase();
+  return getCompactQualityLevelFromString(getQualityLevel(score));
 };
 
 /**
@@ -224,7 +221,7 @@ export const getCompactQualityLevel = (score: number): string => {
  * @returns Single uppercase letter representing quality level
  */
 export const getCompactQualityLevelFromString = (level: QualityLevel): string => {
-  return level.charAt(0).toUpperCase();
+  return QUALITY_LEVEL_CONFIG[level].shortLabel;
 };
 
 /**
@@ -233,8 +230,7 @@ export const getCompactQualityLevelFromString = (level: QualityLevel): string =>
  * @returns Capitalized quality level name
  */
 export const getFullQualityLevel = (score: number): string => {
-  const level = getQualityLevel(score);
-  return level.charAt(0).toUpperCase() + level.slice(1);
+  return getFullQualityLevelFromString(getQualityLevel(score));
 };
 
 /**
@@ -243,5 +239,19 @@ export const getFullQualityLevel = (score: number): string => {
  * @returns Capitalized quality level name
  */
 export const getFullQualityLevelFromString = (level: QualityLevel): string => {
-  return level.charAt(0).toUpperCase() + level.slice(1);
+  return QUALITY_LEVEL_CONFIG[level].name;
+};
+
+/**
+ * Get all quality levels with their score ranges, badges, and descriptions
+ * @returns Array of quality level information
+ */
+export const getAllQualityLevels = () => {
+  return Object.entries(QUALITY_LEVEL_CONFIG).map(([levelKey, config]) => ({
+    range: `${config.lowScore}-${config.highScore}`,
+    level: levelKey as QualityLevel,
+    badge: config.shortLabel,
+    description: config.name,
+    color: config.color
+  }));
 };

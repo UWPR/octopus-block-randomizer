@@ -59,7 +59,60 @@ export interface CovariateColorInfo {
 }
 
 // Quality Metrics Levels
-export type QualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'bad';
+export interface QualityLevelConfig {
+  name: string;
+  shortLabel: string;
+  color: string;
+  lowScore: number;
+  highScore: number;
+}
+
+export const QUALITY_LEVEL_CONFIG = {
+  excellent: {
+    name: 'Excellent',
+    shortLabel: 'E',
+    color: '#4caf50',      // Green
+    lowScore: 90,
+    highScore: 100
+  },
+  good: {
+    name: 'Good',
+    shortLabel: 'G',
+    color: '#9ACD32',      // Greenish Yellow
+    lowScore: 80,
+    highScore: 89
+  },
+  fair: {
+    name: 'Fair',
+    shortLabel: 'F',
+    color: '#ff9800',      // Orange
+    lowScore: 70,
+    highScore: 79
+  },
+  poor: {
+    name: 'Poor',
+    shortLabel: 'P',
+    color: '#D2691E',      // Red
+    lowScore: 60,
+    highScore: 69
+  },
+  bad: {
+    name: 'Bad',
+    shortLabel: 'B',
+    color: '#f44336',      // Dark Red
+    lowScore: 0,
+    highScore: 59
+  }
+} as const;
+
+export type QualityLevel = keyof typeof QUALITY_LEVEL_CONFIG;
+
+// Utility functions for quality levels
+export const getQualityLevelConfig = (level: QualityLevel): QualityLevelConfig => 
+    QUALITY_LEVEL_CONFIG[level];
+
+export const getAllQualityLevelKeys = (): QualityLevel[] => 
+    Object.keys(QUALITY_LEVEL_CONFIG) as QualityLevel[];
 
 export interface PlateQualityScore {
   plateIndex: number;

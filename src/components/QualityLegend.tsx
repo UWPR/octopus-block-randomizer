@@ -1,14 +1,8 @@
 import React from 'react';
-import { getQualityLevelColor } from '../utils';
+import { getAllQualityLevels } from '../utils';
 
 const QualityLegend: React.FC = () => {
-  const qualityLevels = [
-    { range: '90-100', level: 'excellent', badge: 'E', description: 'Excellent' },
-    { range: '80-89', level: 'good', badge: 'G', description: 'Good' },
-    { range: '70-79', level: 'fair', badge: 'F', description: 'Fair' },
-    { range: '60-69', level: 'poor', badge: 'P', description: 'Poor' },
-    { range: '0-59', level: 'bad', badge: 'B', description: 'Bad' },
-  ];
+  const qualityLevels = getAllQualityLevels();
 
   return (
     <div style={styles.legend}>
@@ -18,7 +12,7 @@ const QualityLegend: React.FC = () => {
           <div key={item.level} style={styles.legendItem}>
             <span style={{
               ...styles.badge,
-              backgroundColor: getQualityLevelColor(item.level as any)
+              backgroundColor: item.color
             }}>
               {item.badge}
             </span>

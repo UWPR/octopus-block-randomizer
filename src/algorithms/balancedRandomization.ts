@@ -263,7 +263,7 @@ function processUnplacedGroups(
     });
 }
 
-// Helper function for Phase 2B - overflow groups with full plate priority
+// Helper function for Phase 2B - overflow groups
 function processOverflowGroups(
     overflowSamplesMap: Map<string, SearchData[]>,
     plateCapacities: number[],
@@ -378,8 +378,8 @@ function validatePerBlockDistribution(
 
 
 /**
- * Advanced spatial randomization to minimize covariate clustering
- * Uses iterative improvement to maximize spatial diversity
+ * Greedy-inspired spatial randomization to minimize covariate clustering
+ * Uses constraint-based placement with increasing tolerance for optimal spatial distribution
  */
 function optimizeSpatialRandomization(
     samples: SearchData[],
@@ -393,80 +393,167 @@ function optimizeSpatialRandomization(
 
     if (samples.length === 0) return plate;
 
-    // Start with a random arrangement
+    // Shuffle samples for randomization
     const shuffledSamples = shuffleArray([...samples]);
-    let sampleIndex = 0;
 
-    for (let row = 0; row < numRows && sampleIndex < shuffledSamples.length; row++) {
-        for (let col = 0; col < numColumns && sampleIndex < shuffledSamples.length; col++) {
-            plate[row][col] = shuffledSamples[sampleIndex++];
-        }
-    }
+    // GREEDY-INSPIRED PLACEMENT: Place each sample in the position that minimizes local clustering
+    for (const sample of shuffledSamples) {
+        const availablePositions = getAvailablePositions(plate, numRows, numColumns);
+        if (availablePositions.length === 0) break; // No more space
 
-    // Iterative improvement: try swapping samples to reduce clustering
-    const maxIterations = Math.min(100, samples.length * 2); // Limit iterations for performance
-    let improvements = 0;
+        let bestPosition: { row: number; col: number } | null = null;
+        let bestScore = -1;
+        let tolerance = 0;
 
-    for (let iteration = 0; iteration < maxIterations; iteration++) {
-        let improved = false;
+        // Try with increasing tolerance until we find a placement
+        while (bestPosition === null && tolerance <= 8) {
+            // Evaluate each position and find the best one
+            for (const pos of availablePositions) {
+                if (canPlaceSampleAtPosition(sample, plate, pos.row, pos.col, selectedCovariates, tolerance)) {
+                    const score = calculatePositionScore(sample, plate, pos.row, pos.col, selectedCovariates);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestPosition = { row: pos.row, col: pos.col };
+                    }
+                }
+            }
 
-        // Try random swaps
-        for (let attempt = 0; attempt < 10; attempt++) {
-            const positions = getFilledPositions(plate, numRows, numColumns);
-            if (positions.length < 2) break;
-
-            // Pick two random positions
-            const pos1 = positions[Math.floor(Math.random() * positions.length)];
-            const pos2 = positions[Math.floor(Math.random() * positions.length)];
-
-            if (pos1.row === pos2.row && pos1.col === pos2.col) continue;
-
-            // Calculate clustering score before swap
-            const scoreBefore = calculatePlateClusteringScore(plate, selectedCovariates);
-
-            // Perform swap
-            const temp = plate[pos1.row][pos1.col];
-            plate[pos1.row][pos1.col] = plate[pos2.row][pos2.col];
-            plate[pos2.row][pos2.col] = temp;
-
-            // Calculate clustering score after swap
-            const scoreAfter = calculatePlateClusteringScore(plate, selectedCovariates);
-
-            // Keep swap if it improves randomization (higher score = less clustering)
-            if (scoreAfter > scoreBefore) {
-                improved = true;
-                improvements++;
-            } else {
-                // Revert swap
-                plate[pos2.row][pos2.col] = plate[pos1.row][pos1.col];
-                plate[pos1.row][pos1.col] = temp;
+            // If no position found with current tolerance, increase tolerance
+            if (bestPosition === null) {
+                tolerance++;
             }
         }
 
-        if (!improved) break; // No more improvements found
+        // Place the sample at the best position found, or fallback to first available
+        const positionToUse = bestPosition || availablePositions[0];
+        if (positionToUse) {
+            plate[positionToUse.row][positionToUse.col] = sample;
+        }
     }
 
-    console.log(`Spatial optimization completed: ${improvements} improvements over ${maxIterations} iterations`);
+    console.log(`Greedy spatial placement completed for ${samples.length} samples`);
     return plate;
 }
 
 /**
- * Get all positions that contain samples
+ * Get all available (empty) positions in the plate
  */
-function getFilledPositions(
+function getAvailablePositions(
     plate: (SearchData | undefined)[][],
     numRows: number,
     numColumns: number
-): Array<{ row: number, col: number }> {
+): Array<{ row: number; col: number }> {
     const positions = [];
     for (let row = 0; row < numRows; row++) {
         for (let col = 0; col < numColumns; col++) {
-            if (plate[row][col] !== undefined) {
+            if (plate[row][col] === undefined) {
                 positions.push({ row, col });
             }
         }
     }
     return positions;
+}
+
+/**
+ * Check if a sample can be placed at a position with given tolerance
+ * Tolerance = maximum number of similar neighbors allowed
+ */
+function canPlaceSampleAtPosition(
+    sample: SearchData,
+    plate: (SearchData | undefined)[][],
+    row: number,
+    col: number,
+    selectedCovariates: string[],
+    tolerance: number
+): boolean {
+    const sampleKey = getCovariateKey(sample, selectedCovariates);
+    let similarNeighbors = 0;
+
+    // Check all 8 neighbors
+    for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue; // Skip self
+
+            const newRow = row + dr;
+            const newCol = col + dc;
+
+            if (newRow >= 0 && newRow < plate.length && newCol >= 0 && newCol < plate[0].length) {
+                const neighbor = plate[newRow][newCol];
+                if (neighbor && getCovariateKey(neighbor, selectedCovariates) === sampleKey) {
+                    similarNeighbors++;
+                }
+            }
+        }
+    }
+
+    return similarNeighbors <= tolerance;
+}
+
+/**
+ * Calculate a score for placing a sample at a position (higher = better for randomization)
+ * Considers both immediate neighbors and broader spatial distribution
+ */
+function calculatePositionScore(
+    sample: SearchData,
+    plate: (SearchData | undefined)[][],
+    row: number,
+    col: number,
+    selectedCovariates: string[]
+): number {
+    const sampleKey = getCovariateKey(sample, selectedCovariates);
+    let score = 100; // Start with perfect score
+
+    // Penalty for similar immediate neighbors (8-connected)
+    let similarNeighbors = 0;
+    let totalNeighbors = 0;
+
+    for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+
+            const newRow = row + dr;
+            const newCol = col + dc;
+
+            if (newRow >= 0 && newRow < plate.length && newCol >= 0 && newCol < plate[0].length) {
+                const neighbor = plate[newRow][newCol];
+                if (neighbor) {
+                    totalNeighbors++;
+                    if (getCovariateKey(neighbor, selectedCovariates) === sampleKey) {
+                        similarNeighbors++;
+                    }
+                }
+            }
+        }
+    }
+
+    // Heavy penalty for similar neighbors
+    if (totalNeighbors > 0) {
+        const similarRatio = similarNeighbors / totalNeighbors;
+        score -= similarRatio * 50; // Up to 50 point penalty
+    }
+
+    // Additional penalty for similar samples in same row/column
+    let similarInRow = 0;
+    let similarInCol = 0;
+
+    // Check row
+    for (let c = 0; c < plate[0].length; c++) {
+        if (c !== col && plate[row][c] && getCovariateKey(plate[row][c]!, selectedCovariates) === sampleKey) {
+            similarInRow++;
+        }
+    }
+
+    // Check column
+    for (let r = 0; r < plate.length; r++) {
+        if (r !== row && plate[r][col] && getCovariateKey(plate[r][col]!, selectedCovariates) === sampleKey) {
+            similarInCol++;
+        }
+    }
+
+    // Moderate penalty for row/column clustering
+    score -= (similarInRow + similarInCol) * 5;
+
+    return Math.max(0, score);
 }
 
 /**

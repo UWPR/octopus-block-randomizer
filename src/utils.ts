@@ -70,6 +70,113 @@ export function groupByCovariates(searches: SearchData[], selectedCovariates: st
     return groups;
 }
 
+// Spatial neighbor utility functions
+export interface NeighborPosition {
+    row: number;
+    col: number;
+}
+
+/**
+ * Get all valid 8-connected neighbors of a cell in a plate
+ * @param row - Current row position
+ * @param col - Current column position  
+ * @param numRows - Total number of rows in the plate
+ * @param numCols - Total number of columns in the plate
+ * @returns Array of valid neighbor positions
+ */
+export function getNeighborPositions(
+    row: number, 
+    col: number, 
+    numRows: number, 
+    numCols: number
+): NeighborPosition[] {
+    const neighbors: NeighborPosition[] = [];
+    
+    for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue; // Skip self
+            
+            const newRow = row + dr;
+            const newCol = col + dc;
+            
+            if (newRow >= 0 && newRow < numRows && newCol >= 0 && newCol < numCols) {
+                neighbors.push({ row: newRow, col: newCol });
+            }
+        }
+    }
+    
+    return neighbors;
+}
+
+/**
+ * Count neighbors with similar covariate values
+ * @param plate - 2D array representing the plate
+ * @param row - Current row position
+ * @param col - Current column position
+ * @param sampleKey - Covariate key of the current sample
+ * @param selectedCovariates - Array of selected covariate names
+ * @returns Number of neighbors with the same covariate key
+ */
+export function countSimilarNeighbors<T extends SearchData | undefined>(
+    plate: T[][],
+    row: number,
+    col: number,
+    sampleKey: string,
+    selectedCovariates: string[]
+): number {
+    const neighbors = getNeighborPositions(row, col, plate.length, plate[0]?.length || 0);
+    let similarCount = 0;
+    
+    for (const neighbor of neighbors) {
+        const neighborSample = plate[neighbor.row][neighbor.col];
+        if (neighborSample && getCovariateKey(neighborSample, selectedCovariates) === sampleKey) {
+            similarCount++;
+        }
+    }
+    
+    return similarCount;
+}
+
+/**
+ * Get neighbor analysis for spatial quality metrics
+ * @param plate - 2D array representing the plate
+ * @param row - Current row position  
+ * @param col - Current column position
+ * @param selectedCovariates - Array of selected covariate names
+ * @returns Object with similar and total neighbor counts
+ */
+export function analyzeNeighbors<T extends SearchData | undefined>(
+    plate: T[][],
+    row: number,
+    col: number,
+    selectedCovariates: string[]
+): { similarNeighbors: number; totalNeighbors: number; differentNeighbors: number } {
+    const currentSample = plate[row][col];
+    if (!currentSample) {
+        return { similarNeighbors: 0, totalNeighbors: 0, differentNeighbors: 0 };
+    }
+    
+    const currentKey = getCovariateKey(currentSample, selectedCovariates);
+    const neighbors = getNeighborPositions(row, col, plate.length, plate[0]?.length || 0);
+    
+    let similarNeighbors = 0;
+    let totalNeighbors = 0;
+    
+    for (const neighbor of neighbors) {
+        const neighborSample = plate[neighbor.row][neighbor.col];
+        if (neighborSample) {
+            totalNeighbors++;
+            const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
+            if (currentKey === neighborKey) {
+                similarNeighbors++;
+            }
+        }
+    }
+    
+    const differentNeighbors = totalNeighbors - similarNeighbors;
+    return { similarNeighbors, totalNeighbors, differentNeighbors };
+}
+
 // Main randomization function with algorithm selection
 export function randomizeSearches(
     searches: SearchData[],

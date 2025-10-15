@@ -1,5 +1,5 @@
 import { SearchData } from '../types';
-import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils';
+import { shuffleArray, getCovariateKey, groupByCovariates, countSimilarNeighbors, analyzeNeighbors, getNeighborPositions } from '../utils';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -379,7 +379,7 @@ function validatePerBlockDistribution(
 
 /**
  * Greedy-inspired spatial randomization to minimize covariate clustering
- * Uses constraint-based placement with increasing tolerance for optimal spatial distribution
+ * Uses constraint-based placement with increasing tolerance to minimize local clustering
  */
 export function optimizeSpatialRandomization(
   samples: SearchData[],
@@ -396,7 +396,7 @@ export function optimizeSpatialRandomization(
   // Shuffle samples for randomization
   const shuffledSamples = shuffleArray([...samples]);
 
-  // GREEDY-INSPIRED PLACEMENT: Place each sample in the position that minimizes local clustering
+  // Place each sample in the position that minimizes local clustering
   for (const sample of shuffledSamples) {
     const availablePositions = getAvailablePositions(plate, numRows, numColumns);
     if (availablePositions.length === 0) break; // No more space
@@ -467,25 +467,7 @@ function canPlaceSampleAtPosition(
   tolerance: number
 ): boolean {
   const sampleKey = getCovariateKey(sample, selectedCovariates);
-  let similarNeighbors = 0;
-
-  // Check all 8 neighbors
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue; // Skip self
-
-      const newRow = row + dr;
-      const newCol = col + dc;
-
-      if (newRow >= 0 && newRow < plate.length && newCol >= 0 && newCol < plate[0].length) {
-        const neighbor = plate[newRow][newCol];
-        if (neighbor && getCovariateKey(neighbor, selectedCovariates) === sampleKey) {
-          similarNeighbors++;
-        }
-      }
-    }
-  }
-
+  const similarNeighbors = countSimilarNeighbors(plate, row, col, sampleKey, selectedCovariates);
   return similarNeighbors <= tolerance;
 }
 
@@ -504,27 +486,7 @@ function calculatePositionScore(
   let score = 100; // Start with perfect score
 
   // Penalty for similar immediate neighbors (8-connected)
-  let similarNeighbors = 0;
-  let totalNeighbors = 0;
-
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-
-      const newRow = row + dr;
-      const newCol = col + dc;
-
-      if (newRow >= 0 && newRow < plate.length && newCol >= 0 && newCol < plate[0].length) {
-        const neighbor = plate[newRow][newCol];
-        if (neighbor) {
-          totalNeighbors++;
-          if (getCovariateKey(neighbor, selectedCovariates) === sampleKey) {
-            similarNeighbors++;
-          }
-        }
-      }
-    }
-  }
+  const { similarNeighbors, totalNeighbors } = analyzeNeighbors(plate, row, col, selectedCovariates);
 
   // Heavy penalty for similar neighbors
   if (totalNeighbors > 0) {
@@ -556,53 +518,6 @@ function calculatePositionScore(
   return Math.max(0, score);
 }
 
-/**
- * Calculate clustering score for a plate (same logic as quality metrics)
- */
-function calculatePlateClusteringScore(
-  plate: (SearchData | undefined)[][],
-  selectedCovariates: string[]
-): number {
-  const numRows = plate.length;
-  const numCols = plate[0]?.length || 0;
-
-  let totalComparisons = 0;
-  let differentNeighbors = 0;
-
-  for (let row = 0; row < numRows; row++) {
-    for (let col = 0; col < numCols; col++) {
-      const currentSample = plate[row][col];
-      if (!currentSample) continue;
-
-      const currentKey = getCovariateKey(currentSample, selectedCovariates);
-
-      // Check all 8 neighbors
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-
-          const newRow = row + dr;
-          const newCol = col + dc;
-
-          if (newRow >= 0 && newRow < numRows && newCol >= 0 && newCol < numCols) {
-            const neighborSample = plate[newRow][newCol];
-            if (!neighborSample) continue;
-
-            const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
-            totalComparisons++;
-
-            if (currentKey !== neighborKey) {
-              differentNeighbors++;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (totalComparisons === 0) return 100;
-  return (differentNeighbors / totalComparisons) * 100;
-}
 
 // Balanced randomization (proportional distribution in plates and rows + row shuffling)
 export function balancedBlockRandomization(

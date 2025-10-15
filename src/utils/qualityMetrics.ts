@@ -1,5 +1,5 @@
 import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment, QualityLevel } from '../types';
-import { getCovariateKey, groupByCovariates, getQualityLevel } from '../utils';
+import { getCovariateKey, groupByCovariates, getQualityLevel, getNeighborPositions } from '../utils';
 
 /**
  * Simplified Quality Metrics Calculator
@@ -123,21 +123,6 @@ const calculateSpatialClusteringScore = (
   let totalComparisons = 0;
   let differentNeighbors = 0;
 
-  // Helper function to get neighbors of a cell
-  const getNeighbors = (row: number, col: number): Array<{ row: number, col: number }> => {
-    const neighbors = [];
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue; // Skip self
-        const newRow = row + dr;
-        const newCol = col + dc;
-        if (newRow >= 0 && newRow < numRows && newCol >= 0 && newCol < numCols) {
-          neighbors.push({ row: newRow, col: newCol });
-        }
-      }
-    }
-    return neighbors;
-  };
 
   // Check each sample against its neighbors
   for (let row = 0; row < numRows; row++) {
@@ -146,7 +131,7 @@ const calculateSpatialClusteringScore = (
       if (!currentSample) continue;
 
       const currentKey = getCovariateKey(currentSample, selectedCovariates);
-      const neighbors = getNeighbors(row, col);
+      const neighbors = getNeighborPositions(row, col, numRows, numCols);
 
       for (const neighbor of neighbors) {
         const neighborSample = plateRows[neighbor.row][neighbor.col];

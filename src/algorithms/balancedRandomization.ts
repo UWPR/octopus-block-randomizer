@@ -377,6 +377,146 @@ function validatePerBlockDistribution(
 
 
 
+/**
+ * Advanced spatial randomization to minimize covariate clustering
+ * Uses iterative improvement to maximize spatial diversity
+ */
+function optimizeSpatialRandomization(
+    samples: SearchData[],
+    numRows: number,
+    numColumns: number,
+    selectedCovariates: string[]
+): (SearchData | undefined)[][] {
+    const plate: (SearchData | undefined)[][] = Array.from({ length: numRows }, () =>
+        new Array(numColumns).fill(undefined)
+    );
+
+    if (samples.length === 0) return plate;
+
+    // Start with a random arrangement
+    const shuffledSamples = shuffleArray([...samples]);
+    let sampleIndex = 0;
+
+    for (let row = 0; row < numRows && sampleIndex < shuffledSamples.length; row++) {
+        for (let col = 0; col < numColumns && sampleIndex < shuffledSamples.length; col++) {
+            plate[row][col] = shuffledSamples[sampleIndex++];
+        }
+    }
+
+    // Iterative improvement: try swapping samples to reduce clustering
+    const maxIterations = Math.min(100, samples.length * 2); // Limit iterations for performance
+    let improvements = 0;
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+        let improved = false;
+
+        // Try random swaps
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const positions = getFilledPositions(plate, numRows, numColumns);
+            if (positions.length < 2) break;
+
+            // Pick two random positions
+            const pos1 = positions[Math.floor(Math.random() * positions.length)];
+            const pos2 = positions[Math.floor(Math.random() * positions.length)];
+
+            if (pos1.row === pos2.row && pos1.col === pos2.col) continue;
+
+            // Calculate clustering score before swap
+            const scoreBefore = calculatePlateClusteringScore(plate, selectedCovariates);
+
+            // Perform swap
+            const temp = plate[pos1.row][pos1.col];
+            plate[pos1.row][pos1.col] = plate[pos2.row][pos2.col];
+            plate[pos2.row][pos2.col] = temp;
+
+            // Calculate clustering score after swap
+            const scoreAfter = calculatePlateClusteringScore(plate, selectedCovariates);
+
+            // Keep swap if it improves randomization (higher score = less clustering)
+            if (scoreAfter > scoreBefore) {
+                improved = true;
+                improvements++;
+            } else {
+                // Revert swap
+                plate[pos2.row][pos2.col] = plate[pos1.row][pos1.col];
+                plate[pos1.row][pos1.col] = temp;
+            }
+        }
+
+        if (!improved) break; // No more improvements found
+    }
+
+    console.log(`Spatial optimization completed: ${improvements} improvements over ${maxIterations} iterations`);
+    return plate;
+}
+
+/**
+ * Get all positions that contain samples
+ */
+function getFilledPositions(
+    plate: (SearchData | undefined)[][],
+    numRows: number,
+    numColumns: number
+): Array<{ row: number, col: number }> {
+    const positions = [];
+    for (let row = 0; row < numRows; row++) {
+        for (let col = 0; col < numColumns; col++) {
+            if (plate[row][col] !== undefined) {
+                positions.push({ row, col });
+            }
+        }
+    }
+    return positions;
+}
+
+/**
+ * Calculate clustering score for a plate (same logic as quality metrics)
+ */
+function calculatePlateClusteringScore(
+    plate: (SearchData | undefined)[][],
+    selectedCovariates: string[]
+): number {
+    const numRows = plate.length;
+    const numCols = plate[0]?.length || 0;
+
+    let totalComparisons = 0;
+    let differentNeighbors = 0;
+
+    for (let row = 0; row < numRows; row++) {
+        for (let col = 0; col < numCols; col++) {
+            const currentSample = plate[row][col];
+            if (!currentSample) continue;
+
+            const currentKey = getCovariateKey(currentSample, selectedCovariates);
+
+            // Check all 8 neighbors
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+
+                    if (newRow >= 0 && newRow < numRows && newCol >= 0 && newCol < numCols) {
+                        const neighborSample = plate[newRow][newCol];
+                        if (!neighborSample) continue;
+
+                        const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
+                        totalComparisons++;
+
+                        if (currentKey !== neighborKey) {
+                            differentNeighbors++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (totalComparisons === 0) return 100;
+    return (differentNeighbors / totalComparisons) * 100;
+}
+
 // Balanced block randomization with validation
 export function balancedBlockRandomization(
     searches: SearchData[],
@@ -437,8 +577,11 @@ export function balancedBlockRandomization(
 
     // STEP 5: For each plate, distribute samples across rows with validation
     plateAssignments.forEach((plateSamples, plateIdx) => {
+        // Shuffle plate samples before grouping to add initial randomization
+        const shuffledPlateSamples = shuffleArray([...plateSamples]);
+
         // Group samples by covariates for this plate
-        const plateGroups = groupByCovariates(plateSamples, selectedCovariates);
+        const plateGroups = groupByCovariates(shuffledPlateSamples, selectedCovariates);
 
         // Calculate how many rows we need
         const totalPlateSamples = plateSamples.length;
@@ -473,18 +616,26 @@ export function balancedBlockRandomization(
             console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
         }
 
-        // STEP 6: Fill the actual plate positions and shuffle within rows
-        rowAssignments.forEach((rowSamples, rowIdx) => {
-            if (rowIdx < numRows) {
-                // Shuffle samples within this row for final randomization
-                const shuffledRowSamples = shuffleArray([...rowSamples]);
-
-                // Place samples in the row
-                for (let colIdx = 0; colIdx < Math.min(numColumns, shuffledRowSamples.length); colIdx++) {
-                    plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
-                }
-            }
+        // STEP 6: Collect all plate samples and perform advanced spatial randomization
+        const allPlateSamples: SearchData[] = [];
+        rowAssignments.forEach((rowSamples) => {
+            allPlateSamples.push(...rowSamples);
         });
+
+        // STEP 7: Apply anti-clustering spatial randomization for maximum randomization score
+        const spatiallyOptimizedPlate = optimizeSpatialRandomization(
+            allPlateSamples,
+            numRows,
+            numColumns,
+            selectedCovariates
+        );
+
+        // Fill the plate with spatially optimized positions
+        for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
+            for (let colIdx = 0; colIdx < numColumns; colIdx++) {
+                plates[plateIdx][rowIdx][colIdx] = spatiallyOptimizedPlate[rowIdx][colIdx];
+            }
+        }
     });
 
     return {

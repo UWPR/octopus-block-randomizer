@@ -1,46 +1,46 @@
 export interface SearchData {
-    name: string;
-    metadata: { [key: string]: string };
+  name: string;
+  metadata: { [key: string]: string };
 }
 
 // Algorithm configuration with descriptions
 export const ALGORITHM_CONFIG = {
-    balanced: {
-        name: 'Balanced Block Randomization',
-        description: 'Proportional distribution across plates and within plate rows'
-    },
-    balanced_spatial: {
-        name: 'Balanced Spatial Randomization', 
-        description: 'Proportional distribution across plates with spatial optimization with plates'
-    },
-    greedy: {
-        name: 'Greedy Randomization',
-        description: 'Greedy Randomization'
-    }
+  balanced: {
+    name: 'Balanced Block Randomization',
+    description: 'Proportional distribution across plates and within plate rows'
+  },
+  balanced_spatial: {
+    name: 'Balanced Spatial Randomization',
+    description: 'Proportional distribution across plates with spatial optimization with plates'
+  },
+  greedy: {
+    name: 'Greedy Randomization',
+    description: 'Greedy Randomization'
+  }
 } as const;
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;
 
 // Utility functions for algorithm configuration
-export const getAlgorithmName = (algorithm: RandomizationAlgorithm): string => 
-    ALGORITHM_CONFIG[algorithm].name;
+export const getAlgorithmName = (algorithm: RandomizationAlgorithm): string =>
+  ALGORITHM_CONFIG[algorithm].name;
 
-export const getAlgorithmDescription = (algorithm: RandomizationAlgorithm): string => 
-    ALGORITHM_CONFIG[algorithm].description;
+export const getAlgorithmDescription = (algorithm: RandomizationAlgorithm): string =>
+  ALGORITHM_CONFIG[algorithm].description;
 
-export const getAllAlgorithms = (): RandomizationAlgorithm[] => 
-    Object.keys(ALGORITHM_CONFIG) as RandomizationAlgorithm[];
+export const getAllAlgorithms = (): RandomizationAlgorithm[] =>
+  Object.keys(ALGORITHM_CONFIG) as RandomizationAlgorithm[];
 
 // Get algorithms in UI display order (most advanced first)
-export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] => 
-    ['balanced_spatial', 'balanced', 'greedy'] as RandomizationAlgorithm[];
+export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] =>
+  ['balanced_spatial', 'balanced', 'greedy'] as RandomizationAlgorithm[];
 
 export interface RandomizationOptions {
-    algorithm: RandomizationAlgorithm;
-    selectedCovariates: string[];
-    // Additional options for future algorithms
-    maxIterations?: number;
-    balanceWeight?: number;
+  algorithm: RandomizationAlgorithm;
+  selectedCovariates: string[];
+  // Additional options for future algorithms
+  maxIterations?: number;
+  balanceWeight?: number;
 }
 
 export interface SummaryItem {
@@ -53,9 +53,9 @@ export interface SummaryItem {
 }
 
 export interface CovariateColorInfo {
-    color: string;
-    useOutline: boolean;
-    useStripes: boolean;
+  color: string;
+  useOutline: boolean;
+  useStripes: boolean;
 }
 
 // Quality Metrics Levels
@@ -92,14 +92,14 @@ export const QUALITY_LEVEL_CONFIG = {
   poor: {
     name: 'Poor',
     shortLabel: 'P',
-    color: '#D2691E',      // Red
+    color: '#D2691E', // Chocolate
     lowScore: 60,
     highScore: 69
   },
   bad: {
     name: 'Bad',
     shortLabel: 'B',
-    color: '#f44336',      // Dark Red
+    color: '#f44336',      // Red
     lowScore: 0,
     highScore: 59
   }
@@ -108,11 +108,11 @@ export const QUALITY_LEVEL_CONFIG = {
 export type QualityLevel = keyof typeof QUALITY_LEVEL_CONFIG;
 
 // Utility functions for quality levels
-export const getQualityLevelConfig = (level: QualityLevel): QualityLevelConfig => 
-    QUALITY_LEVEL_CONFIG[level];
+export const getQualityLevelConfig = (level: QualityLevel): QualityLevelConfig =>
+  QUALITY_LEVEL_CONFIG[level];
 
-export const getAllQualityLevelKeys = (): QualityLevel[] => 
-    Object.keys(QUALITY_LEVEL_CONFIG) as QualityLevel[];
+export const getAllQualityLevelKeys = (): QualityLevel[] =>
+  Object.keys(QUALITY_LEVEL_CONFIG) as QualityLevel[];
 
 export interface PlateQualityScore {
   plateIndex: number;

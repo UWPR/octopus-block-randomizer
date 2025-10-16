@@ -128,7 +128,7 @@ Each plate displays:
 
 ---
 
-## 5. Compact View Implementation
+## 5. Compact Plate View Implementation
 
 The original full-size plate view made it difficult to visualize sample distribution patterns across multiple plates simultaneously, especially when working with many plates. A compact view was added to enable quick overview of sample distribution over multiple plates.
 Users can switch between views using the **Compact View** / **Full Size View** button in the control panel.

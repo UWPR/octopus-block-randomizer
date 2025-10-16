@@ -31,13 +31,17 @@ The configuration form includes new options:
 - Allows users to specify which column contains the unique sample identifiers. Users can select from the available columns in the uploaded CSV file.
 
 ### Algorithm Selection
-Users can choose between two randomization strategies:
+Users can choose between three randomization strategies:
 
-1. **Balanced Randomization** (_New_)
+1. **Balanced Spatial Randomization** (_New_)
+   - Proportionally distributes samples across plates
+   - Uses greedy, tolerance-based approach to minimize spatial clustering within plates
+
+2. **Balanced Block Randomization** (_New_)
    - Proportionally distributes samples across plates
    - Maintains balance within plate rows
 
-2. **Greedy Algorithm** (_Legacy_)
+3. **Greedy Algorithm** (_Legacy_)
    - Original algorithm implementation
    - Places samples iteratively with tolerance-based placement
 
@@ -45,12 +49,12 @@ Users can choose between two randomization strategies:
 - Comma-separated list of labels (e.g., "Control, QC, Reference")
 - Covariate groups containing these labels receive priority in color assignment - brighter colors assigned to make them more recognizable.
 
-### Plate Dimensions (_only available for the Balanced Randomization algorithm_)
+### Plate Dimensions (_only available for the Balanced Block / Spatial Randomization algorithm_)
 - **Rows**: Configurable from 1-16 (default: 8)
 - **Columns**: Configurable from 1-24 (default: 12)
 - **Display**: Shows calculated plate capacity (rows × columns)
 
-### Empty Cell Distribution (_only available for the Balanced Randomization algorithm_)
+### Empty Cell Distribution (_only available for the Balanced Block / Spatial Randomization algorithm_)
 Option to control how empty cells / wells are handled when sample count < total capacity:
 
 - **Keep empty cells in last plate** (default checked): All empty cells are assigned to the final plate
@@ -61,34 +65,53 @@ Option to control how empty cells / wells are handled when sample count < total 
 
 ---
 
-## 3. New Balanced Randomization Algorithm
+## 3. Compact Plate View Implementation
+
+The original full-size plate view made it difficult to visualize sample distribution patterns across multiple plates simultaneously, especially when working with many plates. A compact view was added to enable quick overview of sample distribution over multiple plates.
+Users can switch between views using the **Compact View** / **Full Size View** button in the control panel.
+
+![alt text](compactPlates.png)
 
 
-#### Two-Level Distribution
-1. **Plate Level**: Distributes samples proportionally across all plates
-2. **Row Level**: Distributes samples proportionally within each plate's rows
+#### Compact View (Default)
+- **Cell Size**: 18×16 pixels per cell
+- Hover tooltip shows:
+  - Sample name
+  - Cell / well position (e.g., A05)
+  - All covariate values
 
-
-##### Phase 1: Proportional Placement
-- Calculates expected minimum samples per covariate group
-- Adjusts for varying plate capacities
-- Places base allocation across all blocks (plates or rows)
-
-##### Phase 2A: Unplaced Groups
-- Handles covariate groups too small for Phase 1
-- Distributes samples across available capacity
-- Largest covariate groups processed first
-
-##### Phase 2B: Overflow Handling
-- Places remaining samples from Phase 1
-- Uses prioritization strategies:
-  - **Plate level**: Prioritizes full-capacity plates
-  - **Row level**: Prioritizes rows with fewer samples of the group
-
+#### Full Size View (Toggle)
+- **Cell Size**: 100×60 pixels per well
+- Detailed information directly visible
+  - Sample name prominently displayed
+  - All covariate values shown within the plate cell
 
 ---
 
-## 4. Quality Metrics
+## 4. Covariate Groups Summary Panel
+
+The summary panel provides an overview of all unique covariate groups.
+- Toggle visibility using the "Show/Hide Covariate Summary" button.
+- Summary items are sorted by sample count (descending) - covariate groups with most samples first.
+
+#### Color Indicator
+- Visual representation matching the plate display
+- Shows fill pattern (solid/outline/stripes)
+
+#### Sample Count
+- Total number of samples in the group
+
+#### Covariate Values
+- Lists all covariate names and their values for the group
+- Format: `Set: Training • Focus_Area: FA2 • Time_point: 21 • Dose_Rate: LDR`
+
+![alt text](summaryView.png)
+
+---
+
+
+
+## 5. Quality Metrics
 
 Quality assement includes scores that evaluates the balance and randomization quality of plate assignments. Quality scores are calculated automatically and updated in real-time as users make changes. The following scores are calculated:
 
@@ -128,52 +151,10 @@ Each plate displays:
 
 ---
 
-## 5. Compact Plate View Implementation
-
-The original full-size plate view made it difficult to visualize sample distribution patterns across multiple plates simultaneously, especially when working with many plates. A compact view was added to enable quick overview of sample distribution over multiple plates.
-Users can switch between views using the **Compact View** / **Full Size View** button in the control panel.
-
-![alt text](compactPlates.png)
 
 
-#### Compact View (Default)
-- **Cell Size**: 18×16 pixels per cell
-- Hover tooltip shows:
-  - Sample name
-  - Cell / well position (e.g., A05)
-  - All covariate values
 
-#### Full Size View (Toggle)
-- **Cell Size**: 100×60 pixels per well
-- Detailed information directly visible
-  - Sample name prominently displayed
-  - All covariate values shown within the plate cell
-
----
-
-## 6. Covariate Groups Summary Panel
-
-The summary panel provides an overview of all unique covariate groups.
-- Toggle visibility using the "Show/Hide Covariate Summary" button.
-- Summary items are sorted by sample count (descending) - covariate groups with most samples first.
-
-#### Color Indicator
-- Visual representation matching the plate display
-- Shows fill pattern (solid/outline/stripes)
-
-#### Sample Count
-- Total number of samples in the group
-
-#### Covariate Values
-- Lists all covariate names and their values for the group
-- Format: `Set: Training • Focus_Area: FA2 • Time_point: 21 • Dose_Rate: LDR`
-
-![alt text](summaryView.png)
-
----
-
-
-## 7. Plate Details Popup
+## 6. Plate Details Popup
 
 Click the information icon ("i") in the header of any plate. The draggable popup displays comprehensive information about the selected plate:
 
@@ -191,7 +172,7 @@ Click the information icon ("i") in the header of any plate. The draggable popup
 
 #### Covariate Distribution
 
-The modal shows each covariate group with detailed information arranged in two columns:
+The popup shows each covariate group with detailed information arranged in two columns:
 
 **Left Column - Covariate Information:**
 - **Color Indicator**: 16×16px color box matching plate display
@@ -213,7 +194,7 @@ The modal shows each covariate group with detailed information arranged in two c
 
 ---
 
-## 8. Interactive Highlighting
+## 7. Interactive Highlighting
 
 Clicking a covariate group in the summary panel highlights (blue border; glowing effect) all samples belonging to that group in all the plates.
 
@@ -227,15 +208,15 @@ Clicking a covariate group in the summary panel highlights (blue border; glowing
 
 ---
 
-## 9. Re-randomization
+## 8. Re-randomization
 
 The application provides two methods for re-randomizing samples to improve quality scores or generate alternative arrangements:
 
 ### Global Re-randomization ("Re-randomize" Button)
 
-The main "Re-randomize" button in the control panel generates a completely new sample placement and randomization for all plates while preserving:
-
 ![alt text](RerandomizeButton.png)
+
+The main "Re-randomize" button in the control panel generates a completely new sample placement and randomization for all plates while preserving:
 
 - Current covariate selections
 - Algorithm choice
@@ -251,8 +232,9 @@ Each plate header includes an "R" button that re-randomizes only that specific p
 
 
 #### Algorithm-Specific Behavior:
-- **Balanced Randomization**: Shuffles samples within each row only (preserves balanced distribution in rows)
-- **Other Algorithms**: Shuffles all samples across the entire plate
+- **Balanced Spatial Randomization**: Uses greedy, tolerance-based sample placement within a plate to minimize spatial clustering
+- **Balanced Block Randomization**: Shuffles samples within each row only (preserves balanced distribution in rows)
+- **Greedy Randomization**: Shuffles all samples across the entire plate
 
 ### Quality Score Updates
 
@@ -263,6 +245,51 @@ Both re-randomization methods automatically trigger:
 
 ---
 ---
+
+## New Balanced Randomization Algorithms
+
+The app introduces two new algorithms: **Balanced Block Randomization** and **Balanced Spatial Randomization**. Both algorithms use the same strategy to proportionally distribute samples across plates, ensuring balanced representation of covariate groups on each plate.
+
+### Balanced Block Randomization
+After proportional plate distribution, this algorithm:
+- Distributes samples proportionally across rows within each plate
+- Shuffle samples within each row for final randomization
+- Attempts to maintain balance at both plate and row levels
+
+### Balanced Spatial Randomization  
+After proportional plate distribution, this algorithm:
+- Uses a greedy, tolerance-based approach to place samples within each plate
+- Attempts to minimize spatial clustering by analyzing neighbor positions
+- Focuses on better spatial distribution within plates while maintaining overall plate balance
+
+Both algorithms share the same approach for plate-level distribution:
+
+
+#### Two-Level Distribution
+1. **Plate Level**: Distributes samples proportionally across all plates
+2. **Row Level**: Distributes samples proportionally within each plate's rows
+
+
+##### Phase 1: Proportional Placement
+- Calculates expected minimum samples per covariate group
+- Adjusts for varying plate capacities
+- Places base allocation across all blocks (plates or rows)
+
+##### Phase 2A: Unplaced Groups
+- Handles covariate groups too small for Phase 1
+- Distributes samples across available capacity
+- Largest covariate groups processed first
+
+##### Phase 2B: Overflow Handling
+- Places remaining samples from Phase 1
+- Uses prioritization strategies:
+  - **Plate level**: Prioritizes full-capacity plates
+  - **Row level**: Prioritizes rows with fewer samples of the group (only for Balanced Block Randomization)
+
+
+---
+---
+
 
 ## Quality Score Calculation Details
 

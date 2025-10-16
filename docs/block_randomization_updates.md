@@ -4,6 +4,38 @@
 
 This document describes the enhancements made to the Octopus Block Randomization app for distributing samples across plates.
 
+## Table of Contents
+
+- [1. Updated Color Palette](#1-updated-color-palette)
+- [2. Updated Configuration Form](#2-updated-configuration-form)
+  - [ID Column Selection](#id-column-selection)
+  - [Algorithm Selection](#algorithm-selection)
+  - [Control/Reference Sample Field](#controlreference-sample-field)
+  - [Plate Dimensions](#plate-dimensions-only-available-for-the-balanced-block--spatial-randomization-algorithm)
+  - [Empty Cell Distribution](#empty-cell-distribution-only-available-for-the-balanced-block--spatial-randomization-algorithm)
+  - [Covariate Display](#covariate-display)
+- [3. Compact Plate View Implementation](#3-compact-plate-view-implementation)
+- [4. Covariate Groups Summary Panel](#4-covariate-groups-summary-panel)
+- [5. Quality Metrics](#5-quality-metrics)
+  - [Quality Score Display](#quality-score-display)
+- [6. Plate Details Popup](#6-plate-details-popup)
+- [7. Interactive Highlighting](#7-interactive-highlighting)
+- [8. Re-randomization](#8-re-randomization)
+  - [Global Re-randomization](#global-re-randomization-re-randomize-button)
+  - [Individual Plate Re-randomization](#individual-plate-re-randomization-r-button)
+  - [Quality Score Updates](#quality-score-updates)
+- [New Balanced Randomization Algorithms](#new-balanced-randomization-algorithms)
+  - [Balanced Block Randomization](#balanced-block-randomization)
+  - [Balanced Spatial Randomization](#balanced-spatial-randomization)
+- [Quality Score Calculation](#quality-score-calculation)
+  - [Balance Score](#balance-score)
+  - [Randomization Score](#randomization-score)
+  - [Plate-Level Overall Score](#plate-level-overall-score)
+  - [Experiment-Level Scores](#experiment-level-scores)
+- [Usage](#usage)
+
+---
+
 
 ## 1. Updated Color Palette
 
@@ -262,18 +294,13 @@ After proportional plate distribution, this algorithm:
 - Attempts to minimize spatial clustering by analyzing neighbor positions
 - Focuses on better spatial distribution within plates while maintaining overall plate balance
 
+#### Plate level distribution
 Both algorithms share the same approach for plate-level distribution:
-
-
-#### Two-Level Distribution
-1. **Plate Level**: Distributes samples proportionally across all plates
-2. **Row Level**: Distributes samples proportionally within each plate's rows
-
 
 ##### Phase 1: Proportional Placement
 - Calculates expected minimum samples per covariate group
 - Adjusts for varying plate capacities
-- Places base allocation across all blocks (plates or rows)
+- Places base allocation across all plates 
 
 ##### Phase 2A: Unplaced Groups
 - Handles covariate groups too small for Phase 1
@@ -291,7 +318,7 @@ Both algorithms share the same approach for plate-level distribution:
 ---
 
 
-## Quality Score Calculation Details
+## Quality Score Calculation
 
 ### Balance Score
 The balance score evaluates whether each plate contains a representative sample of the overall population based on selected covariates.

@@ -4,6 +4,7 @@
 
 This document describes the enhancements made to the Octopus Block Randomization app for distributing samples across plates.
 
+<a id="table-of-contents"></a>
 ## Table of Contents
 
 - [1. Updated Color Palette](#1-updated-color-palette)
@@ -52,6 +53,8 @@ This document describes the enhancements made to the Octopus Block Randomization
 
 This approach supports up to 72 unique covariate groups.
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ---
 
 ## 2. Updated Configuration Form
@@ -95,6 +98,8 @@ Option to control how empty cells / wells are handled when sample count < total 
 ### Covariate Display
 - Selected covariates displayed below the **Select Covariates** selection box
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ---
 
 ## 3. Compact Plate View Implementation
@@ -118,6 +123,8 @@ Users can switch between views using the **Compact View** / **Full Size View** b
   - Sample name prominently displayed
   - All covariate values shown within the plate cell
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ---
 
 ## 4. Covariate Groups Summary Panel
@@ -138,6 +145,8 @@ The summary panel provides an overview of all unique covariate groups.
 - Format: `Set: Training • Focus_Area: FA2 • Time_point: 21 • Dose_Rate: LDR`
 
 ![alt text](summaryView.png)
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ---
 
@@ -180,6 +189,8 @@ Each plate displays:
 - **Rand**: Randomization score for that specific plate
 
 ![Plate Quality in Header](PlateQualityHeader.png)
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ---
 
@@ -224,6 +235,8 @@ The popup shows each covariate group with detailed information arranged in two c
 - All quality scores update automatically when samples are moved
 - Covariate groups selected in the **Covariate Summary" view are highlighted in the popup
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ---
 
 ## 7. Interactive Highlighting
@@ -237,6 +250,8 @@ Clicking a covariate group in the summary panel highlights (blue border; glowing
 ![alt text](selectedCovariateGroup.png)
 ![alt text](cellHighlighted-Plate.png)
 ![alt text](selectionHighlighted-Modal.png)
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ---
 
@@ -274,6 +289,8 @@ Both re-randomization methods automatically trigger:
 - Recalculation of quality scores
 - Real-time update of plate headers and quality button
 - Refresh of quality assessment popup data
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ---
 ---
@@ -313,6 +330,7 @@ Both algorithms share the same approach for plate-level distribution:
   - **Plate level**: Prioritizes full-capacity plates
   - **Row level**: Prioritizes rows with fewer samples of the group (only for Balanced Block Randomization)
 
+[↑ Back to Table of Contents](#table-of-contents)
 
 ---
 ---
@@ -384,6 +402,8 @@ Overall Experiment Score = (Average Balance + Average Randomization) / 2
 | 60-69 | Poor |
 | 0-59 | Bad |
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ---
 ---
 
@@ -404,3 +424,5 @@ Overall Experiment Score = (Average Balance + Average Randomization) / 2
    - Click covariate groups in summary view to highlight samples in plates
    - Inspect individual plates using details modal
 5. **Export**: Download CSV with plate assignments
+
+[↑ Back to Table of Contents](#table-of-contents)

@@ -31,7 +31,7 @@ export const getAlgorithmDescription = (algorithm: RandomizationAlgorithm): stri
 export const getAllAlgorithms = (): RandomizationAlgorithm[] =>
   Object.keys(ALGORITHM_CONFIG) as RandomizationAlgorithm[];
 
-// Get algorithms in UI display order (most advanced first)
+// Get algorithms in UI display order
 export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] =>
   ['balanced_spatial', 'balanced', 'greedy'] as RandomizationAlgorithm[];
 

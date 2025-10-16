@@ -1,5 +1,5 @@
 import { SearchData } from '../types';
-import { shuffleArray, getCovariateKey, groupByCovariates, countSimilarNeighbors, analyzeNeighbors, getNeighborPositions } from '../utils';
+import { shuffleArray, getCovariateKey, groupByCovariates, analyzeNeighbors } from '../utils';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -409,12 +409,10 @@ export function optimizeSpatialRandomization(
     while (bestPosition === null && tolerance <= 8) {
       // Evaluate each position and find the best one
       for (const pos of availablePositions) {
-        if (canPlaceSampleAtPosition(sample, plate, pos.row, pos.col, selectedCovariates, tolerance)) {
-          const score = calculatePositionScore(sample, plate, pos.row, pos.col, selectedCovariates);
-          if (score > bestScore) {
-            bestScore = score;
-            bestPosition = { row: pos.row, col: pos.col };
-          }
+        const analysis = analyzePositionForPlacement(sample, plate, pos.row, pos.col, selectedCovariates, tolerance);
+        if (analysis !== null && analysis.score > bestScore) {
+          bestScore = analysis.score;
+          bestPosition = { row: pos.row, col: pos.col };
         }
       }
 
@@ -455,38 +453,35 @@ function getAvailablePositions(
 }
 
 /**
- * Check if a sample can be placed at a position with given tolerance
- * Tolerance = maximum number of similar neighbors allowed
+ * Analyze neighbors for a potential sample placement and calculate position score
+ * @param sample - Sample to potentially place
+ * @param plate - 2D array representing the plate
+ * @param row - Row position to analyze
+ * @param col - Column position to analyze
+ * @param selectedCovariates - Array of selected covariate names
+ * @param tolerance - Maximum number of similar neighbors allowed
+ * @returns Object with neighbor analysis and position score (null if placement violates tolerance)
  */
-function canPlaceSampleAtPosition(
+function analyzePositionForPlacement<T extends SearchData | undefined>(
   sample: SearchData,
-  plate: (SearchData | undefined)[][],
+  plate: T[][],
   row: number,
   col: number,
   selectedCovariates: string[],
   tolerance: number
-): boolean {
+): { similarNeighbors: number; totalNeighbors: number; score: number } | null {
   const sampleKey = getCovariateKey(sample, selectedCovariates);
-  const similarNeighbors = countSimilarNeighbors(plate, row, col, sampleKey, selectedCovariates);
-  return similarNeighbors <= tolerance;
-}
+  
+  // Use the analyzeNeighbors function with the sample key
+  const { similarNeighbors, totalNeighbors } = analyzeNeighbors(plate, row, col, sampleKey, selectedCovariates);
 
-/**
- * Calculate a score for placing a sample at a position (higher = better for randomization)
- * Considers both immediate neighbors and broader spatial distribution
- */
-function calculatePositionScore(
-  sample: SearchData,
-  plate: (SearchData | undefined)[][],
-  row: number,
-  col: number,
-  selectedCovariates: string[]
-): number {
-  const sampleKey = getCovariateKey(sample, selectedCovariates);
+  // Check tolerance - return null if placement violates tolerance
+  if (similarNeighbors > tolerance) {
+    return null;
+  }
+
+  // Calculate position score (higher = better for randomization)
   let score = 100; // Start with perfect score
-
-  // Penalty for similar immediate neighbors (8-connected)
-  const { similarNeighbors, totalNeighbors } = analyzeNeighbors(plate, row, col, selectedCovariates);
 
   // Heavy penalty for similar neighbors
   if (totalNeighbors > 0) {
@@ -515,8 +510,9 @@ function calculatePositionScore(
   // Moderate penalty for row/column clustering
   score -= (similarInRow + similarInCol) * 5;
 
-  return Math.max(0, score);
+  return { similarNeighbors, totalNeighbors, score: Math.max(0, score) };
 }
+
 
 
 // Balanced randomization (proportional distribution in plates and rows + row shuffling)

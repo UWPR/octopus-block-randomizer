@@ -109,39 +109,11 @@ export function getNeighborPositions(
 }
 
 /**
- * Count neighbors with similar covariate values
- * @param plate - 2D array representing the plate
- * @param row - Current row position
- * @param col - Current column position
- * @param sampleKey - Covariate key of the current sample
- * @param selectedCovariates - Array of selected covariate names
- * @returns Number of neighbors with the same covariate key
- */
-export function countSimilarNeighbors<T extends SearchData | undefined>(
-  plate: T[][],
-  row: number,
-  col: number,
-  sampleKey: string,
-  selectedCovariates: string[]
-): number {
-  const neighbors = getNeighborPositions(row, col, plate.length, plate[0]?.length || 0);
-  let similarCount = 0;
-
-  for (const neighbor of neighbors) {
-    const neighborSample = plate[neighbor.row][neighbor.col];
-    if (neighborSample && getCovariateKey(neighborSample, selectedCovariates) === sampleKey) {
-      similarCount++;
-    }
-  }
-
-  return similarCount;
-}
-
-/**
  * Get neighbor analysis for spatial quality metrics
  * @param plate - 2D array representing the plate
- * @param row - Current row position
+ * @param row - Current row position  
  * @param col - Current column position
+ * @param sampleKey - The covariate key to compare neighbors against
  * @param selectedCovariates - Array of selected covariate names
  * @returns Object with similar and total neighbor counts
  */
@@ -149,14 +121,9 @@ export function analyzeNeighbors<T extends SearchData | undefined>(
   plate: T[][],
   row: number,
   col: number,
+  sampleKey: string,
   selectedCovariates: string[]
 ): { similarNeighbors: number; totalNeighbors: number; differentNeighbors: number } {
-  const currentSample = plate[row][col];
-  if (!currentSample) {
-    return { similarNeighbors: 0, totalNeighbors: 0, differentNeighbors: 0 };
-  }
-
-  const currentKey = getCovariateKey(currentSample, selectedCovariates);
   const neighbors = getNeighborPositions(row, col, plate.length, plate[0]?.length || 0);
 
   let similarNeighbors = 0;
@@ -167,7 +134,7 @@ export function analyzeNeighbors<T extends SearchData | undefined>(
     if (neighborSample) {
       totalNeighbors++;
       const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
-      if (currentKey === neighborKey) {
+      if (sampleKey === neighborKey) {
         similarNeighbors++;
       }
     }

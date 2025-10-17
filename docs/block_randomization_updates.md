@@ -1,5 +1,7 @@
 # Octopus Block Randomization - Feature Updates
-
+---
+## _Sample placement algorithm and randomization score calculation are being updated.  Please check back later_ ##
+---
 ## Overview
 
 This document describes the enhancements made to the Octopus Block Randomization app for distributing samples across plates.

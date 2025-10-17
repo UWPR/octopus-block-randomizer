@@ -401,31 +401,61 @@ export function optimizeSpatialRandomization(
     const availablePositions = getAvailablePositions(plate, numRows, numColumns);
     if (availablePositions.length === 0) break; // No more space
 
-    let bestPosition: { row: number; col: number } | null = null;
-    let bestScore = -1;
     let tolerance = 0;
+    let candidatePositions: Array<{ pos: { row: number; col: number }; score: number }> = [];
 
     // Try with increasing tolerance until we find a placement
-    while (bestPosition === null && tolerance <= 8) {
-      // Evaluate each position and find the best one
+    while (candidatePositions.length === 0 && tolerance <= 8) {
       for (const pos of availablePositions) {
         const analysis = analyzePositionForPlacement(sample, plate, pos.row, pos.col, selectedCovariates, tolerance);
-        if (analysis !== null && analysis.score > bestScore) {
-          bestScore = analysis.score;
-          bestPosition = { row: pos.row, col: pos.col };
+        if (analysis !== null) {
+          candidatePositions.push({ pos, score: analysis.score });
         }
       }
 
       // If no position found with current tolerance, increase tolerance
-      if (bestPosition === null) {
+      if (candidatePositions.length === 0) {
         tolerance++;
       }
     }
 
-    // Place the sample at the best position found, or fallback to first available
-    const positionToUse = bestPosition || availablePositions[0];
-    if (positionToUse) {
-      plate[positionToUse.row][positionToUse.col] = sample;
+    // Select from top candidates randomly
+    let positionToUse: { row: number; col: number };
+
+    if (candidatePositions.length > 0) {
+      // Sort by score and select from top 20% or top 5 positions (whichever is larger)
+      candidatePositions.sort((a, b) => b.score - a.score);
+      const topCount = Math.max(5, Math.ceil(candidatePositions.length * 0.2));
+      const topCandidates = candidatePositions.slice(0, topCount);
+      
+      // Randomly select from top candidates
+      const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+      positionToUse = selected.pos;
+    } else {
+      // Fallback to random available position
+      positionToUse = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+    }
+
+    plate[positionToUse.row][positionToUse.col] = sample;
+  
+  }
+
+  // Shuffle samples within each row after placement
+  for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
+    // Extract non-undefined samples from the row
+    const rowSamples = plate[rowIdx].filter((sample): sample is SearchData => sample !== undefined);
+    
+    if (rowSamples.length > 0) {
+      // Shuffle the samples
+      const shuffledRowSamples = shuffleArray(rowSamples);
+      
+      // Clear the row
+      plate[rowIdx].fill(undefined);
+      
+      // Place shuffled samples back in the row
+      for (let colIdx = 0; colIdx < shuffledRowSamples.length; colIdx++) {
+        plate[rowIdx][colIdx] = shuffledRowSamples[colIdx];
+      }
     }
   }
 
@@ -453,6 +483,64 @@ function getAvailablePositions(
 }
 
 /**
+ * Analyze a row for a potential sample placement and calculate position score
+ * @param sample - Sample to potentially place
+ * @param plate - 2D array representing the plate
+ * @param row - Row position to analyze
+ * @param col - Column position to analyze
+ * @param selectedCovariates - Array of selected covariate names
+ * @param tolerance - Maximum number of similar samples allowed in the same row
+ * @returns Object with row analysis and position score (null if placement violates tolerance)
+ */
+function analyzePositionForPlacement<T extends SearchData | undefined>(
+  sample: SearchData,
+  plate: T[][],
+  row: number,
+  col: number,
+  selectedCovariates: string[],
+  tolerance: number
+): { similarInRow: number; totalInRow: number; score: number } | null {
+  const sampleKey = getCovariateKey(sample, selectedCovariates);
+  
+  // Count similar samples in the same row
+  let similarInRow = 0;
+  let totalInRow = 0;
+
+  for (let c = 0; c < plate[0].length; c++) {
+    if (c !== col && plate[row][c]) {
+      totalInRow++;
+      if (getCovariateKey(plate[row][c]!, selectedCovariates) === sampleKey) {
+        similarInRow++;
+      }
+    }
+  }
+
+  // Check tolerance - return null if placement violates tolerance
+  if (similarInRow > tolerance) {
+    return null;
+  }
+
+  // Calculate position score (higher = better for randomization)
+  let score = 100;
+
+  // Penalty based on proportion of similar samples in row
+  if (totalInRow > 0) {
+    const similarRatio = similarInRow / totalInRow;
+    score -= similarRatio * 40; // Penalty for having similar samples in row
+  }
+
+  // Additional penalty for absolute count of similar samples
+  score -= similarInRow * 15; // Linear penalty per similar sample
+
+  // Small bonus for filling gaps (positions surrounded by samples)
+  if (totalInRow >= 2) {
+    score += 5; // Encourage filling in gaps
+  }
+
+  return { similarInRow, totalInRow, score: Math.max(0, score) };
+}
+
+/**
  * Analyze neighbors for a potential sample placement and calculate position score
  * @param sample - Sample to potentially place
  * @param plate - 2D array representing the plate
@@ -462,7 +550,7 @@ function getAvailablePositions(
  * @param tolerance - Maximum number of similar neighbors allowed
  * @returns Object with neighbor analysis and position score (null if placement violates tolerance)
  */
-function analyzePositionForPlacement<T extends SearchData | undefined>(
+function analyzePositionForPlacementSpatial<T extends SearchData | undefined>(
   sample: SearchData,
   plate: T[][],
   row: number,
@@ -483,10 +571,10 @@ function analyzePositionForPlacement<T extends SearchData | undefined>(
   // Calculate position score (higher = better for randomization)
   let score = 100; // Start with perfect score
 
-  // Heavy penalty for similar neighbors
+  // Penalty for similar neighbors
   if (totalNeighbors > 0) {
     const similarRatio = similarNeighbors / totalNeighbors;
-    score -= similarRatio * 50; // Up to 50 point penalty
+      score -= similarRatio * 5;
   }
 
   // Additional penalty for similar samples in same row/column
@@ -507,8 +595,8 @@ function analyzePositionForPlacement<T extends SearchData | undefined>(
     }
   }
 
-  // Moderate penalty for row/column clustering
-  score -= (similarInRow + similarInCol) * 5;
+  // Penalty for row/column clustering
+  score -= (similarInRow + similarInCol) * 50;
 
   return { similarNeighbors, totalNeighbors, score: Math.max(0, score) };
 }

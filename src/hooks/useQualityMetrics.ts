@@ -123,7 +123,7 @@ export function useQualityMetrics() {
       bestPlates: [] as number[],
       worstPlates: [] as number[],
       averageBalanceScore: metrics.plateDiversity.averageBalanceScore,
-      averageRandomizationScore: metrics.plateDiversity.averageRandomizationScore,
+      // averageRowClusteringScore: metrics.plateDiversity.averageRowClusteringScore,
       overallConsistency: metrics.overallQuality.score
     };
 

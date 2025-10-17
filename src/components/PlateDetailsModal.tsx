@@ -102,15 +102,15 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                     </span>
                     <span>
                       <strong>Randomization:</strong>{' '}
-                      <span style={{ color: getQualityColor(plateQuality.randomizationScore) }}>
-                        {formatScore(plateQuality.randomizationScore)}
+                      <span style={{ color: getQualityColor(plateQuality.rowClusteringScore) }}>
+                        {formatScore(plateQuality.rowClusteringScore)}
                       </span>
                       {' '}
                       <span style={{
                         ...styles.qualityBadge,
-                        backgroundColor: getQualityColor(plateQuality.randomizationScore)
+                        backgroundColor: getQualityColor(plateQuality.rowClusteringScore)
                       }}>
-                        {getCompactQualityLevel(plateQuality.randomizationScore)}
+                        {getCompactQualityLevel(plateQuality.rowClusteringScore)}
                       </span>
                     </span>
                   </>

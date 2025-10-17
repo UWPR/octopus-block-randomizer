@@ -89,15 +89,15 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                     <span style={styles.compactItemLabel}>Avg Randomization:</span>
                     <span style={{
                       ...styles.compactItemValue,
-                      color: getQualityColor(metrics.plateDiversity.averageRandomizationScore)
+                      color: getQualityColor(metrics.plateDiversity.averageRowClusteringScore)
                     }}>
-                      {formatScore(metrics.plateDiversity.averageRandomizationScore)}
+                      {formatScore(metrics.plateDiversity.averageRowClusteringScore)}
                     </span>
                     <span style={{
                       ...styles.qualityBadge,
-                      backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageRandomizationScore))
+                      backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageRowClusteringScore))
                     }}>
-                      {getCompactQualityLevel(metrics.plateDiversity.averageRandomizationScore)}
+                      {getCompactQualityLevel(metrics.plateDiversity.averageRowClusteringScore)}
                     </span>
                   </div>
                 </div>
@@ -150,15 +150,15 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                             <span style={styles.scoreLabel}>Randomization:</span>
                             <span style={{
                               ...styles.scoreValue,
-                              color: getQualityColor(plate.randomizationScore)
+                              color: getQualityColor(plate.rowClusteringScore)
                             }}>
                               <span style={{
                                 ...styles.qualityBadge,
-                                backgroundColor: getQualityLevelColor(getQualityLevel(plate.randomizationScore))
+                                backgroundColor: getQualityLevelColor(getQualityLevel(plate.rowClusteringScore))
                               }}>
-                                {getQualityLevel(plate.randomizationScore).charAt(0).toUpperCase()}
+                                {getQualityLevel(plate.rowClusteringScore).charAt(0).toUpperCase()}
                               </span>
-                              {' '}{formatScore(plate.randomizationScore)}
+                              {' '}{formatScore(plate.rowClusteringScore)}
                             </span>
                           </div>
                         </div>

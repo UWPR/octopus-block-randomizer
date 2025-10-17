@@ -228,16 +228,16 @@ const Plate: React.FC<PlateProps> = ({
               <span
                 style={{
                   ...currentStyles.qualityScore,
-                  color: getQualityColor(plateQuality.randomizationScore)
+                  color: getQualityColor(plateQuality.rowClusteringScore)
                 }}
               >
                 <span style={{
                   ...currentStyles.qualityBadge,
-                  backgroundColor: getQualityColor(plateQuality.randomizationScore)
+                  backgroundColor: getQualityColor(plateQuality.rowClusteringScore)
                 }}>
-                  {getCompactQualityLevel(plateQuality.randomizationScore)}
+                  {getCompactQualityLevel(plateQuality.rowClusteringScore)}
                 </span>
-                {' '}Rand: {formatScore(plateQuality.randomizationScore)}
+                {' '}Rand: {formatScore(plateQuality.rowClusteringScore)}
               </span>
             </div>
           </div>

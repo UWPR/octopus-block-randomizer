@@ -7,6 +7,7 @@ import { getCovariateKey, groupByCovariates, getQualityLevel, getNeighborPositio
  * Focuses on two key aspects of plate randomization quality:
  * 1. Plate Balance Score (Proportional Accuracy)
  * 2. Plate Randomization Score (Spatial Clustering Analysis)
+ * 3. Row Clustering Score (Row-level Pattern Detection)
  */
 
 // Utility functions
@@ -154,7 +155,169 @@ const calculateSpatialClusteringScore = (
 };
 
 /**
- * Calculate plate diversity metrics (Balance + Randomization scores)
+ * Run Test for randomness
+ * Counts the number of runs and compares to expected value for random sequence
+ * A "run" is a sequence of identical consecutive values
+ */
+const calculateRunTest = (keys: string[]): number => {
+  if (keys.length <= 1) return 100;
+
+  const n = keys.length;
+
+  // Count actual runs
+  let actualRuns = 1;
+  for (let i = 1; i < n; i++) {
+    if (keys[i] !== keys[i - 1]) {
+      actualRuns++;
+    }
+  }
+
+  // Count frequency of each group
+  const groupCounts = new Map<string, number>();
+  keys.forEach(key => {
+    groupCounts.set(key, (groupCounts.get(key) || 0) + 1);
+  });
+
+  // Calculate expected number of runs for random sequence
+  // E(R) = 1 + sum over all pairs of groups: 2*n_i*n_j/n
+  let expectedRuns = 1;
+  const counts = Array.from(groupCounts.values());
+  
+  for (let i = 0; i < counts.length; i++) {
+    for (let j = 0; j < counts.length; j++) {
+      if (i !== j) {
+        expectedRuns += (counts[i] * counts[j]) / n;
+      }
+    }
+  }
+
+  // For small samples, use simplified scoring based on deviation from expected
+  const deviation = Math.abs(actualRuns - expectedRuns);
+  const maxExpectedDeviation = expectedRuns * 0.4; // Allow 40% deviation
+  
+  let score = 100;
+  if (deviation > maxExpectedDeviation * 0.5) {
+    // Penalize based on how far from expected
+    const excessDeviation = deviation - (maxExpectedDeviation * 0.5);
+    score -= (excessDeviation / maxExpectedDeviation) * 100;
+  }
+
+  // Additional check: penalize extreme cases
+  if (actualRuns === 1) {
+    // All same group (shouldn't happen, but just in case)
+    score = 0;
+  } else if (actualRuns === n) {
+    // Perfect alternation (every value different from neighbors)
+    score = Math.min(score, 70); // Cap at 70 for perfect alternation
+  } else if (actualRuns <= 2 && n > 4) {
+    // Very few runs = high clustering
+    score = Math.min(score, 40);
+  }
+
+  return Math.max(0, Math.min(100, score));
+};
+
+/**
+ * Calculate autocorrelation score for pattern detection
+ * Detects regular repeating patterns (e.g., ABCABC or ABABAB)
+ * Returns 0-100, where 100 = no detectable pattern (good randomness)
+ */
+const calculateAutocorrelationScore = (keys: string[]): number => {
+  if (keys.length <= 3) return 100;
+
+  // Check for patterns at different lags (period lengths)
+  const maxLag = Math.min(Math.floor(keys.length / 2), 6); // Check patterns up to length 6
+  let maxCorrelation = 0;
+
+  for (let lag = 1; lag <= maxLag; lag++) {
+    let matches = 0;
+    let comparisons = 0;
+
+    // Count how many positions match at this lag distance
+    for (let i = 0; i < keys.length - lag; i++) {
+      comparisons++;
+      if (keys[i] === keys[i + lag]) {
+        matches++;
+      }
+    }
+
+    const correlation = matches / comparisons;
+    maxCorrelation = Math.max(maxCorrelation, correlation);
+  }
+
+  // Expected correlation for random distribution (based on number of unique groups)
+  const uniqueGroups = new Set(keys).size;
+  const expectedCorrelation = 1 / uniqueGroups;
+
+  // Calculate excess correlation beyond what's expected by chance
+  const excessCorrelation = Math.max(0, maxCorrelation - expectedCorrelation);
+  
+  // Convert to score (0-100)
+  // If excess correlation is 0, score is 100 (perfect)
+  // If excess correlation is high, score is low (pattern detected)
+  const score = 100 - (excessCorrelation * 150); // Scale factor to make penalties meaningful
+
+  return Math.max(0, Math.min(100, score));
+};
+
+/**
+ * Combined pattern score using both Run Test and Autocorrelation
+ * For short sequences (≤12), weights Run Test more heavily
+ * For longer sequences, uses equal weighting
+ */
+const calculatePatternScore = (keys: string[]): number => {
+  if (keys.length <= 3) return 100;
+  
+  //const runTestScore = calculateRunTest(keys);
+  const autocorrScore = calculateAutocorrelationScore(keys);
+  
+  // For short sequences, weight Run Test more heavily
+  // if (keys.length <= 12) {
+  //   return runTestScore * 0.7 + autocorrScore * 0.3;
+  // } else {
+  //   return runTestScore * 0.5 + autocorrScore * 0.5;
+  // }
+  return autocorrScore
+};
+
+/**
+ * Calculate row clustering score
+ * Measures both clustering (runs of same group) and regular patterns (predictable alternation)
+ * Higher score = better distribution (random-looking, neither clustered nor patterned)
+ */
+const calculateRowClusteringScore = (
+  plateRows: (SearchData | undefined)[][],
+  selectedCovariates: string[]
+): number => {
+  if (plateRows.length === 0) return 0;
+
+  const numRows = plateRows.length;
+  let totalScore = 0;
+  let analyzedRows = 0;
+
+  // Analyze each row
+  for (let row = 0; row < numRows; row++) {
+    const rowSamples = plateRows[row].filter((sample): sample is SearchData => sample !== undefined);
+    
+    if (rowSamples.length <= 2) continue; // Need at least 3 samples for meaningful analysis
+
+    const rowKeys = rowSamples.map(sample => getCovariateKey(sample, selectedCovariates));
+    
+    // Use combined pattern score (Run Test + Autocorrelation)
+    const rowScore = calculatePatternScore(rowKeys);
+    console.log(`Row ${row} keys: ${rowKeys.join(', ')} => Pattern Score: ${rowScore.toFixed(2)}`);
+    
+    totalScore += rowScore;
+    analyzedRows++;
+  }
+
+  if (analyzedRows === 0) return 100;
+  console.log(`Average Row Clustering Score: ${(totalScore / analyzedRows).toFixed(2)}`);
+  return totalScore / analyzedRows;
+};
+
+/**
+ * Calculate plate diversity metrics (Balance + Randomization + Row Clustering scores)
  */
 export const calculatePlateDiversityMetrics = (
   searches: SearchData[],
@@ -165,7 +328,8 @@ export const calculatePlateDiversityMetrics = (
   if (!searches.length || !plateAssignments.size || !selectedCovariates.length) {
     return {
       averageBalanceScore: 0,
-      averageRandomizationScore: 0,
+      // averageRandomizationScore: 0,
+      averageRowClusteringScore: 0,
       plateScores: []
     };
   }
@@ -185,26 +349,33 @@ export const calculatePlateDiversityMetrics = (
 
     // Calculate randomization score (spatial clustering)
     const plateRows = randomizedPlates[plateIndex] || [];
-    const randomizationScore = calculateSpatialClusteringScore(plateRows, selectedCovariates);
+    // const randomizationScore = calculateSpatialClusteringScore(plateRows, selectedCovariates);
 
-    // Overall score is average of both metrics
-    const overallScore = (plateBalance.overallScore + randomizationScore) / 2;
+    // Calculate row clustering score
+    const rowClusteringScore = calculateRowClusteringScore(plateRows, selectedCovariates);
+
+    // Overall score is average of all three metrics
+    // const overallScore = (plateBalance.overallScore + randomizationScore + rowClusteringScore) / 3;
+    const overallScore = (plateBalance.overallScore + rowClusteringScore) / 2;
 
     plateScores.push({
       plateIndex,
       balanceScore: plateBalance.overallScore,
-      randomizationScore,
+      // randomizationScore,
+      rowClusteringScore,
       overallScore,
       covariateGroupBalance: plateBalance.groupDetails
     });
   });
 
   const averageBalanceScore = calculateMean(plateScores.map(score => score.balanceScore));
-  const averageRandomizationScore = calculateMean(plateScores.map(score => score.randomizationScore));
+  // const averageRandomizationScore = calculateMean(plateScores.map(score => score.randomizationScore));
+  const averageRowClusteringScore = calculateMean(plateScores.map(score => score.rowClusteringScore));
 
   return {
     averageBalanceScore,
-    averageRandomizationScore,
+    // averageRandomizationScore,
+    averageRowClusteringScore,
     plateScores
   };
 };
@@ -222,23 +393,32 @@ export const calculateOverallQuality = (
     recommendations.push(`Low plate balance (${plateDiversity.averageBalanceScore.toFixed(1)}) - plates may not represent overall population well`);
   }
 
-  // Check randomization quality
-  if (plateDiversity.averageRandomizationScore < 70) {
-    recommendations.push(`Poor spatial randomization (${plateDiversity.averageRandomizationScore.toFixed(1)}) - similar samples may be clustered together`);
+  // // Check randomization quality
+  // if (plateDiversity.averageRandomizationScore < 70) {
+  //   recommendations.push(`Poor spatial randomization (${plateDiversity.averageRandomizationScore.toFixed(1)}) - similar samples may be clustered together`);
+  // }
+
+  // Check row clustering
+  if (plateDiversity.averageRowClusteringScore < 70) {
+    recommendations.push(`High row clustering (${plateDiversity.averageRowClusteringScore.toFixed(1)}) - similar samples are grouped within rows`);
   }
 
-  // Identify problematic plates
-  const poorPlates = plateDiversity.plateScores.filter(score =>
-    score.balanceScore < 60 || score.randomizationScore < 60
-  );
+  // // Identify problematic plates
+  // const poorPlates = plateDiversity.plateScores.filter(score =>
+  //   score.balanceScore < 60 || score.randomizationScore < 60 || score.rowClusteringScore < 60
+  // );
 
-  if (poorPlates.length > 0) {
-    const plateNumbers = poorPlates.map(p => p.plateIndex + 1).join(', ');
-    recommendations.push(`Plates ${plateNumbers} have poor quality scores`);
-  }
+  // if (poorPlates.length > 0) {
+  //   const plateNumbers = poorPlates.map(p => p.plateIndex + 1).join(', ');
+  //   recommendations.push(`Plates ${plateNumbers} have poor quality scores`);
+  // }
 
-  // Calculate overall score (equal weight to balance and randomization)
-  const overallScore = (plateDiversity.averageBalanceScore + plateDiversity.averageRandomizationScore) / 2;
+  // Calculate overall score (equal weight to balance, randomization, and row clustering)
+  const overallScore = (
+    plateDiversity.averageBalanceScore + 
+    //plateDiversity.averageRandomizationScore + 
+    plateDiversity.averageRowClusteringScore
+  ) / 2;
 
   // Determine quality level using utility function
   const level = getQualityLevel(overallScore);

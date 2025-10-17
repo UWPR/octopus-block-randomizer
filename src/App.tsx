@@ -299,7 +299,6 @@ const App: React.FC = () => {
     <div style={styles.container}>
       <div style={styles.content}>
         <h1 style={styles.heading}>Octopus Block Randomization</h1>
-
         {/* File Upload */}
         <FileUploadSection
           selectedFileName={selectedFileName}
@@ -450,6 +449,28 @@ const App: React.FC = () => {
           show={showMetrics}
           onClose={toggleMetrics}
         />
+
+        {/* Help Section */}
+        {/* <div style={styles.helpSection}>
+          <div style={styles.helpLinks}>
+            <a 
+              href="https://github.com/uwpr/octopus-block-randomizer/blob/main/docs/block_randomization_updates.md" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={styles.helpLink}
+            >
+              <i className="fa-regular fa-circle-question" style={{marginRight: '4px'}}></i> Documentation
+            </a>
+            <a 
+              href="/test-data/simple-metadata.csv" 
+              download="example-metadata.csv"
+              style={styles.helpLink}
+            >
+              <i className="fa-regular fa-circle-down" style={{marginRight: '4px'}}></i>Example Input File
+            </a>
+          </div>
+        </div> */}
+
       </div>
     </div>
   );
@@ -480,9 +501,16 @@ const styles = {
   heading: {
     fontSize: '28px',
     fontWeight: 'bold',
-    marginBottom: '30px',
+    marginBottom: '10px',
     color: '#333',
     textAlign: 'center' as const,
+  },
+  subtitle: {
+    fontSize: '16px',
+    color: '#666',
+    textAlign: 'center' as const,
+    marginBottom: '30px',
+    lineHeight: '1.5',
   },
   processButton: {
     padding: '12px 24px',
@@ -586,6 +614,29 @@ const styles = {
     fontWeight: '600',
     textTransform: 'uppercase' as const,
   },
+  helpSection: {
+    width: '100%',
+    padding: '15px',
+    backgroundColor: '#ffffffff',
+  },
+  helpLinks: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '20px',
+    flexWrap: 'wrap' as const,
+  },
+  helpLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '8px 16px',
+    backgroundColor: '#ffffff',
+    color: '#0066cc',
+    textDecoration: 'none',
+    fontSize: '12px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+  } as React.CSSProperties,
 };
 
 export default App;

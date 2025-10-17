@@ -25,7 +25,7 @@ export const BRIGHT_COLOR_PALETTE = [
   // Subgroup 3
   '#F08080', // Light Coral
   '#40E0D0', // Turquoise
-  '#FFA500', // Orange
+  '#D2691E', // Chocolate
   '#9370DB', // Medium Purple
   '#98FB98', // Pale Green
   '#C0C0C0', // Silver

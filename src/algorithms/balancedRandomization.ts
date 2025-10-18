@@ -97,17 +97,22 @@ function assignBlockCapacities(
 
     console.log(`Keep empty in last ${blockName}: ${totalSamples} samples across ${blockCapacities.length} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   } else {
-    // Distribute empty spots across all blocks
+    // Distribute empty spots randomly across all blocks
     const baseSamplesPerBlock = Math.floor(totalSamples / actualBlocksNeeded);
     const extraSamples = totalSamples % actualBlocksNeeded;
     console.log(`Calculating ${blockName} capacities with keepEmptyInLastBlock=false: ${totalSamples} samples, ${actualBlocksNeeded} ${blockName}s, base samples per ${blockName}: ${baseSamplesPerBlock}, extra samples: ${extraSamples}`);
 
     blockCapacities = Array(actualBlocksNeeded).fill(baseSamplesPerBlock);
+
+    // Randomly assign extra samples to blocks instead of always using the first ones
+    const blockIndices = Array.from({ length: actualBlocksNeeded }, (_, i) => i);
+    const shuffledIndices = shuffleArray(blockIndices);
+
     for (let i = 0; i < extraSamples; i++) {
-      blockCapacities[i]++;
+      blockCapacities[shuffledIndices[i]]++;
     }
 
-    console.log(`Even distribution of empty spots: ${totalSamples} samples across ${actualBlocksNeeded} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
+    console.log(`Random distribution of empty spots: ${totalSamples} samples across ${actualBlocksNeeded} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   }
 
   return blockCapacities;
@@ -251,13 +256,21 @@ function processUnplacedGroups(
       return;
     }
 
+    // Sort available blocks by available capacity descending (most space first)
+    const sortedAvailableBlocks = availableBlocks.sort((a, b) => {
+      const availableCapacityA = blockCapacities[a] - blockCounts[a];
+      const availableCapacityB = blockCapacities[b] - blockCounts[b];
+      return availableCapacityB - availableCapacityA; // Descending order
+    });
+
     const placedSamples = distributeSamplesAcrossBlocks(
       remainingSamples,
-      availableBlocks,
+      sortedAvailableBlocks,
       blockCapacities,
       blockAssignments,
       blockCounts,
-      `Placing 1 unplaced (${blockType})`
+      `Placing 1 unplaced (${blockType})`,
+      true // Use sorted order
     );
 
     if (placedSamples < remainingSamples.length) {

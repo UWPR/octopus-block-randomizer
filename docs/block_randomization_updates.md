@@ -1,7 +1,7 @@
 # Octopus Block Randomization - Feature Updates
----
+<!-- ---
 ## _Sample placement algorithm and randomization score calculation are being updated.  Please check back later_ ##
----
+--- -->
 ## Overview
 
 This document describes the enhancements made to the Octopus Block Randomization app for distributing samples across plates.
@@ -27,14 +27,10 @@ This document describes the enhancements made to the Octopus Block Randomization
   - [Global Re-randomization](#global-re-randomization-re-randomize-button)
   - [Individual Plate Re-randomization](#individual-plate-re-randomization-r-button)
   - [Quality Score Updates](#quality-score-updates)
-- [New Balanced Randomization Algorithms](#new-balanced-randomization-algorithms)
+- [New Balanced Randomization Algorithm](#new-balanced-randomization-algorithms)
   - [Balanced Block Randomization](#balanced-block-randomization)
-  - [Balanced Spatial Randomization](#balanced-spatial-randomization)
 - [Quality Score Calculation](#quality-score-calculation)
   - [Balance Score](#balance-score)
-  - [Randomization Score](#randomization-score)
-  - [Plate-Level Overall Score](#plate-level-overall-score)
-  - [Experiment-Level Scores](#experiment-level-scores)
 - [Usage](#usage)
 
 ---
@@ -70,15 +66,11 @@ The configuration form includes new options:
 ### Algorithm Selection
 Users can choose between three randomization strategies:
 
-1. **Balanced Spatial Randomization** (_New_)
-   - Proportionally distributes samples across plates
-   - Uses greedy, tolerance-based approach to minimize spatial clustering within plates
-
-2. **Balanced Block Randomization** (_New_)
+1. **Balanced Block Randomization** (_New_)
    - Proportionally distributes samples across plates
    - Maintains balance within plate rows
 
-3. **Greedy Algorithm** (_Legacy_)
+2. **Greedy Algorithm** (_Legacy_)
    - Original algorithm implementation
    - Places samples iteratively with tolerance-based placement
 
@@ -86,12 +78,12 @@ Users can choose between three randomization strategies:
 - Comma-separated list of labels (e.g., "Control, QC, Reference")
 - Covariate groups containing these labels receive priority in color assignment - brighter colors assigned to make them more recognizable.
 
-### Plate Dimensions (_only available for the Balanced Block / Spatial Randomization algorithm_)
+### Plate Dimensions (_only available for the Balanced Block Randomization algorithm_)
 - **Rows**: Configurable from 1-16 (default: 8)
 - **Columns**: Configurable from 1-24 (default: 12)
 - **Display**: Shows calculated plate capacity (rows × columns)
 
-### Empty Cell Distribution (_only available for the Balanced Block / Spatial Randomization algorithm_)
+### Empty Cell Distribution (_only available for the Balanced Block Randomization algorithm_)
 Option to control how empty cells / wells are handled when sample count < total capacity:
 
 - **Keep empty cells in last plate** (default checked): All empty cells are assigned to the final plate
@@ -156,19 +148,12 @@ The summary panel provides an overview of all unique covariate groups.
 
 ## 5. Quality Metrics
 
-Quality assement includes scores that evaluates the balance and randomization quality of plate assignments. Quality scores are calculated automatically and updated in real-time as users make changes. The following scores are calculated:
-
 #### __Balance Score__ (0-100)
 - **Purpose**: The balance score evaluates whether each plate contains a representative sample of the overall population based on selected covariates
 - **Calculation**: Based on relative deviation from expected covariate group proportions
 - **Weighting**: Larger covariate groups have more influence on the score
 - **Real-time**: Updates when all plates or single plates are re-randomized, and when samples are moved between or within plates
 
-#### __Randomization Score__ (0-100)
-- **Purpose**: Measures spatial clustering and randomness of sample placement
-- **Calculation**: Analyzes neighbor relationships to detect clustering patterns
-- **Method**: Counts samples from different covariate groups among spatial neighbors
-- **Real-time**: Updates when samples are repositioned on plates
 
 ### Quality Score Display
 
@@ -177,20 +162,8 @@ Located in the main control panel, shows the overall score, and quality level
 
 ![Quality Button](qualityButton.png)
 
-#### __Quality Assessment Popup__
-Accessible via the quality button, provides:
-- **Experiment Summary**: Overall scores and quality level
-- **Individual Plate Scores**: Detailed breakdown for each plate
-
-![Quality Assessment Modal](QualityAssessmentModal.png)
-
-
-#### __Individual Plate Headers__
-Each plate displays:
-- **Bal**: Balance score for that specific plate
-- **Rand**: Randomization score for that specific plate
-
-![Plate Quality in Header](PlateQualityHeader.png)
+- Clicking on the quality buttons opens a popup with the balance scores for individual plates.
+- Balance score can also be seen in the individual plate headers.
 
 [↑ Back to Table of Contents](#table-of-contents)
 
@@ -213,7 +186,7 @@ Click the information icon ("i") in the header of any plate. The draggable popup
 #### Summary Statistics
 - **Capacity**: Total number of cells / wells in the plate
 - **Samples**: Number of samples actually placed in the plate
-- **Quality Scores**: Balance and randomization scores
+- **Quality Scores**: Balance score
 
 #### Covariate Distribution
 
@@ -251,7 +224,7 @@ Clicking a covariate group in the summary panel highlights (blue border; glowing
 
 ![alt text](selectedCovariateGroup.png)
 ![alt text](cellHighlighted-Plate.png)
-![alt text](selectionHighlighted-Modal.png)
+
 
 [↑ Back to Table of Contents](#table-of-contents)
 
@@ -281,7 +254,6 @@ Each plate header includes an "R" button that re-randomizes only that specific p
 
 
 #### Algorithm-Specific Behavior:
-- **Balanced Spatial Randomization**: Uses greedy, tolerance-based sample placement within a plate to minimize spatial clustering
 - **Balanced Block Randomization**: Shuffles samples within each row only (preserves balanced distribution in rows)
 - **Greedy Randomization**: Shuffles all samples across the entire plate
 
@@ -297,29 +269,16 @@ Both re-randomization methods automatically trigger:
 ---
 ---
 
-## New Balanced Randomization Algorithms
+## New Balanced Randomization Algorithm
 
-The app introduces two new algorithms: **Balanced Block Randomization** and **Balanced Spatial Randomization**. Both algorithms use the same strategy to proportionally distribute samples across plates, ensuring balanced representation of covariate groups on each plate.
 
 ### Balanced Block Randomization
-After proportional plate distribution, this algorithm:
-- Distributes samples proportionally across rows within each plate
-- Shuffle samples within each row for final randomization
-- Attempts to maintain balance at both plate and row levels
-
-### Balanced Spatial Randomization  
-After proportional plate distribution, this algorithm:
-- Uses a greedy, tolerance-based approach to place samples within each plate
-- Attempts to minimize spatial clustering by analyzing neighbor positions
-- Focuses on better spatial distribution within plates while maintaining overall plate balance
-
-#### Plate level distribution
-Both algorithms share the same approach for plate-level distribution:
+This strategy attempts to proportionally distribute samples across plates, ensuring balanced representation of covariate groups on each plate.
 
 ##### Phase 1: Proportional Placement
 - Calculates expected minimum samples per covariate group
 - Adjusts for varying plate capacities
-- Places base allocation across all plates 
+- Places base allocation across all plates
 
 ##### Phase 2A: Unplaced Groups
 - Handles covariate groups too small for Phase 1
@@ -330,7 +289,11 @@ Both algorithms share the same approach for plate-level distribution:
 - Places remaining samples from Phase 1
 - Uses prioritization strategies:
   - **Plate level**: Prioritizes full-capacity plates
-  - **Row level**: Prioritizes rows with fewer samples of the group (only for Balanced Block Randomization)
+  - **Row level**: Prioritizes rows with fewer samples of the group
+
+After proportional plate distribution, this algorithm:
+- Distributes samples proportionally across rows within each plate
+- Shuffle samples within each row for final randomization
 
 [↑ Back to Table of Contents](#table-of-contents)
 
@@ -364,33 +327,12 @@ Plate Balance Score = max(0, 100 - (Weighted Average Deviation × 100))
 
 ```
 
-### Randomization Score
-The randomization score measures spatial clustering to ensure similar samples are not grouped together on the plate.
-For each sample position:
-1. **Identify Neighbors**: All adjacent positions (8-directional: up, down, left, right, diagonals)
-2. **Compare Covariate Keys**: Check if neighbor represents a different covariate group
-3. **Count Different Neighbors**: Tally neighbors which represent different covariate groups
-3. **Calculate Ratio**: Different neighbors / Total neighbor comparisons
-4. **Scale to 0-100**: Higher percentage = better randomization
+### Randomization Score TODO
 
-#### Score Calculation
-```
-Total Comparisons = Sum of all neighbor-to-neighbor comparisons
-Different Neighbors = Count of neighbors representing different covariate groups
-
-Randomization Score = (Different Neighbors / Total Comparisons) × 100
-```
-
-### Plate-Level Overall Score
-```
-Plate Overall Score = (Balance Score + Randomization Score) / 2
-```
 
 ### Experiment-Level Scores
 ```
 Average Balance Score = Mean of all plate balance scores
-Average Randomization Score = Mean of all plate randomization scores
-Overall Experiment Score = (Average Balance + Average Randomization) / 2
 ```
 
 

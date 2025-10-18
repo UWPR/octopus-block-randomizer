@@ -22,7 +22,7 @@ function distributeToBlocks(
 
   console.log(`Distributing samples across ${numBlocks} ${blockType.toLowerCase()} with capacities: ${blockCapacities.join(', ')}`);
 
-  // PHASE 1: Place samples proportionately in plates
+  // PHASE 1: Place samples proportionately
   const [unplacedGroupsMap, remainingSamplesMap] = placeProportionalSamples(
     covariateGroups,
     blockCapacities,
@@ -73,41 +73,44 @@ function getAvailableBlocks(
   return availableBlocks;
 }
 
-// Helper function to assign plate capacities based on distribution strategy
-function assignPlateCapacities(
+// Helper function to assign block capacities based on distribution strategy
+function assignBlockCapacities(
   totalSamples: number,
-  actualPlatesNeeded: number,
-  keepEmptyInLastPlate: boolean,
-  plateSize: number
+  actualBlocksNeeded: number,
+  keepEmptyInLastBlock: boolean,
+  blockSize: number,
+  blockName: string
 ): number[] {
-  let plateCapacities: number[];
+  let blockCapacities: number[];
 
-  if (keepEmptyInLastPlate) {
-    // Calculate how many plates should be completely filled
-    const fullPlates = Math.floor(totalSamples / plateSize);
-    const remainingSamples = totalSamples % plateSize;
+  if (keepEmptyInLastBlock) {
+    // Calculate how many blocks should be completely filled
+    const fullBlocks = Math.floor(totalSamples / blockSize);
+    const remainingSamples = totalSamples % blockSize;
+    console.log(`Calculating ${blockName} capacities with keepEmptyInLastBlock=true: ${totalSamples} samples, ${fullBlocks} full ${blockName}s, ${remainingSamples} remaining samples`);
 
-    // Set capacities: full plates get plateSize, last plate gets remaining samples
-    plateCapacities = Array(fullPlates).fill(plateSize);
+    // Set capacities: full blocks get blockSize, last block gets remaining samples
+    blockCapacities = Array(fullBlocks).fill(blockSize);
     if (remainingSamples > 0) {
-      plateCapacities.push(remainingSamples);
+      blockCapacities.push(remainingSamples);
     }
 
-    console.log(`Keep empty in last plate: ${totalSamples} samples across ${plateCapacities.length} plates with capacities: ${plateCapacities.join(', ')}`);
+    console.log(`Keep empty in last ${blockName}: ${totalSamples} samples across ${blockCapacities.length} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   } else {
-    // Distribute empty spots evenly across all plates
-    const baseSamplesPerPlate = Math.floor(totalSamples / actualPlatesNeeded);
-    const extraSamples = totalSamples % actualPlatesNeeded;
+    // Distribute empty spots across all blocks
+    const baseSamplesPerBlock = Math.floor(totalSamples / actualBlocksNeeded);
+    const extraSamples = totalSamples % actualBlocksNeeded;
+    console.log(`Calculating ${blockName} capacities with keepEmptyInLastBlock=false: ${totalSamples} samples, ${actualBlocksNeeded} ${blockName}s, base samples per ${blockName}: ${baseSamplesPerBlock}, extra samples: ${extraSamples}`);
 
-    plateCapacities = Array(actualPlatesNeeded).fill(baseSamplesPerPlate);
+    blockCapacities = Array(actualBlocksNeeded).fill(baseSamplesPerBlock);
     for (let i = 0; i < extraSamples; i++) {
-      plateCapacities[i]++;
+      blockCapacities[i]++;
     }
 
-    console.log(`Even distribution of empty spots: ${totalSamples} samples across ${actualPlatesNeeded} plates with capacities: ${plateCapacities.join(', ')}`);
+    console.log(`Even distribution of empty spots: ${totalSamples} samples across ${actualBlocksNeeded} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   }
 
-  return plateCapacities;
+  return blockCapacities;
 }
 
 // Helper function to validate capacity
@@ -387,7 +390,7 @@ export function balancedBlockRandomization(
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
-  return doBalancedRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns, false);
+  return doBalancedRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
 }
 
 // Core balanced randomization implementation
@@ -396,18 +399,19 @@ function doBalancedRandomization(
   selectedCovariates: string[],
   keepEmptyInLastPlate: boolean = true,
   numRows: number = 8,
-  numColumns: number = 12,
-  useSpatialOptimization: boolean = false
+  numColumns: number = 12
 ): {
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
   const totalSamples = searches.length;
   const plateSize = numRows * numColumns;
+  console.log(`Starting balanced randomization for ${totalSamples} samples with plate size ${plateSize} (${numRows} rows x ${numColumns} columns)`);
 
   // Calculate number of plates needed (same regardless of keepEmptyInLastPlate)
   const actualPlatesNeeded = Math.ceil(totalSamples / plateSize);
-  const plateCapacities = assignPlateCapacities(totalSamples, actualPlatesNeeded, keepEmptyInLastPlate, plateSize);
+  console.log(`Calculated plates needed: ${actualPlatesNeeded}`);
+  const plateCapacities = assignBlockCapacities(totalSamples, actualPlatesNeeded, keepEmptyInLastPlate, plateSize, "Plate");
 
   const plates = Array.from({ length: actualPlatesNeeded }, () =>
     Array.from({ length: numRows }, () => new Array(numColumns).fill(undefined))
@@ -429,13 +433,16 @@ function doBalancedRandomization(
   // STEP 2: Calculate expected minimums per plate based on plate capacities
   const expectedMinimumsPerPlate: { [plateIdx: number]: { [groupKey: string]: number } } = {};
 
+  console.log("Calculating expected minimums per plate based on capacities:");
   plateCapacities.forEach((capacity, plateIdx) => {
     expectedMinimumsPerPlate[plateIdx] = {};
     covariateGroups.forEach((samples, groupKey) => {
       // Calculate expected minimum for this covariate group on this specific plate
       // Based on the plate's capacity relative to a full plate
-      const capacityRatio = capacity / plateSize;
+      const capacityRatio = actualPlatesNeeded == 1 ? 1 : capacity / plateSize;
       const globalExpected = Math.floor(samples.length / actualPlatesNeeded);
+      console.log(`  Plate ${plateIdx}, Group ${groupKey}: Global expected ${globalExpected},
+        Capacity ratio: ${capacityRatio.toFixed(2)}, Expected minimum: ${Math.round(globalExpected * capacityRatio)}`);
       expectedMinimumsPerPlate[plateIdx][groupKey] = Math.round(globalExpected * capacityRatio);
     });
   });
@@ -449,10 +456,10 @@ function doBalancedRandomization(
     console.error("Plate-level distribution validation failed");
   }
 
-  // STEP 5: For each plate, apply the randomization strategy
+  // STEP 5: For each plate, apply the distribution and randomization strategy to rows
   plateAssignments.forEach((plateSamples, plateIdx) => {
-    
-    // STEP 5B: Row-Based Distribution - Distribute samples across rows with validation
+
+    // STEP 5B: Row-Based Distribution - Distribute samples across rows
     console.log(`Applying row-based distribution to plate ${plateIdx + 1} with ${plateSamples.length} samples`);
 
     // Shuffle plate samples before grouping to add initial randomization
@@ -465,26 +472,28 @@ function doBalancedRandomization(
     const totalPlateSamples = plateSamples.length;
     const rowsNeeded = Math.ceil(totalPlateSamples / numColumns);
     const actualRowsToUse = Math.min(rowsNeeded, numRows);
+    console.log(`Plate ${plateIdx + 1} has ${totalPlateSamples} samples, needs ${rowsNeeded} rows, using ${actualRowsToUse} rows`);
+
+    // Calculate row capacities. Fill rows sequentially, leaving empty cells in the last row
+    const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, true, numColumns, "Row");
 
     // Calculate expected minimums per row
+    console.log("Calculating expected minimums per row based on plate capacities:");
     const expectedRowMinimums: { [rowIdx: number]: { [groupKey: string]: number } } = {};
-    for (let rowIdx = 0; rowIdx < actualRowsToUse; rowIdx++) {
+
+    rowCapacities.forEach((capacity, rowIdx) => {
       expectedRowMinimums[rowIdx] = {};
       plateGroups.forEach((samples, groupKey) => {
+        // Calculate expected minimum for this covariate group on this specific row
+        // Based on the row's capacity relative to a full row
+        const capacityRatio = actualRowsToUse == 1 ? 1 : capacity / numColumns;
         const expectedPerRow = Math.floor(samples.length / actualRowsToUse);
-        expectedRowMinimums[rowIdx][groupKey] = expectedPerRow;
+        expectedRowMinimums[rowIdx][groupKey] = Math.round(expectedPerRow * capacityRatio);
+        console.log(`  Row ${rowIdx + 1},  Group ${groupKey}, Samples ${samples.length}, Expected ${expectedPerRow},
+          Capacity ratio: ${capacityRatio.toFixed(2)}, Expected minimum: ${Math.round(expectedPerRow * capacityRatio)}`);
       });
-    }
+    });
 
-    // Calculate row capacities for even distribution
-    const totalPlateSamplesForCapacity = plateSamples.length;
-    const baseSamplesPerRow = Math.floor(totalPlateSamplesForCapacity / actualRowsToUse);
-    const extraSamplesForRows = totalPlateSamplesForCapacity % actualRowsToUse;
-
-    const rowCapacities = Array(actualRowsToUse).fill(baseSamplesPerRow);
-    for (let i = 0; i < extraSamplesForRows; i++) {
-      rowCapacities[i]++;
-    }
 
     const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, "Rows", expectedRowMinimums);
 

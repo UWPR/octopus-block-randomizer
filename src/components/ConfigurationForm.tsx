@@ -127,7 +127,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
         )}
       </div>
 
-      {/* Balanced Algorithm Options */}
+      {/* Non-greedy Algorithm Options */}
       {selectedAlgorithm !== 'greedy' && (
         <div style={styles.compactRow}>
           <div style={styles.fullWidthColumn}>

@@ -376,233 +376,6 @@ function validatePerBlockDistribution(
 }
 
 
-
-/**
- * Greedy-inspired spatial randomization to minimize covariate clustering
- * Uses constraint-based placement with increasing tolerance to minimize local clustering
- */
-export function optimizeSpatialRandomization(
-  samples: SearchData[],
-  numRows: number,
-  numColumns: number,
-  selectedCovariates: string[]
-): (SearchData | undefined)[][] {
-  const plate: (SearchData | undefined)[][] = Array.from({ length: numRows }, () =>
-    new Array(numColumns).fill(undefined)
-  );
-
-  if (samples.length === 0) return plate;
-
-  // Shuffle samples for randomization
-  const shuffledSamples = shuffleArray([...samples]);
-
-  // Place each sample in the position that minimizes local clustering
-  for (const sample of shuffledSamples) {
-    const availablePositions = getAvailablePositions(plate, numRows, numColumns);
-    if (availablePositions.length === 0) break; // No more space
-
-    let tolerance = 0;
-    let candidatePositions: Array<{ pos: { row: number; col: number }; score: number }> = [];
-
-    // Try with increasing tolerance until we find a placement
-    while (candidatePositions.length === 0 && tolerance <= 8) {
-      for (const pos of availablePositions) {
-        const analysis = analyzePositionForPlacement(sample, plate, pos.row, pos.col, selectedCovariates, tolerance);
-        if (analysis !== null) {
-          candidatePositions.push({ pos, score: analysis.score });
-        }
-      }
-
-      // If no position found with current tolerance, increase tolerance
-      if (candidatePositions.length === 0) {
-        tolerance++;
-      }
-    }
-
-    // Select from top candidates randomly
-    let positionToUse: { row: number; col: number };
-
-    if (candidatePositions.length > 0) {
-      // Sort by score and select from top 20% or top 5 positions (whichever is larger)
-      candidatePositions.sort((a, b) => b.score - a.score);
-      const topCount = Math.max(5, Math.ceil(candidatePositions.length * 0.2));
-      const topCandidates = candidatePositions.slice(0, topCount);
-      
-      // Randomly select from top candidates
-      const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
-      positionToUse = selected.pos;
-    } else {
-      // Fallback to random available position
-      positionToUse = availablePositions[Math.floor(Math.random() * availablePositions.length)];
-    }
-
-    plate[positionToUse.row][positionToUse.col] = sample;
-  
-  }
-
-  // Shuffle samples within each row after placement
-  for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
-    // Extract non-undefined samples from the row
-    const rowSamples = plate[rowIdx].filter((sample): sample is SearchData => sample !== undefined);
-    
-    if (rowSamples.length > 0) {
-      // Shuffle the samples
-      const shuffledRowSamples = shuffleArray(rowSamples);
-      
-      // Clear the row
-      plate[rowIdx].fill(undefined);
-      
-      // Place shuffled samples back in the row
-      for (let colIdx = 0; colIdx < shuffledRowSamples.length; colIdx++) {
-        plate[rowIdx][colIdx] = shuffledRowSamples[colIdx];
-      }
-    }
-  }
-
-  console.log(`Greedy spatial placement completed for ${samples.length} samples`);
-  return plate;
-}
-
-/**
- * Get all available (empty) positions in the plate
- */
-function getAvailablePositions(
-  plate: (SearchData | undefined)[][],
-  numRows: number,
-  numColumns: number
-): Array<{ row: number; col: number }> {
-  const positions = [];
-  for (let row = 0; row < numRows; row++) {
-    for (let col = 0; col < numColumns; col++) {
-      if (plate[row][col] === undefined) {
-        positions.push({ row, col });
-      }
-    }
-  }
-  return positions;
-}
-
-/**
- * Analyze a row for a potential sample placement and calculate position score
- * @param sample - Sample to potentially place
- * @param plate - 2D array representing the plate
- * @param row - Row position to analyze
- * @param col - Column position to analyze
- * @param selectedCovariates - Array of selected covariate names
- * @param tolerance - Maximum number of similar samples allowed in the same row
- * @returns Object with row analysis and position score (null if placement violates tolerance)
- */
-function analyzePositionForPlacement<T extends SearchData | undefined>(
-  sample: SearchData,
-  plate: T[][],
-  row: number,
-  col: number,
-  selectedCovariates: string[],
-  tolerance: number
-): { similarInRow: number; totalInRow: number; score: number } | null {
-  const sampleKey = getCovariateKey(sample, selectedCovariates);
-  
-  // Count similar samples in the same row
-  let similarInRow = 0;
-  let totalInRow = 0;
-
-  for (let c = 0; c < plate[0].length; c++) {
-    if (c !== col && plate[row][c]) {
-      totalInRow++;
-      if (getCovariateKey(plate[row][c]!, selectedCovariates) === sampleKey) {
-        similarInRow++;
-      }
-    }
-  }
-
-  // Check tolerance - return null if placement violates tolerance
-  if (similarInRow > tolerance) {
-    return null;
-  }
-
-  // Calculate position score (higher = better for randomization)
-  let score = 100;
-
-  // Penalty based on proportion of similar samples in row
-  if (totalInRow > 0) {
-    const similarRatio = similarInRow / totalInRow;
-    score -= similarRatio * 40; // Penalty for having similar samples in row
-  }
-
-  // Additional penalty for absolute count of similar samples
-  score -= similarInRow * 15; // Linear penalty per similar sample
-
-  // Small bonus for filling gaps (positions surrounded by samples)
-  if (totalInRow >= 2) {
-    score += 5; // Encourage filling in gaps
-  }
-
-  return { similarInRow, totalInRow, score: Math.max(0, score) };
-}
-
-/**
- * Analyze neighbors for a potential sample placement and calculate position score
- * @param sample - Sample to potentially place
- * @param plate - 2D array representing the plate
- * @param row - Row position to analyze
- * @param col - Column position to analyze
- * @param selectedCovariates - Array of selected covariate names
- * @param tolerance - Maximum number of similar neighbors allowed
- * @returns Object with neighbor analysis and position score (null if placement violates tolerance)
- */
-function analyzePositionForPlacementSpatial<T extends SearchData | undefined>(
-  sample: SearchData,
-  plate: T[][],
-  row: number,
-  col: number,
-  selectedCovariates: string[],
-  tolerance: number
-): { similarNeighbors: number; totalNeighbors: number; score: number } | null {
-  const sampleKey = getCovariateKey(sample, selectedCovariates);
-  
-  // Use the analyzeNeighbors function with the sample key
-  const { similarNeighbors, totalNeighbors } = analyzeNeighbors(plate, row, col, sampleKey, selectedCovariates);
-
-  // Check tolerance - return null if placement violates tolerance
-  if (similarNeighbors > tolerance) {
-    return null;
-  }
-
-  // Calculate position score (higher = better for randomization)
-  let score = 100; // Start with perfect score
-
-  // Penalty for similar neighbors
-  if (totalNeighbors > 0) {
-    const similarRatio = similarNeighbors / totalNeighbors;
-      score -= similarRatio * 5;
-  }
-
-  // Additional penalty for similar samples in same row/column
-  let similarInRow = 0;
-  let similarInCol = 0;
-
-  // Check row
-  for (let c = 0; c < plate[0].length; c++) {
-    if (c !== col && plate[row][c] && getCovariateKey(plate[row][c]!, selectedCovariates) === sampleKey) {
-      similarInRow++;
-    }
-  }
-
-  // Check column
-  for (let r = 0; r < plate.length; r++) {
-    if (r !== row && plate[r][col] && getCovariateKey(plate[r][col]!, selectedCovariates) === sampleKey) {
-      similarInCol++;
-    }
-  }
-
-  // Penalty for row/column clustering
-  score -= (similarInRow + similarInCol) * 50;
-
-  return { similarNeighbors, totalNeighbors, score: Math.max(0, score) };
-}
-
-
-
 // Balanced randomization (proportional distribution in plates and rows + row shuffling)
 export function balancedBlockRandomization(
   searches: SearchData[],
@@ -615,20 +388,6 @@ export function balancedBlockRandomization(
   plateAssignments?: Map<number, SearchData[]>;
 } {
   return doBalancedRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns, false);
-}
-
-// New balanced spatial randomization (proportional distribution + spatial optimization)
-export function balancedSpatialRandomization(
-  searches: SearchData[],
-  selectedCovariates: string[],
-  keepEmptyInLastPlate: boolean = true,
-  numRows: number = 8,
-  numColumns: number = 12
-): {
-  plates: (SearchData | undefined)[][][];
-  plateAssignments?: Map<number, SearchData[]>;
-} {
-  return doBalancedRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns, true);
 }
 
 // Core balanced randomization implementation
@@ -690,81 +449,64 @@ function doBalancedRandomization(
     console.error("Plate-level distribution validation failed");
   }
 
-  // STEP 5: For each plate, apply the appropriate randomization strategy
+  // STEP 5: For each plate, apply the randomization strategy
   plateAssignments.forEach((plateSamples, plateIdx) => {
-    if (useSpatialOptimization) {
-      // STEP 5A: Spatial Optimization - Apply greedy spatial randomization directly to plate samples
-      console.log(`Applying spatial optimization to plate ${plateIdx + 1} with ${plateSamples.length} samples`);
+    
+    // STEP 5B: Row-Based Distribution - Distribute samples across rows with validation
+    console.log(`Applying row-based distribution to plate ${plateIdx + 1} with ${plateSamples.length} samples`);
 
-      const spatiallyOptimizedPlate = optimizeSpatialRandomization(
-        plateSamples,
-        numRows,
-        numColumns,
-        selectedCovariates
-      );
+    // Shuffle plate samples before grouping to add initial randomization
+    const shuffledPlateSamples = shuffleArray([...plateSamples]);
 
-      // Fill the plate with spatially optimized positions
-      for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
-        for (let colIdx = 0; colIdx < numColumns; colIdx++) {
-          plates[plateIdx][rowIdx][colIdx] = spatiallyOptimizedPlate[rowIdx][colIdx];
-        }
-      }
-    } else {
-      // STEP 5B: Row-Based Distribution - Distribute samples across rows with validation
-      console.log(`Applying row-based distribution to plate ${plateIdx + 1} with ${plateSamples.length} samples`);
+    // Group samples by covariates for this plate
+    const plateGroups = groupByCovariates(shuffledPlateSamples, selectedCovariates);
 
-      // Shuffle plate samples before grouping to add initial randomization
-      const shuffledPlateSamples = shuffleArray([...plateSamples]);
+    // Calculate how many rows we need
+    const totalPlateSamples = plateSamples.length;
+    const rowsNeeded = Math.ceil(totalPlateSamples / numColumns);
+    const actualRowsToUse = Math.min(rowsNeeded, numRows);
 
-      // Group samples by covariates for this plate
-      const plateGroups = groupByCovariates(shuffledPlateSamples, selectedCovariates);
-
-      // Calculate how many rows we need
-      const totalPlateSamples = plateSamples.length;
-      const rowsNeeded = Math.ceil(totalPlateSamples / numColumns);
-      const actualRowsToUse = Math.min(rowsNeeded, numRows);
-
-      // Calculate expected minimums per row
-      const expectedRowMinimums: { [rowIdx: number]: { [groupKey: string]: number } } = {};
-      for (let rowIdx = 0; rowIdx < actualRowsToUse; rowIdx++) {
-        expectedRowMinimums[rowIdx] = {};
-        plateGroups.forEach((samples, groupKey) => {
-          const expectedPerRow = Math.floor(samples.length / actualRowsToUse);
-          expectedRowMinimums[rowIdx][groupKey] = expectedPerRow;
-        });
-      }
-
-      // Calculate row capacities for even distribution
-      const totalPlateSamplesForCapacity = plateSamples.length;
-      const baseSamplesPerRow = Math.floor(totalPlateSamplesForCapacity / actualRowsToUse);
-      const extraSamplesForRows = totalPlateSamplesForCapacity % actualRowsToUse;
-
-      const rowCapacities = Array(actualRowsToUse).fill(baseSamplesPerRow);
-      for (let i = 0; i < extraSamplesForRows; i++) {
-        rowCapacities[i]++;
-      }
-
-      const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, "Rows", expectedRowMinimums);
-
-      // Validate row-level distribution
-      const rowDistributionValid = validatePerBlockDistribution(rowAssignments, selectedCovariates, expectedRowMinimums, "row");
-      if (!rowDistributionValid) {
-        console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
-      }
-
-      // Fill positions and shuffle within rows
-      rowAssignments.forEach((rowSamples, rowIdx) => {
-        if (rowIdx < numRows) {
-          // Shuffle samples within this row for final randomization
-          const shuffledRowSamples = shuffleArray([...rowSamples]);
-
-          // Place samples in the row
-          for (let colIdx = 0; colIdx < Math.min(numColumns, shuffledRowSamples.length); colIdx++) {
-            plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
-          }
-        }
+    // Calculate expected minimums per row
+    const expectedRowMinimums: { [rowIdx: number]: { [groupKey: string]: number } } = {};
+    for (let rowIdx = 0; rowIdx < actualRowsToUse; rowIdx++) {
+      expectedRowMinimums[rowIdx] = {};
+      plateGroups.forEach((samples, groupKey) => {
+        const expectedPerRow = Math.floor(samples.length / actualRowsToUse);
+        expectedRowMinimums[rowIdx][groupKey] = expectedPerRow;
       });
     }
+
+    // Calculate row capacities for even distribution
+    const totalPlateSamplesForCapacity = plateSamples.length;
+    const baseSamplesPerRow = Math.floor(totalPlateSamplesForCapacity / actualRowsToUse);
+    const extraSamplesForRows = totalPlateSamplesForCapacity % actualRowsToUse;
+
+    const rowCapacities = Array(actualRowsToUse).fill(baseSamplesPerRow);
+    for (let i = 0; i < extraSamplesForRows; i++) {
+      rowCapacities[i]++;
+    }
+
+    const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, "Rows", expectedRowMinimums);
+
+    // Validate row-level distribution
+    const rowDistributionValid = validatePerBlockDistribution(rowAssignments, selectedCovariates, expectedRowMinimums, "row");
+    if (!rowDistributionValid) {
+      console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
+    }
+
+    // Fill positions and shuffle within rows
+    rowAssignments.forEach((rowSamples, rowIdx) => {
+      if (rowIdx < numRows) {
+        // Shuffle samples within this row for final randomization
+        const shuffledRowSamples = shuffleArray([...rowSamples]);
+
+        // Place samples in the row
+        for (let colIdx = 0; colIdx < Math.min(numColumns, shuffledRowSamples.length); colIdx++) {
+          plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
+        }
+      }
+    });
+
   });
 
   return {

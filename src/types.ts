@@ -9,10 +9,6 @@ export const ALGORITHM_CONFIG = {
     name: 'Balanced Block Randomization',
     description: 'Proportional distribution across plates and within plate rows'
   },
-  balanced_spatial: {
-    name: 'Balanced Spatial Randomization',
-    description: 'Proportional distribution across plates with spatial optimization with plates'
-  },
   greedy: {
     name: 'Greedy Randomization',
     description: 'Greedy Randomization'
@@ -33,7 +29,7 @@ export const getAllAlgorithms = (): RandomizationAlgorithm[] =>
 
 // Get algorithms in UI display order
 export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] =>
-  ['balanced_spatial', 'balanced', 'greedy'] as RandomizationAlgorithm[];
+  ['balanced', 'greedy'] as RandomizationAlgorithm[];
 
 export interface RandomizationOptions {
   algorithm: RandomizationAlgorithm;

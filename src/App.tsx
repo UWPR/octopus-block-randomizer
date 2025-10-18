@@ -19,7 +19,7 @@ import { useQualityMetrics } from './hooks/useQualityMetrics';
 
 const App: React.FC = () => {
 
-  const defaultAlgorithm = "balanced_spatial";
+  const defaultAlgorithm = "balanced";
 
   // File upload hook
   const {

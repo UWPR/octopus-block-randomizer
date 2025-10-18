@@ -259,7 +259,6 @@ export const calculatePlateDiversityMetrics = (
   if (!searches.length || !plateAssignments.size || !selectedCovariates.length) {
     return {
       averageBalanceScore: 0,
-      // averageRandomizationScore: 0,
       averageRowClusteringScore: 0,
       plateScores: []
     };
@@ -319,30 +318,6 @@ export const calculateOverallQuality = (
   displayConfig: QualityDisplayConfig = DEFAULT_QUALITY_DISPLAY_CONFIG
 ): OverallQualityAssessment => {
   const recommendations: string[] = [];
-
-  // // Check plate balance
-  // if (plateDiversity.averageBalanceScore < 70) {
-  //   recommendations.push(`Low plate balance (${plateDiversity.averageBalanceScore.toFixed(1)}) - plates may not represent overall population well`);
-  // }
-
-  // // Check randomization quality if enabled
-  // if (displayConfig.showRandomizationScore && plateDiversity.averageRowClusteringScore < 70) {
-  //   recommendations.push(`Poor randomization (${plateDiversity.averageRowClusteringScore.toFixed(1)}) - similar samples may be clustered together`);
-  // }
-
-  // // Identify problematic plates
-  // const poorPlates = plateDiversity.plateScores.filter(score => {
-  //   if (displayConfig.showRandomizationScore) {
-  //     return score.balanceScore < 60 || score.rowClusteringScore < 60;
-  //   } else {
-  //     return score.balanceScore < 60;
-  //   }
-  // });
-
-  // if (poorPlates.length > 0) {
-  //   const plateNumbers = poorPlates.map(p => p.plateIndex + 1).join(', ');
-  //   recommendations.push(`Plates ${plateNumbers} have poor quality scores`);
-  // }
 
   // Calculate overall score based on display configuration
   const overallScore = displayConfig.showRandomizationScore

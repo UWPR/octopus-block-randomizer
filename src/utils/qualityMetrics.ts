@@ -6,8 +6,7 @@ import { getCovariateKey, groupByCovariates, getQualityLevel, getNeighborPositio
  *
  * Focuses on two key aspects of plate randomization quality:
  * 1. Plate Balance Score (Proportional Accuracy)
- * 2. Plate Randomization Score (Spatial Clustering Analysis)
- * 3. Row Clustering Score (Row-level Pattern Detection)
+ * 2. Row Clustering Score (Row-level Pattern Detection)
  */
 
 // Utility functions
@@ -154,68 +153,6 @@ const calculateSpatialClusteringScore = (
   return (differentNeighbors / totalComparisons) * 100;
 };
 
-/**
- * Run Test for randomness
- * Counts the number of runs and compares to expected value for random sequence
- * A "run" is a sequence of identical consecutive values
- */
-const calculateRunTest = (keys: string[]): number => {
-  if (keys.length <= 1) return 100;
-
-  const n = keys.length;
-
-  // Count actual runs
-  let actualRuns = 1;
-  for (let i = 1; i < n; i++) {
-    if (keys[i] !== keys[i - 1]) {
-      actualRuns++;
-    }
-  }
-
-  // Count frequency of each group
-  const groupCounts = new Map<string, number>();
-  keys.forEach(key => {
-    groupCounts.set(key, (groupCounts.get(key) || 0) + 1);
-  });
-
-  // Calculate expected number of runs for random sequence
-  // E(R) = 1 + sum over all pairs of groups: 2*n_i*n_j/n
-  let expectedRuns = 1;
-  const counts = Array.from(groupCounts.values());
-  
-  for (let i = 0; i < counts.length; i++) {
-    for (let j = 0; j < counts.length; j++) {
-      if (i !== j) {
-        expectedRuns += (counts[i] * counts[j]) / n;
-      }
-    }
-  }
-
-  // For small samples, use simplified scoring based on deviation from expected
-  const deviation = Math.abs(actualRuns - expectedRuns);
-  const maxExpectedDeviation = expectedRuns * 0.4; // Allow 40% deviation
-  
-  let score = 100;
-  if (deviation > maxExpectedDeviation * 0.5) {
-    // Penalize based on how far from expected
-    const excessDeviation = deviation - (maxExpectedDeviation * 0.5);
-    score -= (excessDeviation / maxExpectedDeviation) * 100;
-  }
-
-  // Additional check: penalize extreme cases
-  if (actualRuns === 1) {
-    // All same group (shouldn't happen, but just in case)
-    score = 0;
-  } else if (actualRuns === n) {
-    // Perfect alternation (every value different from neighbors)
-    score = Math.min(score, 70); // Cap at 70 for perfect alternation
-  } else if (actualRuns <= 2 && n > 4) {
-    // Very few runs = high clustering
-    score = Math.min(score, 40);
-  }
-
-  return Math.max(0, Math.min(100, score));
-};
 
 /**
  * Calculate autocorrelation score for pattern detection
@@ -268,15 +205,8 @@ const calculateAutocorrelationScore = (keys: string[]): number => {
 const calculatePatternScore = (keys: string[]): number => {
   if (keys.length <= 3) return 100;
   
-  //const runTestScore = calculateRunTest(keys);
   const autocorrScore = calculateAutocorrelationScore(keys);
   
-  // For short sequences, weight Run Test more heavily
-  // if (keys.length <= 12) {
-  //   return runTestScore * 0.7 + autocorrScore * 0.3;
-  // } else {
-  //   return runTestScore * 0.5 + autocorrScore * 0.5;
-  // }
   return autocorrScore
 };
 

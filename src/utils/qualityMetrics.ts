@@ -233,9 +233,9 @@ const calculateRowClusteringScore = (
 
     const rowKeys = rowSamples.map(sample => getCovariateKey(sample, selectedCovariates));
 
-    // Use combined pattern score (Run Test + Autocorrelation)
-    const rowScore = calculatePatternScore(rowKeys);
-    console.log(`Row ${row} keys: ${rowKeys.join(', ')} => Pattern Score: ${rowScore.toFixed(2)}`);
+    // Calculate clustering score
+    const rowScore = calculateRowScore(rowKeys);
+    console.log(`Row ${row} keys: ${rowKeys.join(', ')} => Clustering Score: ${rowScore.toFixed(2)}`);
 
     totalScore += rowScore;
     analyzedRows++;
@@ -244,6 +244,135 @@ const calculateRowClusteringScore = (
   if (analyzedRows === 0) return 100;
   console.log(`Average Row Clustering Score: ${(totalScore / analyzedRows).toFixed(2)}`);
   return totalScore / analyzedRows;
+};
+
+/**
+ * Calculate expected number of runs of each length for a given sequence composition
+ * Based on statistical theory of runs in random sequences
+ */
+const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, number>> => {
+  const n = keys.length;
+  const composition = new Map<string, number>();
+
+  // Count composition
+  keys.forEach(key => {
+    composition.set(key, (composition.get(key) || 0) + 1); // How many members for each key
+  });
+
+  const expectedRunsByGroup = new Map<string, Map<number, number>>(); // key -> {run length -> expected count}
+
+  // For each covariate group
+  composition.forEach((groupSize, groupKey) => {
+    const groupExpectedRuns = new Map<number, number>();
+
+    if (groupSize >= 2) { // Only groups with 2+ samples can have runs
+
+      // Probability calculations for this specific group
+        const groupProbability = groupSize / n;
+
+      // For each possible run length for this group
+      for (let runLength = 2; runLength <= groupSize; runLength++) {
+
+        // Expected number of runs of this length for this group
+        // Simplified model: probability of consecutive placement; treats each position as independent.
+        // To be accurate we should use sampling without replacement. This calculation treats it like
+        // sampling WITH replacement.
+        const consecutiveProbability = Math.pow(groupProbability, runLength);
+        const possibleStartPositions = Math.max(0, n - runLength + 1);
+
+        // Expected runs considering the group's actual size
+        const expectedCount = possibleStartPositions * consecutiveProbability;
+
+        if (expectedCount > 0.01) { // Only include if expectation is meaningful
+          groupExpectedRuns.set(runLength, expectedCount);
+        }
+      }
+    }
+
+    expectedRunsByGroup.set(groupKey, groupExpectedRuns);
+  });
+
+  return expectedRunsByGroup;
+};
+
+/**
+ * Count actual runs by group and length
+ */
+const getRunCountsByGroup = (runs: Array<{ length: number; group: string }>): Map<string, Map<number, number>> => {
+  const countsByGroup = new Map<string, Map<number, number>>();
+
+  runs.forEach(run => {
+    if (!countsByGroup.has(run.group)) {
+      countsByGroup.set(run.group,
+        new Map<number, number>()); // Run length -> number of runs of the length
+    }
+    const groupCounts = countsByGroup.get(run.group)!;
+    groupCounts.set(run.length, (groupCounts.get(run.length) || 0) + 1);
+  });
+
+  return countsByGroup;
+};
+
+const calculateRowScore = (keys: string[]): number => {
+
+  if (keys.length <= 3) return 100;
+
+  // Track runs with their covariate groups
+  const runs: Array<{ length: number; group: string }> = [];
+  let currentRun = 1;
+  let currentGroup = keys[0];
+
+  for (let i = 1; i < keys.length; i++) {
+    if (keys[i] !== keys[i - 1]) {
+      // End of current run
+      runs.push({ length: currentRun, group: currentGroup });
+      currentRun = 1;
+      currentGroup = keys[i];
+    } else {
+      currentRun++;
+    }
+
+    if (i === keys.length - 1) {
+      // End of sequence
+      runs.push({ length: currentRun, group: currentGroup });
+    }
+  }
+
+  const filteredRuns = runs.filter(run => run.length > 1); // Remove runs of size 1
+  console.log(`Runs: ${filteredRuns.map(r => `${r.group}:${r.length}`).join(', ')}`);
+
+  if (filteredRuns.length === 0) return 100;
+
+  // Calculate expected runs by group
+  const expectedRunsByGroup = calculateExpectedRunsByGroup(keys);
+  const actualRunCountsByGroup = getRunCountsByGroup(filteredRuns);
+
+  let totalPenalty = 0;
+
+  // Compare actual vs expected runs for each group and length
+  actualRunCountsByGroup.forEach((groupRunCounts, groupKey) => {
+    const expectedGroupRuns = expectedRunsByGroup.get(groupKey) || new Map<number, number>();
+
+    groupRunCounts.forEach((actualCount, runLength) => {
+      const expectedCount = expectedGroupRuns.get(runLength) || 0;
+      const excess = Math.max(0, actualCount - expectedCount);
+
+      if (excess > 0) {
+        // Penalty based on how much we exceed expectation for this specific group
+        // Longer runs get higher base penalty, scaled by excess
+        const basePenalty = Math.pow(runLength, 1.5) * 10; // Base penalty increases with run length
+        const excessPenalty = excess * basePenalty;
+
+        console.log(`  Group ${groupKey}, run length ${runLength}: expected ${expectedCount.toFixed(2)}, actual ${actualCount}, excess ${excess.toFixed(2)}, penalty ${excessPenalty.toFixed(2)}`);
+        totalPenalty += excessPenalty;
+      }
+    });
+  });
+  console.log(`Total Penalty: ${totalPenalty.toFixed(2)}`);
+  const score = (100 - totalPenalty);
+
+  // Convert to score (0-100).  If no penalty score is 100.  If penalty is high, score is 0
+  return Math.max(0, Math.min(100, score));
 };
 
 /**

@@ -1,5 +1,5 @@
 import React from 'react';
-import { QualityMetrics } from '../types';
+import { QualityMetrics, QUALITY_DISPLAY_CONFIG } from '../types';
 import { getQualityColor, getQualityLevelColor, getQualityLevel, getCompactQualityLevel, formatScore } from '../utils';
 
 interface QualityMetricsPanelProps {
@@ -85,21 +85,23 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                       {getCompactQualityLevel(metrics.plateDiversity.averageBalanceScore)}
                     </span>
                   </div>
-                  <div style={styles.compactScoreItem}>
-                    <span style={styles.compactItemLabel}>Avg Randomization:</span>
-                    <span style={{
-                      ...styles.compactItemValue,
-                      color: getQualityColor(metrics.plateDiversity.averageRowClusteringScore)
-                    }}>
-                      {formatScore(metrics.plateDiversity.averageRowClusteringScore)}
-                    </span>
-                    <span style={{
-                      ...styles.qualityBadge,
-                      backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageRowClusteringScore))
-                    }}>
-                      {getCompactQualityLevel(metrics.plateDiversity.averageRowClusteringScore)}
-                    </span>
-                  </div>
+                  {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+                    <div style={styles.compactScoreItem}>
+                      <span style={styles.compactItemLabel}>Avg Randomization:</span>
+                      <span style={{
+                        ...styles.compactItemValue,
+                        color: getQualityColor(metrics.plateDiversity.averageRowClusteringScore)
+                      }}>
+                        {formatScore(metrics.plateDiversity.averageRowClusteringScore)}
+                      </span>
+                      <span style={{
+                        ...styles.qualityBadge,
+                        backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageRowClusteringScore))
+                      }}>
+                        {getCompactQualityLevel(metrics.plateDiversity.averageRowClusteringScore)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -146,21 +148,23 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                               {' '}{formatScore(plate.balanceScore)}
                             </span>
                           </div>
-                          <div style={styles.scoreItem}>
-                            <span style={styles.scoreLabel}>Randomization:</span>
-                            <span style={{
-                              ...styles.scoreValue,
-                              color: getQualityColor(plate.rowClusteringScore)
-                            }}>
+                          {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+                            <div style={styles.scoreItem}>
+                              <span style={styles.scoreLabel}>Randomization:</span>
                               <span style={{
-                                ...styles.qualityBadge,
-                                backgroundColor: getQualityLevelColor(getQualityLevel(plate.rowClusteringScore))
+                                ...styles.scoreValue,
+                                color: getQualityColor(plate.rowClusteringScore)
                               }}>
-                                {getQualityLevel(plate.rowClusteringScore).charAt(0).toUpperCase()}
+                                <span style={{
+                                  ...styles.qualityBadge,
+                                  backgroundColor: getQualityLevelColor(getQualityLevel(plate.rowClusteringScore))
+                                }}>
+                                  {getQualityLevel(plate.rowClusteringScore).charAt(0).toUpperCase()}
+                                </span>
+                                {' '}{formatScore(plate.rowClusteringScore)}
                               </span>
-                              {' '}{formatScore(plate.rowClusteringScore)}
-                            </span>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

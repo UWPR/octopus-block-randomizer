@@ -146,3 +146,18 @@ export interface QualityMetrics {
   plateDiversity: PlateDiversityMetrics;
   overallQuality: OverallQualityAssessment;
 }
+
+// Quality display configuration
+export interface QualityDisplayConfig {
+  showRandomizationScore: boolean;
+}
+
+// Default quality display configuration
+export const DEFAULT_QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
+  showRandomizationScore: true
+};
+
+// Global quality display configuration - change this flag to control randomization score visibility
+export const QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
+  showRandomizationScore: false  // Set to false to hide randomization scores
+};

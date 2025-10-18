@@ -1,4 +1,4 @@
-import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment, QualityLevel } from '../types';
+import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment, QualityLevel, QualityDisplayConfig, DEFAULT_QUALITY_DISPLAY_CONFIG } from '../types';
 import { getCovariateKey, groupByCovariates, getQualityLevel, getNeighborPositions } from '../utils';
 
 /**
@@ -188,7 +188,7 @@ const calculateAutocorrelationScore = (keys: string[]): number => {
 
   // Calculate excess correlation beyond what's expected by chance
   const excessCorrelation = Math.max(0, maxCorrelation - expectedCorrelation);
-  
+
   // Convert to score (0-100)
   // If excess correlation is 0, score is 100 (perfect)
   // If excess correlation is high, score is low (pattern detected)
@@ -204,9 +204,9 @@ const calculateAutocorrelationScore = (keys: string[]): number => {
  */
 const calculatePatternScore = (keys: string[]): number => {
   if (keys.length <= 3) return 100;
-  
+
   const autocorrScore = calculateAutocorrelationScore(keys);
-  
+
   return autocorrScore
 };
 
@@ -228,15 +228,15 @@ const calculateRowClusteringScore = (
   // Analyze each row
   for (let row = 0; row < numRows; row++) {
     const rowSamples = plateRows[row].filter((sample): sample is SearchData => sample !== undefined);
-    
+
     if (rowSamples.length <= 2) continue; // Need at least 3 samples for meaningful analysis
 
     const rowKeys = rowSamples.map(sample => getCovariateKey(sample, selectedCovariates));
-    
+
     // Use combined pattern score (Run Test + Autocorrelation)
     const rowScore = calculatePatternScore(rowKeys);
     console.log(`Row ${row} keys: ${rowKeys.join(', ')} => Pattern Score: ${rowScore.toFixed(2)}`);
-    
+
     totalScore += rowScore;
     analyzedRows++;
   }
@@ -253,7 +253,8 @@ export const calculatePlateDiversityMetrics = (
   searches: SearchData[],
   plateAssignments: Map<number, SearchData[]>,
   randomizedPlates: (SearchData | undefined)[][][],
-  selectedCovariates: string[]
+  selectedCovariates: string[],
+  displayConfig: QualityDisplayConfig = DEFAULT_QUALITY_DISPLAY_CONFIG
 ): PlateDiversityMetrics => {
   if (!searches.length || !plateAssignments.size || !selectedCovariates.length) {
     return {
@@ -277,34 +278,34 @@ export const calculatePlateDiversityMetrics = (
     // Calculate comprehensive balance metrics (both overall score and group details)
     const plateBalance = calculatePlateBalance(plateSamples, searches, selectedCovariates);
 
-    // Calculate randomization score (spatial clustering)
+    // Calculate randomization score (spatial clustering) if enabled
     const plateRows = randomizedPlates[plateIndex] || [];
-    // const randomizationScore = calculateSpatialClusteringScore(plateRows, selectedCovariates);
+    const rowClusteringScore = displayConfig.showRandomizationScore
+      ? calculateRowClusteringScore(plateRows, selectedCovariates)
+      : 0;
 
-    // Calculate row clustering score
-    const rowClusteringScore = calculateRowClusteringScore(plateRows, selectedCovariates);
-
-    // Overall score is average of all three metrics
-    // const overallScore = (plateBalance.overallScore + randomizationScore + rowClusteringScore) / 3;
-    const overallScore = (plateBalance.overallScore + rowClusteringScore) / 2;
+    // Calculate overall score based on display configuration
+    const overallScore = displayConfig.showRandomizationScore
+      ? (plateBalance.overallScore + rowClusteringScore) / 2
+      : plateBalance.overallScore;
 
     plateScores.push({
       plateIndex,
       balanceScore: plateBalance.overallScore,
-      // randomizationScore,
       rowClusteringScore,
+      // randomizationScore,
       overallScore,
       covariateGroupBalance: plateBalance.groupDetails
     });
   });
 
   const averageBalanceScore = calculateMean(plateScores.map(score => score.balanceScore));
-  // const averageRandomizationScore = calculateMean(plateScores.map(score => score.randomizationScore));
-  const averageRowClusteringScore = calculateMean(plateScores.map(score => score.rowClusteringScore));
+  const averageRowClusteringScore = displayConfig.showRandomizationScore
+    ? calculateMean(plateScores.map(score => score.rowClusteringScore))
+    : 0;
 
   return {
     averageBalanceScore,
-    // averageRandomizationScore,
     averageRowClusteringScore,
     plateScores
   };
@@ -314,41 +315,39 @@ export const calculatePlateDiversityMetrics = (
  * Calculate overall quality assessment
  */
 export const calculateOverallQuality = (
-  plateDiversity: PlateDiversityMetrics
+  plateDiversity: PlateDiversityMetrics,
+  displayConfig: QualityDisplayConfig = DEFAULT_QUALITY_DISPLAY_CONFIG
 ): OverallQualityAssessment => {
   const recommendations: string[] = [];
 
-  // Check plate balance
-  if (plateDiversity.averageBalanceScore < 70) {
-    recommendations.push(`Low plate balance (${plateDiversity.averageBalanceScore.toFixed(1)}) - plates may not represent overall population well`);
-  }
-
-  // // Check randomization quality
-  // if (plateDiversity.averageRandomizationScore < 70) {
-  //   recommendations.push(`Poor spatial randomization (${plateDiversity.averageRandomizationScore.toFixed(1)}) - similar samples may be clustered together`);
+  // // Check plate balance
+  // if (plateDiversity.averageBalanceScore < 70) {
+  //   recommendations.push(`Low plate balance (${plateDiversity.averageBalanceScore.toFixed(1)}) - plates may not represent overall population well`);
   // }
 
-  // Check row clustering
-  if (plateDiversity.averageRowClusteringScore < 70) {
-    recommendations.push(`High row clustering (${plateDiversity.averageRowClusteringScore.toFixed(1)}) - similar samples are grouped within rows`);
-  }
+  // // Check randomization quality if enabled
+  // if (displayConfig.showRandomizationScore && plateDiversity.averageRowClusteringScore < 70) {
+  //   recommendations.push(`Poor randomization (${plateDiversity.averageRowClusteringScore.toFixed(1)}) - similar samples may be clustered together`);
+  // }
 
   // // Identify problematic plates
-  // const poorPlates = plateDiversity.plateScores.filter(score =>
-  //   score.balanceScore < 60 || score.randomizationScore < 60 || score.rowClusteringScore < 60
-  // );
+  // const poorPlates = plateDiversity.plateScores.filter(score => {
+  //   if (displayConfig.showRandomizationScore) {
+  //     return score.balanceScore < 60 || score.rowClusteringScore < 60;
+  //   } else {
+  //     return score.balanceScore < 60;
+  //   }
+  // });
 
   // if (poorPlates.length > 0) {
   //   const plateNumbers = poorPlates.map(p => p.plateIndex + 1).join(', ');
   //   recommendations.push(`Plates ${plateNumbers} have poor quality scores`);
   // }
 
-  // Calculate overall score (equal weight to balance, randomization, and row clustering)
-  const overallScore = (
-    plateDiversity.averageBalanceScore + 
-    //plateDiversity.averageRandomizationScore + 
-    plateDiversity.averageRowClusteringScore
-  ) / 2;
+  // Calculate overall score based on display configuration
+  const overallScore = displayConfig.showRandomizationScore
+    ? (plateDiversity.averageBalanceScore + plateDiversity.averageRowClusteringScore) / 2
+    : plateDiversity.averageBalanceScore;
 
   // Determine quality level using utility function
   const level = getQualityLevel(overallScore);
@@ -367,16 +366,18 @@ export const calculateQualityMetrics = (
   searches: SearchData[],
   plateAssignments: Map<number, SearchData[]>,
   randomizedPlates: (SearchData | undefined)[][][],
-  selectedCovariates: string[]
+  selectedCovariates: string[],
+  displayConfig: QualityDisplayConfig = DEFAULT_QUALITY_DISPLAY_CONFIG
 ): QualityMetrics => {
   const plateDiversity = calculatePlateDiversityMetrics(
     searches,
     plateAssignments,
     randomizedPlates,
-    selectedCovariates
+    selectedCovariates,
+    displayConfig
   );
 
-  const overallQuality = calculateOverallQuality(plateDiversity);
+  const overallQuality = calculateOverallQuality(plateDiversity, displayConfig);
 
   return {
     plateDiversity,

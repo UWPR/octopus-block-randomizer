@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchData, CovariateColorInfo, PlateQualityScore } from '../types';
+import { SearchData, CovariateColorInfo, PlateQualityScore, QUALITY_DISPLAY_CONFIG } from '../types';
 import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils';
 
 interface PlateDetailsModalProps {
@@ -100,19 +100,21 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                         {getCompactQualityLevel(plateQuality.balanceScore)}
                       </span>
                     </span>
-                    <span>
-                      <strong>Randomization:</strong>{' '}
-                      <span style={{ color: getQualityColor(plateQuality.rowClusteringScore) }}>
-                        {formatScore(plateQuality.rowClusteringScore)}
+                    {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+                      <span>
+                        <strong>Randomization:</strong>{' '}
+                        <span style={{ color: getQualityColor(plateQuality.rowClusteringScore) }}>
+                          {formatScore(plateQuality.rowClusteringScore)}
+                        </span>
+                        {' '}
+                        <span style={{
+                          ...styles.qualityBadge,
+                          backgroundColor: getQualityColor(plateQuality.rowClusteringScore)
+                        }}>
+                          {getCompactQualityLevel(plateQuality.rowClusteringScore)}
+                        </span>
                       </span>
-                      {' '}
-                      <span style={{
-                        ...styles.qualityBadge,
-                        backgroundColor: getQualityColor(plateQuality.rowClusteringScore)
-                      }}>
-                        {getCompactQualityLevel(plateQuality.rowClusteringScore)}
-                      </span>
-                    </span>
+                    )}
                   </>
                 )}
               </div>

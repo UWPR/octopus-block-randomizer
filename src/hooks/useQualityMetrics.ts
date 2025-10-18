@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { SearchData, QualityMetrics } from '../types';
+import { SearchData, QualityMetrics, QUALITY_DISPLAY_CONFIG } from '../types';
 import { calculateQualityMetrics } from '../utils/qualityMetrics';
 
 /**
@@ -39,7 +39,8 @@ export function useQualityMetrics() {
         searches,
         plateAssignments,
         randomizedPlates,
-        selectedCovariates
+        selectedCovariates,
+        QUALITY_DISPLAY_CONFIG
       );
 
       setMetrics(qualityMetrics);

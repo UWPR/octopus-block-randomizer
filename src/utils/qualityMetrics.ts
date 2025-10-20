@@ -256,32 +256,36 @@ const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, n
 
   // Count composition
   keys.forEach(key => {
-    composition.set(key, (composition.get(key) || 0) + 1); // How many members for each key
+    composition.set(key, (composition.get(key) || 0) + 1);
   });
 
-  const expectedRunsByGroup = new Map<string, Map<number, number>>(); // key -> {run length -> expected count}
+  // Thresholds for switching between exact and approximate calculations
+  const EXACT_CALCULATION_THRESHOLD = 24; // Use exact calculation for sequences <= 24 elements
+  const useExactCalculation = n <= EXACT_CALCULATION_THRESHOLD;
+
+  console.log(`Using ${useExactCalculation ? 'exact' : 'approximate'} expected run calculation for sequence length ${n}`);
+
+  const expectedRunsByGroup = new Map<string, Map<number, number>>();
 
   // For each covariate group
   composition.forEach((groupSize, groupKey) => {
     const groupExpectedRuns = new Map<number, number>();
 
     if (groupSize >= 2) { // Only groups with 2+ samples can have runs
-
-      // Probability calculations for this specific group
-        const groupProbability = groupSize / n;
-
       // For each possible run length for this group
       for (let runLength = 2; runLength <= groupSize; runLength++) {
+        let expectedCount: number;
 
-        // Expected number of runs of this length for this group
-        // Simplified model: probability of consecutive placement; treats each position as independent.
-        // To be accurate we should use sampling without replacement. This calculation treats it like
-        // sampling WITH replacement.
-        const consecutiveProbability = Math.pow(groupProbability, runLength);
-        const possibleStartPositions = Math.max(0, n - runLength + 1);
-
-        // Expected runs considering the group's actual size
-        const expectedCount = possibleStartPositions * consecutiveProbability;
+        if (useExactCalculation) {
+          // Exact calculation using hypergeometric distribution
+          expectedCount = calculateExactExpectedRuns(n, groupSize, runLength);
+        } else {
+          // Simplified approximation (sampling with replacement)
+          const groupProbability = groupSize / n;
+          const consecutiveProbability = Math.pow(groupProbability, runLength);
+          const possibleStartPositions = Math.max(0, n - runLength + 1);
+          expectedCount = possibleStartPositions * consecutiveProbability;
+        }
 
         if (expectedCount > 0.01) { // Only include if expectation is meaningful
           groupExpectedRuns.set(runLength, expectedCount);
@@ -293,6 +297,61 @@ const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, n
   });
 
   return expectedRunsByGroup;
+};
+
+/**
+ * Calculate exact expected number of runs using hypergeometric distribution
+ * Considers sampling without replacement for precise probability calculations
+ */
+const calculateExactExpectedRuns = (
+  n: number,
+  groupSize: number,
+  runLength: number
+): number => {
+  if (groupSize < runLength) return 0;
+
+  let expectedRuns = 0;
+
+  // For each possible starting position
+  for (let startPos = 0; startPos <= n - runLength; startPos++) {
+    // Calculate probability that positions [startPos, startPos + runLength - 1]
+    // are all from the target group using hypergeometric distribution
+
+    // Probability of drawing runLength items of the target group consecutively
+    let runProbability = 1;
+    let remainingGroupSize = groupSize;
+    let remainingTotal = n;
+
+    // Calculate probability for each position in the run
+    for (let pos = 0; pos < runLength; pos++) {
+      runProbability *= remainingGroupSize / remainingTotal;
+      remainingGroupSize--;
+      remainingTotal--;
+    }
+
+    // Adjust for boundary conditions (run shouldn't be part of a longer run)
+    // Use sampling without replacement to be consistent with the run probability calculation
+    let boundaryAdjustment = 1;
+
+    // Check if position before run (if exists) should be different
+    if (startPos > 0) {
+      // At this point, no samples have been used yet, so use original composition
+      const otherGroupsSize = n - groupSize;
+      boundaryAdjustment *= otherGroupsSize / n;
+    }
+
+    // Check if position after run (if exists) should be different
+    if (startPos + runLength < n) {
+      // At this point, runLength samples from target group have been used
+      const remainingOtherGroups = n - groupSize;
+      const totalRemaining = remainingTotal; // This is n - runLength
+      boundaryAdjustment *= remainingOtherGroups / totalRemaining;
+    }
+
+    expectedRuns += runProbability * boundaryAdjustment;
+  }
+
+  return expectedRuns;
 };
 
 /**

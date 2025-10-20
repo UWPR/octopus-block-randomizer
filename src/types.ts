@@ -157,5 +157,5 @@ export const DEFAULT_QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
 
 // Global quality display configuration - change this flag to control randomization score visibility
 export const QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRandomizationScore: false  // Set to false to hide randomization scores
+  showRandomizationScore: true  // Set to false to hide randomization scores
 };

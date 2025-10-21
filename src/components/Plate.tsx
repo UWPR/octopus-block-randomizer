@@ -238,7 +238,7 @@ const Plate: React.FC<PlateProps> = ({
                   }}>
                     {getCompactQualityLevel(plateQuality.rowClusteringScore)}
                   </span>
-                  {' '}Rand: {formatScore(plateQuality.rowClusteringScore)}
+                  {' '}Row: {formatScore(plateQuality.rowClusteringScore)}
                 </span>
               )}
             </div>

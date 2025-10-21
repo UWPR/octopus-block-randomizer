@@ -102,7 +102,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                     </span>
                     {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
                       <span>
-                        <strong>Randomization:</strong>{' '}
+                        <strong>Row Score:</strong>{' '}
                         <span style={{ color: getQualityColor(plateQuality.rowClusteringScore) }}>
                           {formatScore(plateQuality.rowClusteringScore)}
                         </span>

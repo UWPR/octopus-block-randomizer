@@ -251,42 +251,27 @@ const calculateRowClusteringScore = (
  * Based on statistical theory of runs in random sequences
  */
 // Export for testing purposes
-export const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, number>> => {
-  const n = keys.length;
-  const composition = new Map<string, number>();
+export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map<number, number>> => {
+  const n = rowKeys.length;
+  const rowComposition = new Map<string, number>();
 
   // Count composition
-  keys.forEach(key => {
-    composition.set(key, (composition.get(key) || 0) + 1);
+  rowKeys.forEach(key => {
+    rowComposition.set(key, (rowComposition.get(key) || 0) + 1);
   });
-
-  // Thresholds for switching between exact and approximate calculations
-  const EXACT_CALCULATION_THRESHOLD = 24; // Use exact calculation for sequences <= 24 elements
-  const useExactCalculation = n <= EXACT_CALCULATION_THRESHOLD;
-
-  console.log(`Using ${useExactCalculation ? 'exact' : 'approximate'} expected run calculation for sequence length ${n}`);
 
   const expectedRunsByGroup = new Map<string, Map<number, number>>();
 
+  const totalArrangements = calculateMultinomialCoefficient(n, Array.from(rowComposition.values()));
+
   // For each covariate group
-  composition.forEach((groupSize, groupKey) => {
+  rowComposition.forEach((groupSize, groupKey) => {
     const groupExpectedRuns = new Map<number, number>();
 
     if (groupSize >= 2) { // Only groups with 2+ samples can have runs
       // For each possible run length for this group
       for (let runLength = 2; runLength <= groupSize; runLength++) {
-        let expectedCount: number;
-
-        if (useExactCalculation) {
-          // Exact calculation using combinatorial gap analysis
-          expectedCount = calculateExactExpectedRunsCombinatorial(n, groupSize, runLength, composition, groupKey);
-        } else {
-          // Simplified approximation (sampling with replacement)
-          const groupProbability = groupSize / n;
-          const consecutiveProbability = Math.pow(groupProbability, runLength);
-          const possibleStartPositions = Math.max(0, n - runLength + 1);
-          expectedCount = possibleStartPositions * consecutiveProbability;
-        }
+        const expectedCount = calculateExactExpectedRunsCombinatorial(n, groupSize, runLength, rowComposition, groupKey, totalArrangements);
 
         if (expectedCount > 0.01) { // Only include if expectation is meaningful
           groupExpectedRuns.set(runLength, expectedCount);
@@ -407,7 +392,8 @@ const calculateExactExpectedRunsCombinatorial = (
   groupSize: number,
   runLength: number,
   composition: Map<string, number>,
-  targetGroup: string
+  targetGroup: string,
+  totalArrangements: number
 ): number => {
   if (groupSize < runLength) return 0;
   if (runLength < 2) return 0;
@@ -471,9 +457,6 @@ const calculateExactExpectedRunsCombinatorial = (
     }
   }
 
-  // Step 6: Calculate total possible arrangements
-  const totalArrangements = calculateMultinomialCoefficient(n, Array.from(composition.values()));
-
   // Return expected number of runs
   return totalExpectedRuns / totalArrangements;
 };
@@ -491,6 +474,13 @@ const calculateMultinomialCoefficient = (n: number, groups: number[]): number =>
 
 /**
  * Calculate ways to distribute items in gaps (stars and bars problem)
+ * 
+ * NOTE: This is an APPROXIMATION. It doesn't exclude distributions where
+ * remaining items form additional runs of the target length.
+ * For example, if checking for runs of length 2, a gap with exactly 2 items
+ * would form another run, but this is counted here.
+ * 
+ * This means expected run counts may be slightly overestimated.
  */
 const calculateWaysToDistributeInGaps = (items: number, gaps: number): number => {
   if (items === 0) return 1; // One way to distribute zero items
@@ -596,26 +586,26 @@ const getRunCountsByGroup = (runs: Array<{ length: number; group: string }>): Ma
   return countsByGroup;
 };
 
-const calculateRowScore = (keys: string[]): number => {
+const calculateRowScore = (rowKeys: string[]): number => {
 
-  if (keys.length <= 3) return 100;
+  if (rowKeys.length <= 3) return 100;
 
   // Track runs with their covariate groups
   const runs: Array<{ length: number; group: string }> = [];
   let currentRun = 1;
-  let currentGroup = keys[0];
+  let currentGroup = rowKeys[0];
 
-  for (let i = 1; i < keys.length; i++) {
-    if (keys[i] !== keys[i - 1]) {
+  for (let i = 1; i < rowKeys.length; i++) {
+    if (rowKeys[i] !== rowKeys[i - 1]) {
       // End of current run
       runs.push({ length: currentRun, group: currentGroup });
       currentRun = 1;
-      currentGroup = keys[i];
+      currentGroup = rowKeys[i];
     } else {
       currentRun++;
     }
 
-    if (i === keys.length - 1) {
+    if (i === rowKeys.length - 1) {
       // End of sequence
       runs.push({ length: currentRun, group: currentGroup });
     }
@@ -626,10 +616,11 @@ const calculateRowScore = (keys: string[]): number => {
 
   if (filteredRuns.length === 0) return 100;
 
-  // Calculate expected runs by group
-  const expectedRunsByGroup = calculateExpectedRunsByGroup(keys);
   const actualRunCountsByGroup = getRunCountsByGroup(filteredRuns);
 
+  // Calculate expected runs by group
+  const expectedRunsByGroup = calculateExpectedRunsByGroup(rowKeys);
+  
   let totalPenalty = 0;
 
   // Compare actual vs expected runs for each group and length

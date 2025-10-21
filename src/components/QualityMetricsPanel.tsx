@@ -87,7 +87,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                   </div>
                   {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
                     <div style={styles.compactScoreItem}>
-                      <span style={styles.compactItemLabel}>Avg Randomization:</span>
+                      <span style={styles.compactItemLabel}>Avg Row Score:</span>
                       <span style={{
                         ...styles.compactItemValue,
                         color: getQualityColor(metrics.plateDiversity.averageRowClusteringScore)
@@ -150,7 +150,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                           </div>
                           {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
                             <div style={styles.scoreItem}>
-                              <span style={styles.scoreLabel}>Randomization:</span>
+                              <span style={styles.scoreLabel}>Row Score:</span>
                               <span style={{
                                 ...styles.scoreValue,
                                 color: getQualityColor(plate.rowClusteringScore)

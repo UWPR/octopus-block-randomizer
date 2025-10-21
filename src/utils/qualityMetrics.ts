@@ -250,7 +250,8 @@ const calculateRowClusteringScore = (
  * Calculate expected number of runs of each length for a given sequence composition
  * Based on statistical theory of runs in random sequences
  */
-const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, number>> => {
+// Export for testing purposes
+export const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, number>> => {
   const n = keys.length;
   const composition = new Map<string, number>();
 
@@ -277,8 +278,8 @@ const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, n
         let expectedCount: number;
 
         if (useExactCalculation) {
-          // Exact calculation using hypergeometric distribution
-          expectedCount = calculateExactExpectedRuns(n, groupSize, runLength);
+          // Exact calculation using combinatorial gap analysis
+          expectedCount = calculateExactExpectedRunsCombinatorial(n, groupSize, runLength, composition, groupKey);
         } else {
           // Simplified approximation (sampling with replacement)
           const groupProbability = groupSize / n;
@@ -300,10 +301,233 @@ const calculateExpectedRunsByGroup = (keys: string[]): Map<string, Map<number, n
 };
 
 /**
- * Calculate exact expected number of runs using hypergeometric distribution
- * Considers sampling without replacement for precise probability calculations
+ * Alternative method: Calculate expected sequences using gap-based combinatorial analysis
+ * This implements the approach you described:
+ * 1. Separate non-target groups and calculate their arrangements
+ * 2. Calculate gaps between non-target slots
+ * 3. Choose which gaps will have runs of given size
+ * 4. Place remaining target members in remaining gaps
  */
-const calculateExactExpectedRuns = (
+export const calculateExpectedSequencesGapMethod = (
+  covariateGroups: Map<string, number>,
+  targetGroup: string,
+  runSize: number,
+  numberOfRuns: number
+): number => {
+  const targetCount = covariateGroups.get(targetGroup) || 0;
+  if (targetCount < runSize) return 0;
+
+  // Step 1: Separate non-target groups
+  const nonTargetGroups = new Map<string, number>();
+  let totalNonTargetCount = 0;
+
+  covariateGroups.forEach((count, group) => {
+    if (group !== targetGroup) {
+      nonTargetGroups.set(group, count);
+      totalNonTargetCount += count;
+    }
+  });
+
+  // Special case: only target group exists
+  if (totalNonTargetCount === 0) {
+    // All positions are target group - check if we can have exactly numberOfRuns runs of given size
+    const totalPositions = targetCount;
+    const maxPossibleRuns = Math.max(0, totalPositions - runSize + 1);
+    return numberOfRuns <= maxPossibleRuns ? 1 : 0;
+  }
+
+  // Step 2: Calculate arrangements of non-target groups
+  // n! / (a1! * a2! * ...)
+  const nonTargetArrangements = calculateMultinomialCoefficient(
+    totalNonTargetCount,
+    Array.from(nonTargetGroups.values())
+  );
+
+  // Step 3: Calculate number of gaps between non-target slots
+  // Non-target elements create (totalNonTargetCount + 1) gaps
+  const totalGaps = totalNonTargetCount + 1;
+
+  // Step 4: Calculate maximum possible runs of the given size
+  const maxPossibleRuns = Math.floor(targetCount / runSize);
+
+  // Validation: numberOfRuns parameter must be <= maxPossibleRuns
+  if (numberOfRuns > maxPossibleRuns) {
+    return 0; // Impossible to have more runs than the maximum possible
+  }
+
+  // Validation: numberOfRuns must be <= totalGaps
+  if (numberOfRuns > totalGaps) {
+    return 0; // Can't place more runs than available gaps
+  }
+
+  // Step 5: Calculate for the specific number of runs (r = numberOfRuns)
+  const r = numberOfRuns;
+
+  // Choose which gaps will have runs of the given size: C(totalGaps, r)
+  const waysToChooseGaps = combination(totalGaps, r);
+
+  // Remaining target members after using r runs of runSize
+  const remainingTargetMembers = targetCount - (r * runSize);
+
+  // Remaining gaps after placing r runs
+  const remainingGaps = totalGaps - r;
+
+  if (remainingTargetMembers < 0 || remainingGaps < 0) {
+    return 0; // Invalid configuration
+  }
+
+  // Step 6: Distribute remaining target members in remaining gaps
+  // They can have any run size except the given run size
+  const waysToDistributeRemaining = calculateWaysToDistributeInGaps(
+    remainingTargetMembers,
+    remainingGaps
+  );
+
+  // Total arrangements with exactly r runs of the specified size
+  const arrangementsWithRRuns = nonTargetArrangements * waysToChooseGaps * waysToDistributeRemaining;
+
+  console.log(`Gap method - r=${r}: chooseGaps=${waysToChooseGaps}, distribute=${waysToDistributeRemaining}, arrangements=${arrangementsWithRRuns}`);
+
+  // Calculate total possible arrangements of all groups
+  const totalArrangements = calculateMultinomialCoefficient(
+    Array.from(covariateGroups.values()).reduce((sum, count) => sum + count, 0),
+    Array.from(covariateGroups.values())
+  );
+
+  // Return probability of having exactly numberOfRuns runs of the given size
+  return arrangementsWithRRuns / totalArrangements;
+};
+
+/**
+ * Calculate exact expected number of runs using combinatorial gap analysis
+ * This is a truly exact calculation based on multinomial arrangements
+ */
+const calculateExactExpectedRunsCombinatorial = (
+  n: number,
+  groupSize: number,
+  runLength: number,
+  composition: Map<string, number>,
+  targetGroup: string
+): number => {
+  if (groupSize < runLength) return 0;
+  if (runLength < 2) return 0;
+
+  // Step 1: Separate target group from non-target groups
+  const nonTargetGroups = new Map<string, number>();
+  let totalNonTargetSize = 0;
+
+  composition.forEach((size, group) => {
+    if (group !== targetGroup) {
+      nonTargetGroups.set(group, size);
+      totalNonTargetSize += size;
+    }
+  });
+
+  if (totalNonTargetSize === 0) {
+    // All samples are from target group - special case
+    // Expected runs = total possible runs of this length
+    return Math.max(0, n - runLength + 1);
+  }
+
+  // Step 2: Calculate total arrangements of non-target groups
+  const nonTargetArrangements = calculateMultinomialCoefficient(totalNonTargetSize, Array.from(nonTargetGroups.values()));
+
+  // Step 3: Calculate number of gaps between non-target slots
+  // Non-target elements create (totalNonTargetSize + 1) gaps where target elements can go
+  const totalGaps = totalNonTargetSize + 1;
+
+  // Step 4: Calculate maximum number of runs of given size we can have
+  const maxRunsOfThisSize = Math.floor(groupSize / runLength);
+
+  let totalExpectedRuns = 0;
+
+  // Step 5: For each possible number of runs of the given size (r = 0, 1, 2, ...)
+  for (let r = 1; r <= maxRunsOfThisSize; r++) {
+    if (r > totalGaps) break; // Can't have more runs than gaps
+
+    // Ways to choose which gaps will have runs of the given size
+    const waysToChooseGaps = combination(totalGaps, r);
+
+    // Remaining target group members after using r runs of runLength
+    const remainingTargetMembers = groupSize - (r * runLength);
+
+    // Remaining gaps after placing r runs
+    const remainingGaps = totalGaps - r;
+
+    if (remainingTargetMembers >= 0 && remainingGaps >= 0) {
+      // Ways to distribute remaining target members in remaining gaps
+      // (they can form runs of any other size, including size 1)
+      const waysToDistributeRemaining = calculateWaysToDistributeInGaps(remainingTargetMembers, remainingGaps);
+
+      // Total arrangements with exactly r runs of the specified length
+      const arrangementsWithRRuns = nonTargetArrangements * waysToChooseGaps * waysToDistributeRemaining;
+
+      // Expected number of runs of this length in this configuration
+      const expectedRunsForThisR = r * arrangementsWithRRuns;
+
+      totalExpectedRuns += expectedRunsForThisR;
+
+      console.log(`  r=${r}: gaps=${waysToChooseGaps}, remaining=${waysToDistributeRemaining}, arrangements=${arrangementsWithRRuns}, expected=${expectedRunsForThisR}`);
+    }
+  }
+
+  // Step 6: Calculate total possible arrangements
+  const totalArrangements = calculateMultinomialCoefficient(n, Array.from(composition.values()));
+
+  // Return expected number of runs
+  return totalExpectedRuns / totalArrangements;
+};
+
+/**
+ * Calculate multinomial coefficient: n! / (k1! * k2! * ... * km!)
+ */
+const calculateMultinomialCoefficient = (n: number, groups: number[]): number => {
+  let result = factorial(n);
+  groups.forEach(groupSize => {
+    result /= factorial(groupSize);
+  });
+  return result;
+};
+
+/**
+ * Calculate ways to distribute items in gaps (stars and bars problem)
+ */
+const calculateWaysToDistributeInGaps = (items: number, gaps: number): number => {
+  if (items === 0) return 1; // One way to distribute zero items
+  if (gaps === 0) return items === 0 ? 1 : 0; // Can only distribute zero items in zero gaps
+
+  // Stars and bars: C(items + gaps - 1, gaps - 1)
+  return combination(items + gaps - 1, gaps - 1);
+};
+
+/**
+ * Calculate factorial with caching for performance
+ */
+const factorialCache = new Map<number, number>();
+const factorial = (n: number): number => {
+  if (n <= 1) return 1;
+  if (factorialCache.has(n)) return factorialCache.get(n)!;
+
+  const result = n * factorial(n - 1);
+  factorialCache.set(n, result);
+  return result;
+};
+
+/**
+ * Calculate combination (n choose k)
+ */
+const combination = (n: number, k: number): number => {
+  if (k > n || k < 0) return 0;
+  if (k === 0 || k === n) return 1;
+
+  return factorial(n) / (factorial(k) * factorial(n - k));
+};
+
+/**
+ * Calculate exact expected number of runs using hypergeometric distribution (APPROXIMATION)
+ * This is the previous method - kept for comparison
+ */
+const calculateExactExpectedRunsHypergeometric = (
   n: number,
   groupSize: number,
   runLength: number

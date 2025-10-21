@@ -218,18 +218,22 @@ const calculatePatternScore = (keys: string[]): number => {
 const calculateRowClusteringScore = (
   plateRows: (SearchData | undefined)[][],
   selectedCovariates: string[]
-): number => {
-  if (plateRows.length === 0) return 0;
+): { averageScore: number; rowScores: number[] } => {
+  if (plateRows.length === 0) return { averageScore: 0, rowScores: [] };
 
   const numRows = plateRows.length;
   let totalScore = 0;
   let analyzedRows = 0;
+  const rowScores: number[] = [];
 
   // Analyze each row
   for (let row = 0; row < numRows; row++) {
     const rowSamples = plateRows[row].filter((sample): sample is SearchData => sample !== undefined);
 
-    if (rowSamples.length <= 2) continue; // Need at least 3 samples for meaningful analysis
+    if (rowSamples.length <= 2) {
+      rowScores.push(100); // Default score for rows with insufficient samples
+      continue;
+    }
 
     const rowKeys = rowSamples.map(sample => getCovariateKey(sample, selectedCovariates));
 
@@ -237,13 +241,15 @@ const calculateRowClusteringScore = (
     const rowScore = calculateRowScore(rowKeys);
     console.log(`Row ${row} keys: ${rowKeys.join(', ')} => Clustering Score: ${rowScore.toFixed(2)}`);
 
+    rowScores.push(rowScore);
     totalScore += rowScore;
     analyzedRows++;
   }
 
-  if (analyzedRows === 0) return 100;
-  console.log(`Average Row Clustering Score: ${(totalScore / analyzedRows).toFixed(2)}`);
-  return totalScore / analyzedRows;
+  if (analyzedRows === 0) return { averageScore: 100, rowScores };
+  const averageScore = totalScore / analyzedRows;
+  console.log(`Average Row Clustering Score: ${averageScore.toFixed(2)}`);
+  return { averageScore, rowScores };
 };
 
 /**
@@ -682,20 +688,20 @@ export const calculatePlateDiversityMetrics = (
 
     // Calculate randomization score (spatial clustering) if enabled
     const plateRows = randomizedPlates[plateIndex] || [];
-    const rowClusteringScore = displayConfig.showRandomizationScore
+    const rowClusteringResult = displayConfig.showRandomizationScore
       ? calculateRowClusteringScore(plateRows, selectedCovariates)
-      : 0;
+      : { averageScore: 0, rowScores: [] };
 
     // Calculate overall score based on display configuration
     const overallScore = displayConfig.showRandomizationScore
-      ? (plateBalance.overallScore + rowClusteringScore) / 2
+      ? (plateBalance.overallScore + rowClusteringResult.averageScore) / 2
       : plateBalance.overallScore;
 
     plateScores.push({
       plateIndex,
       balanceScore: plateBalance.overallScore,
-      rowClusteringScore,
-      // randomizationScore,
+      rowClusteringScore: rowClusteringResult.averageScore,
+      rowScores: rowClusteringResult.rowScores,
       overallScore,
       covariateGroupBalance: plateBalance.groupDetails
     });

@@ -441,6 +441,7 @@ const App: React.FC = () => {
           onClose={handleClosePlateDetails}
           onMouseDown={handleModalMouseDown}
           plateQuality={selectedPlateIndex !== null ? metrics?.plateDiversity.plateScores.find(score => score.plateIndex === selectedPlateIndex) : undefined}
+          randomizedPlates={randomizedPlates}
         />
 
         {/* Quality Assessment Modal */}

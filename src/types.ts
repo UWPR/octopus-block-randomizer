@@ -115,6 +115,7 @@ export interface PlateQualityScore {
   balanceScore: number; // 0-100 (Proportional Accuracy)
   rowClusteringScore: number; // 0-100 (Row Clustering)
   overallScore: number; // 0-100 (Average of both)
+  rowScores?: number[]; // Individual row scores (0-100)
   covariateGroupBalance: {
     [combination: string]: {
       actualCount: number;

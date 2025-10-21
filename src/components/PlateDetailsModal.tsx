@@ -17,6 +17,7 @@ interface PlateDetailsModalProps {
   onClose: () => void;
   onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   plateQuality?: PlateQualityScore;
+  randomizedPlates?: (SearchData | undefined)[][][];
 }
 
 const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
@@ -34,6 +35,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
   onClose,
   onMouseDown,
   plateQuality,
+  randomizedPlates,
 }) => {
 
 
@@ -119,6 +121,59 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                 )}
               </div>
 
+              {/* Row Scores Section */}
+              {QUALITY_DISPLAY_CONFIG.showRandomizationScore && plateQuality?.rowScores && plateQuality.rowScores.length > 0 && (
+                <div style={styles.rowScoresSection}>
+                  <h4 style={styles.sectionTitle}>Individual Row Scores</h4>
+                  <div style={styles.rowScoresContainer}>
+                    {plateQuality.rowScores.map((rowScore, rowIndex) => (
+                      <div key={rowIndex} style={styles.rowScoreItem}>
+                        <div style={styles.rowScoreHeader}>
+                          <span style={styles.rowLabel}>Row {String.fromCharCode(65 + rowIndex)}</span>
+                          <span style={{
+                            ...styles.rowScoreValue,
+                            color: getQualityColor(rowScore)
+                          }}>
+                            {formatScore(rowScore)}
+                          </span>
+                          <span style={{
+                            ...styles.qualityBadge,
+                            backgroundColor: getQualityColor(rowScore)
+                          }}>
+                            {getCompactQualityLevel(rowScore)}
+                          </span>
+                        </div>
+                        {/* Optional: Show row composition */}
+                        {randomizedPlates && randomizedPlates[plateIndex] && randomizedPlates[plateIndex][rowIndex] && (
+                          <div style={styles.rowComposition}>
+                            {randomizedPlates[plateIndex][rowIndex]
+                              .filter(sample => sample !== undefined)
+                              .map((sample, colIndex) => {
+                                const key = getCovariateKey(sample!, selectedCovariates);
+                                const colorInfo = covariateColors[key] || { color: '#cccccc', useOutline: false, useStripes: false };
+                                return (
+                                  <div
+                                    key={colIndex}
+                                    style={{
+                                      ...styles.rowCompositionCell,
+                                      backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
+                                      ...(colorInfo.useStripes && {
+                                        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)`
+                                      }),
+                                      border: colorInfo.useOutline ? `1px solid ${colorInfo.color}` : '1px solid rgba(0,0,0,0.1)',
+                                    }}
+                                    title={key}
+                                  />
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(() => {
                 const plateSamples = plateAssignments.get(plateIndex)!;
                 const groupBalance = plateQuality?.covariateGroupBalance || {};
@@ -139,6 +194,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
 
                 return (
                   <div style={styles.covariateDistribution}>
+                    <h4 style={styles.sectionTitle}>Balance Scores</h4>
                     {Array.from(globalDistribution.entries())
                       .sort((a, b) => {
                         // Sort by: 1) total samples in group (descending), 2) samples in plate (descending), 3) group name (ascending)
@@ -324,6 +380,54 @@ const styles = {
     backgroundColor: '#f8f9fa',
     borderRadius: '4px',
     fontSize: '12px',
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#333',
+    margin: '16px 0 8px 0',
+  },
+  rowScoresSection: {
+    marginBottom: '16px',
+  },
+  rowScoresContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+  },
+  rowScoreItem: {
+    padding: '8px 10px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px',
+    border: '1px solid #e9ecef',
+  },
+  rowScoreHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '4px',
+  },
+  rowLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#333',
+    minWidth: '50px',
+  },
+  rowScoreValue: {
+    fontSize: '12px',
+    fontWeight: '600',
+    flex: 1,
+  },
+  rowComposition: {
+    display: 'flex',
+    gap: '2px',
+    marginTop: '6px',
+  },
+  rowCompositionCell: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '2px',
+    flexShrink: 0,
   },
   balanceScore: {
     fontSize: '11px',

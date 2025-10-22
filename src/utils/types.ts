@@ -34,9 +34,6 @@ export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] =>
 export interface RandomizationOptions {
   algorithm: RandomizationAlgorithm;
   selectedCovariates: string[];
-  // Additional options for future algorithms
-  maxIterations?: number;
-  balanceWeight?: number;
 }
 
 export interface SummaryItem {

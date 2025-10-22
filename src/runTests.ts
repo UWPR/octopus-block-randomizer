@@ -15,7 +15,7 @@ import {
   testGapBasedExpectedSequences,
   testGapMethodComparison,
   validateSimplifiedQualityMetricsInputs
-} from './utils/qualityMetrics.test';
+} from './tests/qualityMetrics.test';
 
 console.log('🧪 Starting Quality Metrics Tests...\n');
 

@@ -1,5 +1,5 @@
-import { SearchData } from '../types';
-import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils';
+import { SearchData } from '../utils/types';
+import { shuffleArray } from '../utils/utils';
 
 // Original greedy algorithm (refactored)
 export function greedyRandomization(

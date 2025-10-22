@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { SearchData } from '../types';
+import { SearchData } from '../utils/types';
 
 export function useFileUpload() {
   const [parsedData, setParsedData] = useState<any[]>([]);

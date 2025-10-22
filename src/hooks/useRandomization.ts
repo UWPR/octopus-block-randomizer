@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { SearchData, RandomizationAlgorithm } from '../types';
-import { randomizeSearches } from '../utils';
+import { SearchData, RandomizationAlgorithm } from '../utils/types';
+import { randomizeSearches } from '../utils/utils';
 
 export function useRandomization() {
   const [isProcessed, setIsProcessed] = useState<boolean>(false);

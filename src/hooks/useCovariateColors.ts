@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { SearchData, SummaryItem, CovariateColorInfo } from '../types';
-import { BRIGHT_COLOR_PALETTE, getCovariateKey } from '../utils';
+import { SearchData, SummaryItem, CovariateColorInfo } from '../utils/types';
+import { BRIGHT_COLOR_PALETTE, getCovariateKey } from '../utils/utils';
 
 export function useCovariateColors() {
   const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});

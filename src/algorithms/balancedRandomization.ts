@@ -1,5 +1,5 @@
-import { SearchData } from '../types';
-import { shuffleArray, getCovariateKey, groupByCovariates, analyzeNeighbors } from '../utils';
+import { SearchData } from '../utils/types';
+import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)

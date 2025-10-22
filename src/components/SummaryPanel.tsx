@@ -1,5 +1,5 @@
 import React from 'react';
-import { SummaryItem } from '../types';
+import { SummaryItem } from '../utils/types';
 
 interface SummaryPanelProps {
   summaryData: SummaryItem[];

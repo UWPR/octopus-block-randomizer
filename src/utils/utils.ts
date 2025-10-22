@@ -1,7 +1,7 @@
 import { SearchData, RandomizationAlgorithm, QualityLevel, QUALITY_LEVEL_CONFIG } from './types';
 import Papa from 'papaparse';
-import { balancedBlockRandomization } from './algorithms/balancedRandomization';
-import { greedyRandomization } from './algorithms/greedyRandomization';
+import { balancedBlockRandomization } from '../algorithms/balancedRandomization';
+import { greedyRandomization } from '../algorithms/greedyRandomization';
 
 // Bright color palette with 24 distinct colors in 4 randomized subgroups
 export const BRIGHT_COLOR_PALETTE = [
@@ -70,79 +70,6 @@ export function groupByCovariates(searches: SearchData[], selectedCovariates: st
   return groups;
 }
 
-// Spatial neighbor utility functions
-export interface NeighborPosition {
-  row: number;
-  col: number;
-}
-
-/**
- * Get all valid 8-connected neighbors of a cell in a plate
- * @param row - Current row position
- * @param col - Current column position
- * @param numRows - Total number of rows in the plate
- * @param numCols - Total number of columns in the plate
- * @returns Array of valid neighbor positions
- */
-export function getNeighborPositions(
-  row: number,
-  col: number,
-  numRows: number,
-  numCols: number
-): NeighborPosition[] {
-  const neighbors: NeighborPosition[] = [];
-
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue; // Skip self
-
-      const newRow = row + dr;
-      const newCol = col + dc;
-
-      if (newRow >= 0 && newRow < numRows && newCol >= 0 && newCol < numCols) {
-        neighbors.push({ row: newRow, col: newCol });
-      }
-    }
-  }
-
-  return neighbors;
-}
-
-/**
- * Get neighbor analysis for spatial quality metrics
- * @param plate - 2D array representing the plate
- * @param row - Current row position  
- * @param col - Current column position
- * @param sampleKey - The covariate key to compare neighbors against
- * @param selectedCovariates - Array of selected covariate names
- * @returns Object with similar and total neighbor counts
- */
-export function analyzeNeighbors<T extends SearchData | undefined>(
-  plate: T[][],
-  row: number,
-  col: number,
-  sampleKey: string,
-  selectedCovariates: string[]
-): { similarNeighbors: number; totalNeighbors: number; differentNeighbors: number } {
-  const neighbors = getNeighborPositions(row, col, plate.length, plate[0]?.length || 0);
-
-  let similarNeighbors = 0;
-  let totalNeighbors = 0;
-
-  for (const neighbor of neighbors) {
-    const neighborSample = plate[neighbor.row][neighbor.col];
-    if (neighborSample) {
-      totalNeighbors++;
-      const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
-      if (sampleKey === neighborKey) {
-        similarNeighbors++;
-      }
-    }
-  }
-
-  const differentNeighbors = totalNeighbors - similarNeighbors;
-  return { similarNeighbors, totalNeighbors, differentNeighbors };
-}
 
 // Main randomization function with algorithm selection
 export function randomizeSearches(
@@ -301,24 +228,6 @@ export const getCompactQualityLevelFromString = (level: QualityLevel): string =>
 };
 
 /**
- * Get full quality level name (capitalized) for a given score
- * @param score - Quality score (0-100)
- * @returns Capitalized quality level name
- */
-export const getFullQualityLevel = (score: number): string => {
-  return getFullQualityLevelFromString(getQualityLevel(score));
-};
-
-/**
- * Get full quality level name from quality level string
- * @param level - Quality level string
- * @returns Capitalized quality level name
- */
-export const getFullQualityLevelFromString = (level: QualityLevel): string => {
-  return QUALITY_LEVEL_CONFIG[level].name;
-};
-
-/**
  * Get all quality levels with their score ranges, badges, and descriptions
  * @returns Array of quality level information sorted by score (best to worst)
  */
@@ -330,12 +239,4 @@ export const getAllQualityLevels = () => {
     description: config.name,
     color: config.color
   }));
-};
-
-/**
- * Get quality levels sorted by score threshold (best to worst)
- * @returns Array of quality level keys sorted by descending lowScore
- */
-export const getQualityLevelsByScore = (): QualityLevel[] => {
-  return QUALITY_LEVELS_BY_SCORE.map(([levelKey]) => levelKey as QualityLevel);
 };

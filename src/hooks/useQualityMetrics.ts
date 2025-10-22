@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { SearchData, QualityMetrics, QUALITY_DISPLAY_CONFIG } from '../types';
+import { SearchData, QualityMetrics, QUALITY_DISPLAY_CONFIG } from '../utils/types';
 import { calculateQualityMetrics } from '../utils/qualityMetrics';
 
 /**

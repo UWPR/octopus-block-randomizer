@@ -1,5 +1,5 @@
 import { useState, DragEvent } from 'react';
-import { SearchData } from '../types';
+import { SearchData } from '../utils/types';
 
 /**
  * Custom hook for managing drag and drop functionality for plate randomization

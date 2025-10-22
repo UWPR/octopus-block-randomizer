@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAllQualityLevels } from '../utils';
+import { getAllQualityLevels } from '../utils/utils';
 
 const QualityLegend: React.FC = () => {
   const qualityLevels = getAllQualityLevels();

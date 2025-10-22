@@ -1,6 +1,6 @@
 import React from 'react';
-import { QualityMetrics, QUALITY_DISPLAY_CONFIG } from '../types';
-import { getQualityColor, getQualityLevelColor, getQualityLevel, getCompactQualityLevel, formatScore } from '../utils';
+import { QualityMetrics, QUALITY_DISPLAY_CONFIG } from '../utils/types';
+import { getQualityColor, getQualityLevelColor, getQualityLevel, getCompactQualityLevel, formatScore } from '../utils/utils';
 
 interface QualityMetricsPanelProps {
   metrics: QualityMetrics | null;

@@ -1,8 +1,9 @@
-import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment, QualityLevel, QualityDisplayConfig, DEFAULT_QUALITY_DISPLAY_CONFIG } from '../types';
-import { getCovariateKey, groupByCovariates, getQualityLevel, getNeighborPositions } from '../utils';
+import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment,
+   QualityDisplayConfig, DEFAULT_QUALITY_DISPLAY_CONFIG } from '../utils/types';
+import { getCovariateKey, groupByCovariates, getQualityLevel } from '../utils/utils';
 
 /**
- * Simplified Quality Metrics Calculator
+ * Quality Metrics Calculator
  *
  * Focuses on two key aspects of plate randomization quality:
  * 1. Plate Balance Score (Proportional Accuracy)
@@ -104,53 +105,6 @@ const calculatePlateBalance = (
   }
 
   return { overallScore, groupDetails };
-};
-
-
-/**
- * Calculate spatial clustering score for randomization quality
- * Measures whether similar samples are clustered together spatially
- */
-const calculateSpatialClusteringScore = (
-  plateRows: (SearchData | undefined)[][],
-  selectedCovariates: string[]
-): number => {
-  if (plateRows.length === 0) return 0;
-
-  const numRows = plateRows.length;
-  const numCols = plateRows[0]?.length || 0;
-
-  let totalComparisons = 0;
-  let differentNeighbors = 0;
-
-
-  // Check each sample against its neighbors
-  for (let row = 0; row < numRows; row++) {
-    for (let col = 0; col < numCols; col++) {
-      const currentSample = plateRows[row][col];
-      if (!currentSample) continue;
-
-      const currentKey = getCovariateKey(currentSample, selectedCovariates);
-      const neighbors = getNeighborPositions(row, col, numRows, numCols);
-
-      for (const neighbor of neighbors) {
-        const neighborSample = plateRows[neighbor.row][neighbor.col];
-        if (!neighborSample) continue;
-
-        const neighborKey = getCovariateKey(neighborSample, selectedCovariates);
-        totalComparisons++;
-
-        if (currentKey !== neighborKey) {
-          differentNeighbors++;
-        }
-      }
-    }
-  }
-
-  if (totalComparisons === 0) return 100; // No neighbors to compare
-
-  // Higher percentage of different neighbors = better randomization
-  return (differentNeighbors / totalComparisons) * 100;
 };
 
 

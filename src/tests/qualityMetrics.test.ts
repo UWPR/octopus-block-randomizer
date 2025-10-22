@@ -1,5 +1,5 @@
-import { SearchData } from '../types';
-import { calculateQualityMetrics, calculateExpectedRunsByGroup, calculateExpectedSequencesGapMethod } from './qualityMetrics';
+import { SearchData } from '../utils/types';
+import { calculateQualityMetrics, calculateExpectedRunsByGroup, calculateExpectedSequencesGapMethod } from '../utils/qualityMetrics';
 
 // Simple test to verify simplified quality metrics calculation
 const createTestData = (): {

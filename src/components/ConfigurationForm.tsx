@@ -1,5 +1,5 @@
 import React from 'react';
-import { RandomizationAlgorithm, getAlgorithmName, getAlgorithmDescription, getAlgorithmsInDisplayOrder } from '../types';
+import { RandomizationAlgorithm, getAlgorithmName, getAlgorithmDescription, getAlgorithmsInDisplayOrder } from '../utils/types';
 
 interface ConfigurationFormProps {
   availableColumns: string[];

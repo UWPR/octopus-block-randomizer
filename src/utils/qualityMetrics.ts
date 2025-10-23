@@ -175,7 +175,7 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
     if (groupSize >= 2) { // Only groups with 2+ samples can have runs
       // For each possible run length for this group
       for (let runLength = 2; runLength <= groupSize; runLength++) {
-        const expectedCount = calculateExpectedRunsCombinatorial(rowComposition, groupKey, runLength, totalArrangements);
+        const expectedCount = calculateExpectedRuns(rowComposition, groupKey, runLength, totalArrangements);
 
         if (expectedCount > 0.01) { // Only include if expectation is meaningful
           groupExpectedRuns.set(runLength, expectedCount);
@@ -199,7 +199,7 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
  * 
  * Exported for testing
  */
-export const calculateExpectedRunsCombinatorial = (
+export const calculateExpectedRuns = (
   composition: Map<string, number>,
   targetGroup: string,
   runLength: number,
@@ -280,7 +280,7 @@ export const calculateExpectedRunsCombinatorial = (
 /**
  * Calculate multinomial coefficient: n! / (k1! * k2! * ... * km!)
  */
-const calculateMultinomialCoefficient = (n: number, groups: number[]): number => {
+export const calculateMultinomialCoefficient = (n: number, groups: number[]): number => {
   let result = factorial(n);
   groups.forEach(groupSize => {
     result /= factorial(groupSize);

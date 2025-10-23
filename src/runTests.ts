@@ -17,7 +17,7 @@ import {
   validateSimplifiedQualityMetricsInputs
 } from './tests/qualityMetrics.test';
 
-console.log('🧪 Starting Quality Metrics Tests...\n');
+console.log('Starting Quality Metrics Tests...\n');
 
 try {
   // Run all tests

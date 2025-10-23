@@ -1,5 +1,6 @@
 import React from 'react';
-import { SearchData, CovariateColorInfo, PlateQualityScore, QUALITY_DISPLAY_CONFIG } from '../utils/types';
+import { SearchData, CovariateColorInfo, PlateQualityScore } from '../utils/types';
+import { QUALITY_DISPLAY_CONFIG } from '../utils/configs';
 import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
 
 interface PlateDetailsModalProps {

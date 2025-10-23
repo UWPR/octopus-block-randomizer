@@ -1,19 +1,9 @@
+import { ALGORITHM_CONFIG, QUALITY_LEVEL_CONFIG, QualityLevel } from './configs';
+
 export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
 }
-
-// Algorithm configuration with descriptions
-export const ALGORITHM_CONFIG = {
-  balanced: {
-    name: 'Balanced Block Randomization',
-    description: 'Proportional distribution across plates and within plate rows'
-  },
-  greedy: {
-    name: 'Greedy Randomization',
-    description: 'Greedy Randomization'
-  }
-} as const;
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;
 
@@ -60,46 +50,6 @@ export interface QualityLevelConfig {
   highScore: number;
 }
 
-export const QUALITY_LEVEL_CONFIG = {
-  excellent: {
-    name: 'Excellent',
-    shortLabel: 'E',
-    color: '#4caf50',      // Green
-    lowScore: 90,
-    highScore: 100
-  },
-  good: {
-    name: 'Good',
-    shortLabel: 'G',
-    color: '#9ACD32',      // Greenish Yellow
-    lowScore: 80,
-    highScore: 89
-  },
-  fair: {
-    name: 'Fair',
-    shortLabel: 'F',
-    color: '#ff9800',      // Orange
-    lowScore: 70,
-    highScore: 79
-  },
-  poor: {
-    name: 'Poor',
-    shortLabel: 'P',
-    color: '#D2691E', // Chocolate
-    lowScore: 60,
-    highScore: 69
-  },
-  bad: {
-    name: 'Bad',
-    shortLabel: 'B',
-    color: '#f44336',      // Red
-    lowScore: 0,
-    highScore: 59
-  }
-} as const;
-
-export type QualityLevel = keyof typeof QUALITY_LEVEL_CONFIG;
-
 // Utility functions for quality levels
 export const getQualityLevelConfig = (level: QualityLevel): QualityLevelConfig =>
   QUALITY_LEVEL_CONFIG[level];
@@ -142,17 +92,3 @@ export interface QualityMetrics {
   overallQuality: OverallQualityAssessment;
 }
 
-// Quality display configuration
-export interface QualityDisplayConfig {
-  showRandomizationScore: boolean;
-}
-
-// Default quality display configuration
-export const DEFAULT_QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRandomizationScore: true
-};
-
-// Global quality display configuration - change this flag to control randomization score visibility
-export const QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRandomizationScore: true  // Set to false to hide randomization scores
-};

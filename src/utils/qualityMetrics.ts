@@ -1,5 +1,5 @@
-import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment,
-   QualityDisplayConfig, DEFAULT_QUALITY_DISPLAY_CONFIG } from '../utils/types';
+import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../utils/types';
+   import { DEFAULT_QUALITY_DISPLAY_CONFIG, QualityDisplayConfig } from '../utils/configs';
 import { getCovariateKey, groupByCovariates, getQualityLevel } from '../utils/utils';
 
 /**

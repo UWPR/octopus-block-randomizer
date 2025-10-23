@@ -1,44 +1,8 @@
-import { SearchData, RandomizationAlgorithm, QualityLevel, QUALITY_LEVEL_CONFIG } from './types';
+import { SearchData, RandomizationAlgorithm } from './types';
+import { QualityLevel, QUALITY_LEVEL_CONFIG } from './configs';
 import Papa from 'papaparse';
 import { balancedBlockRandomization } from '../algorithms/balancedRandomization';
 import { greedyRandomization } from '../algorithms/greedyRandomization';
-
-// Bright color palette with 24 distinct colors in 4 randomized subgroups
-export const BRIGHT_COLOR_PALETTE = [
-  // Subgroup 1
-  '#FF0000', // Pure Red
-  '#0000FF', // Pure Blue
-  '#32CD32', // Lime Green
-  '#FF8000', // Pure Orange
-  '#FFFF00', // Pure Yellow
-  '#FF00FF', // Magenta
-
-  // Subgroup 2
-  '#87CEEB', // Sky Blue
-  '#800080', // Purple
-  '#FF1493', // Deep Pink
-  '#006400', // Dark Forest Green
-  '#4169E1', // Royal Blue
-  '#20B2AA', // Light Sea Green
-
-
-  // Subgroup 3
-  '#F08080', // Light Coral
-  '#40E0D0', // Turquoise
-  '#D2691E', // Chocolate
-  '#9370DB', // Medium Purple
-  '#98FB98', // Pale Green
-  '#C0C0C0', // Silver
-
-
-  // Subgroup 4
-  '#FF4500', // Orange Red
-  '#8000FF', // Pure Purple
-  '#BA55D3', // Medium Orchid
-  '#B8860B', // Dark Gold
-  '#008B8B', // Dark Cyan
-  '#FF69B4', // Hot Pink
-];
 
 // Utility functions
 export function shuffleArray<T>(array: T[]): T[] {

@@ -175,7 +175,7 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
     if (groupSize >= 2) { // Only groups with 2+ samples can have runs
       // For each possible run length for this group
       for (let runLength = 2; runLength <= groupSize; runLength++) {
-        const expectedCount = calculateExpectedRunsCombinatorial(n, groupSize, runLength, rowComposition, groupKey, totalArrangements);
+        const expectedCount = calculateExpectedRunsCombinatorial(rowComposition, groupKey, runLength, totalArrangements);
 
         if (expectedCount > 0.01) { // Only include if expectation is meaningful
           groupExpectedRuns.set(runLength, expectedCount);
@@ -200,13 +200,16 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
  * Exported for testing
  */
 export const calculateExpectedRunsCombinatorial = (
-  n: number,
-  groupSize: number,
-  runLength: number,
   composition: Map<string, number>,
   targetGroup: string,
+  runLength: number,
   totalArrangements: number
 ): number => {
+  // Calculate n (total sequence length) 
+  const n = Array.from(composition.values()).reduce((sum, count) => sum + count, 0);
+  // Get the target group size
+  const groupSize = composition.get(targetGroup) || 0;
+  
   if (groupSize < runLength) return 0;
   if (runLength < 2) return 0;
 

@@ -103,7 +103,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                         {getCompactQualityLevel(plateQuality.balanceScore)}
                       </span>
                     </span>
-                    {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+                    {QUALITY_DISPLAY_CONFIG.showRowScore && (
                       <span>
                         <strong>Row Score:</strong>{' '}
                         <span style={{ color: getQualityColor(plateQuality.rowClusteringScore) }}>
@@ -123,7 +123,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
               </div>
 
               {/* Row Scores Section */}
-              {QUALITY_DISPLAY_CONFIG.showRandomizationScore && plateQuality?.rowScores && plateQuality.rowScores.length > 0 && (
+              {QUALITY_DISPLAY_CONFIG.showRowScore && plateQuality?.rowScores && plateQuality.rowScores.length > 0 && (
                 <div style={styles.rowScoresSection}>
                   <h4 style={styles.sectionTitle}>Individual Row Scores</h4>
                   <div style={styles.rowScoresContainer}>

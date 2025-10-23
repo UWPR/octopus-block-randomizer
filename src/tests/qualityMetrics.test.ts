@@ -1,5 +1,5 @@
 import { SearchData } from '../utils/types';
-import { calculateQualityMetrics, calculateExpectedRunsByGroup, calculateExpectedSequencesGapMethod } from '../utils/qualityMetrics';
+import { calculateQualityMetrics, calculateExpectedRunsByGroup, calculateExpectedRunsCombinatorial } from '../utils/qualityMetrics';
 
 // Simple test to verify simplified quality metrics calculation
 const createTestData = (): {
@@ -34,7 +34,7 @@ const createTestData = (): {
 };
 
 // Test function (for manual verification)
-export const testSimplifiedQualityMetrics = () => {
+export const testQualityMetrics = () => {
   const { searches, plateAssignments, randomizedPlates } = createTestData();
   const selectedCovariates = ['gender', 'age'];
 
@@ -55,13 +55,13 @@ export const testSimplifiedQualityMetrics = () => {
 
     return metrics;
   } catch (error) {
-    console.error('Simplified quality metrics test failed:', error);
+    console.error('Quality metrics test failed:', error);
     return null;
   }
 };
 
 // Validation function to check inputs
-export const validateSimplifiedQualityMetricsInputs = (
+export const validateQualityMetricsInputs = (
   searches: SearchData[],
   plateAssignments: Map<number, SearchData[]>,
   randomizedPlates: (SearchData | undefined)[][][],
@@ -398,6 +398,7 @@ export const testGapBasedExpectedSequences = () => {
       name: 'Simple binary case (3R, 3B) - 1 run',
       groups: new Map([['R', 3], ['B', 3]]),
       targetGroup: 'R',
+      groupSize: 3,
       runSize: 2,
       numberOfRuns: 1,
       description: 'Equal groups, target 1 run of size 2'
@@ -406,6 +407,7 @@ export const testGapBasedExpectedSequences = () => {
       name: 'Simple binary case (4R, 2B) - 2 runs',
       groups: new Map([['R', 4], ['B', 2]]),
       targetGroup: 'R',
+      groupSize: 4,
       runSize: 2,
       numberOfRuns: 2,
       description: 'Unbalanced groups, target 2 runs of size 2'
@@ -414,6 +416,7 @@ export const testGapBasedExpectedSequences = () => {
       name: 'Three groups (2R, 2G, 2B) - 1 run',
       groups: new Map([['R', 2], ['G', 2], ['B', 2]]),
       targetGroup: 'R',
+      groupSize: 2,
       runSize: 2,
       numberOfRuns: 1,
       description: 'Three equal groups, target 1 run of size 2'
@@ -422,6 +425,7 @@ export const testGapBasedExpectedSequences = () => {
       name: 'Only target group (6R) - 2 runs',
       groups: new Map([['R', 6]]),
       targetGroup: 'R',
+      groupSize: 6,
       runSize: 3,
       numberOfRuns: 2,
       description: 'Only target group exists, 2 runs of size 3'
@@ -430,6 +434,7 @@ export const testGapBasedExpectedSequences = () => {
       name: 'Impossible - too many runs (5R, 3B)',
       groups: new Map([['R', 5], ['B', 3]]),
       targetGroup: 'R',
+      groupSize: 5,
       runSize: 2,
       numberOfRuns: 5,
       description: 'More runs requested than gaps available'
@@ -438,6 +443,7 @@ export const testGapBasedExpectedSequences = () => {
       name: 'Impossible - run size too large (2R, 4B)',
       groups: new Map([['R', 2], ['B', 4]]),
       targetGroup: 'R',
+      groupSize: 2,
       runSize: 3,
       numberOfRuns: 1,
       description: 'Run size larger than target group size'
@@ -451,7 +457,11 @@ export const testGapBasedExpectedSequences = () => {
     console.log(`Target: ${testCase.targetGroup}, Run size: ${testCase.runSize}, Number of runs: ${testCase.numberOfRuns}`);
 
     try {
-      const result = calculateExpectedSequencesGapMethod(testCase.groups, testCase.targetGroup, testCase.runSize, testCase.numberOfRuns);
+      const totalArrangements = 100;
+      const totalLength = Array.from(testCase.groups.values()).reduce((sum, count) => sum + count, 0);
+      const result = calculateExpectedRunsCombinatorial(totalLength, testCase.groupSize, testCase.runSize, testCase.groups, 
+        testCase.targetGroup, totalArrangements);
+      // const result = calculateExactExpectedRunsCombinatorial(testCase.groups, testCase.targetGroup, testCase.runSize, testCase.numberOfRuns);
 
       const targetCount = testCase.groups.get(testCase.targetGroup) || 0;
       const totalCount = Array.from(testCase.groups.values()).reduce((sum, count) => sum + count, 0);
@@ -523,12 +533,14 @@ export const testGapMethodComparison = () => {
       name: 'Simple case for comparison',
       keys: ['R', 'R', 'R', 'B', 'B', 'B'],
       targetGroup: 'R',
+      groupSize: 3,
       runSize: 2
     },
     {
       name: 'Unbalanced case',
       keys: ['R', 'R', 'R', 'R', 'B', 'B'],
       targetGroup: 'R',
+      groupSize: 4,
       runSize: 2
     }
   ];
@@ -553,7 +565,9 @@ export const testGapMethodComparison = () => {
       console.log(`Existing method result for ${testCase.targetGroup} runs of size ${testCase.runSize}: ${existingExpected.toFixed(6)}`);
 
       // Test gap method
-      const gapResult = calculateExpectedSequencesGapMethod(composition, testCase.targetGroup, testCase.runSize, 1);
+      const totalArrangements = 100;
+      const gapResult = calculateExpectedRunsCombinatorial(testCase.keys.length, testCase.groupSize, testCase.runSize, composition, 
+        testCase.targetGroup, totalArrangements);
       console.log(`Gap method result: ${gapResult.toFixed(6)}`);
 
       // Compare results
@@ -572,7 +586,7 @@ export const testGapMethodComparison = () => {
 };
 
 // Uncomment to run tests
-testSimplifiedQualityMetrics();
+testQualityMetrics();
 testExpectedRunsByGroup();
 testExpectedRunsEdgeCases();
 testExpectedRunsProperties();

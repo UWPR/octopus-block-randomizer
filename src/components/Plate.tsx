@@ -226,7 +226,7 @@ const Plate: React.FC<PlateProps> = ({
                 </span>
                 {' '}Bal: {formatScore(plateQuality.balanceScore)}
               </span>
-              {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+              {QUALITY_DISPLAY_CONFIG.showRowScore && (
                 <span
                   style={{
                     ...currentStyles.qualityScore,

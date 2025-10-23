@@ -6,7 +6,7 @@
  */
 
 import {
-  testSimplifiedQualityMetrics,
+  testQualityMetrics,
   testExpectedRunsByGroup,
   testExpectedRunsEdgeCases,
   testExpectedRunsProperties,
@@ -14,7 +14,7 @@ import {
   testExpectedRunsMathematicalCorrectness,
   testGapBasedExpectedSequences,
   testGapMethodComparison,
-  validateSimplifiedQualityMetricsInputs
+  validateQualityMetricsInputs
 } from './tests/qualityMetrics.test';
 
 console.log('Starting Quality Metrics Tests...\n');
@@ -22,7 +22,7 @@ console.log('Starting Quality Metrics Tests...\n');
 try {
   // Run all tests
   console.log('=' .repeat(60));
-  testSimplifiedQualityMetrics();
+  testQualityMetrics();
 
   console.log('=' .repeat(60));
   testExpectedRunsByGroup();

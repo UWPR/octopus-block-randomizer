@@ -15,7 +15,7 @@ const calculateMean = (values: number[]): number =>
   values.reduce((sum, val) => sum + val, 0) / values.length;
 
 /**
- * Calculate comprehensive plate balance metrics
+ * Calculate plate balance metrics
  * Returns both overall weighted balance score and detailed breakdown for each covariate group
  */
 const calculatePlateBalance = (
@@ -109,65 +109,9 @@ const calculatePlateBalance = (
 
 
 /**
- * Calculate autocorrelation score for pattern detection
- * Detects regular repeating patterns (e.g., ABCABC or ABABAB)
- * Returns 0-100, where 100 = no detectable pattern (good randomness)
- */
-const calculateAutocorrelationScore = (keys: string[]): number => {
-  if (keys.length <= 3) return 100;
-
-  // Check for patterns at different lags (period lengths)
-  const maxLag = Math.min(Math.floor(keys.length / 2), 6); // Check patterns up to length 6
-  let maxCorrelation = 0;
-
-  for (let lag = 1; lag <= maxLag; lag++) {
-    let matches = 0;
-    let comparisons = 0;
-
-    // Count how many positions match at this lag distance
-    for (let i = 0; i < keys.length - lag; i++) {
-      comparisons++;
-      if (keys[i] === keys[i + lag]) {
-        matches++;
-      }
-    }
-
-    const correlation = matches / comparisons;
-    maxCorrelation = Math.max(maxCorrelation, correlation);
-  }
-
-  // Expected correlation for random distribution (based on number of unique groups)
-  const uniqueGroups = new Set(keys).size;
-  const expectedCorrelation = 1 / uniqueGroups;
-
-  // Calculate excess correlation beyond what's expected by chance
-  const excessCorrelation = Math.max(0, maxCorrelation - expectedCorrelation);
-
-  // Convert to score (0-100)
-  // If excess correlation is 0, score is 100 (perfect)
-  // If excess correlation is high, score is low (pattern detected)
-  const score = 100 - (excessCorrelation * 150); // Scale factor to make penalties meaningful
-
-  return Math.max(0, Math.min(100, score));
-};
-
-/**
- * Combined pattern score using both Run Test and Autocorrelation
- * For short sequences (≤12), weights Run Test more heavily
- * For longer sequences, uses equal weighting
- */
-const calculatePatternScore = (keys: string[]): number => {
-  if (keys.length <= 3) return 100;
-
-  const autocorrScore = calculateAutocorrelationScore(keys);
-
-  return autocorrScore
-};
-
-/**
  * Calculate row clustering score
- * Measures both clustering (runs of same group) and regular patterns (predictable alternation)
- * Higher score = better distribution (random-looking, neither clustered nor patterned)
+ * Measures clustering (runs of same group) 
+ * Higher score = better distribution (less clustering)
  */
 const calculateRowClusteringScore = (
   plateRows: (SearchData | undefined)[][],
@@ -208,7 +152,6 @@ const calculateRowClusteringScore = (
 
 /**
  * Calculate expected number of runs of each length for a given sequence composition
- * Based on statistical theory of runs in random sequences
  */
 // Export for testing purposes
 export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map<number, number>> => {
@@ -220,9 +163,10 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
     rowComposition.set(key, (rowComposition.get(key) || 0) + 1);
   });
 
-  const expectedRunsByGroup = new Map<string, Map<number, number>>();
-
+  // Calculate total possible arrangements
   const totalArrangements = calculateMultinomialCoefficient(n, Array.from(rowComposition.values()));
+
+  const expectedRunsByGroup = new Map<string, Map<number, number>>();
 
   // For each covariate group
   rowComposition.forEach((groupSize, groupKey) => {
@@ -231,7 +175,7 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
     if (groupSize >= 2) { // Only groups with 2+ samples can have runs
       // For each possible run length for this group
       for (let runLength = 2; runLength <= groupSize; runLength++) {
-        const expectedCount = calculateExactExpectedRunsCombinatorial(n, groupSize, runLength, rowComposition, groupKey, totalArrangements);
+        const expectedCount = calculateExpectedRunsCombinatorial(n, groupSize, runLength, rowComposition, groupKey, totalArrangements);
 
         if (expectedCount > 0.01) { // Only include if expectation is meaningful
           groupExpectedRuns.set(runLength, expectedCount);
@@ -245,109 +189,17 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
   return expectedRunsByGroup;
 };
 
+
 /**
- * Alternative method: Calculate expected sequences using gap-based combinatorial analysis
- * This implements the approach you described:
+ * Calculate the expected number of runs using combinatorial gap analysis
  * 1. Separate non-target groups and calculate their arrangements
  * 2. Calculate gaps between non-target slots
  * 3. Choose which gaps will have runs of given size
  * 4. Place remaining target members in remaining gaps
+ * 
+ * Exported for testing
  */
-export const calculateExpectedSequencesGapMethod = (
-  covariateGroups: Map<string, number>,
-  targetGroup: string,
-  runSize: number,
-  numberOfRuns: number
-): number => {
-  const targetCount = covariateGroups.get(targetGroup) || 0;
-  if (targetCount < runSize) return 0;
-
-  // Step 1: Separate non-target groups
-  const nonTargetGroups = new Map<string, number>();
-  let totalNonTargetCount = 0;
-
-  covariateGroups.forEach((count, group) => {
-    if (group !== targetGroup) {
-      nonTargetGroups.set(group, count);
-      totalNonTargetCount += count;
-    }
-  });
-
-  // Special case: only target group exists
-  if (totalNonTargetCount === 0) {
-    // All positions are target group - check if we can have exactly numberOfRuns runs of given size
-    const totalPositions = targetCount;
-    const maxPossibleRuns = Math.max(0, totalPositions - runSize + 1);
-    return numberOfRuns <= maxPossibleRuns ? 1 : 0;
-  }
-
-  // Step 2: Calculate arrangements of non-target groups
-  // n! / (a1! * a2! * ...)
-  const nonTargetArrangements = calculateMultinomialCoefficient(
-    totalNonTargetCount,
-    Array.from(nonTargetGroups.values())
-  );
-
-  // Step 3: Calculate number of gaps between non-target slots
-  // Non-target elements create (totalNonTargetCount + 1) gaps
-  const totalGaps = totalNonTargetCount + 1;
-
-  // Step 4: Calculate maximum possible runs of the given size
-  const maxPossibleRuns = Math.floor(targetCount / runSize);
-
-  // Validation: numberOfRuns parameter must be <= maxPossibleRuns
-  if (numberOfRuns > maxPossibleRuns) {
-    return 0; // Impossible to have more runs than the maximum possible
-  }
-
-  // Validation: numberOfRuns must be <= totalGaps
-  if (numberOfRuns > totalGaps) {
-    return 0; // Can't place more runs than available gaps
-  }
-
-  // Step 5: Calculate for the specific number of runs (r = numberOfRuns)
-  const r = numberOfRuns;
-
-  // Choose which gaps will have runs of the given size: C(totalGaps, r)
-  const waysToChooseGaps = combination(totalGaps, r);
-
-  // Remaining target members after using r runs of runSize
-  const remainingTargetMembers = targetCount - (r * runSize);
-
-  // Remaining gaps after placing r runs
-  const remainingGaps = totalGaps - r;
-
-  if (remainingTargetMembers < 0 || remainingGaps < 0) {
-    return 0; // Invalid configuration
-  }
-
-  // Step 6: Distribute remaining target members in remaining gaps
-  // They can have any run size except the given run size
-  const waysToDistributeRemaining = calculateWaysToDistributeInGaps(
-    remainingTargetMembers,
-    remainingGaps
-  );
-
-  // Total arrangements with exactly r runs of the specified size
-  const arrangementsWithRRuns = nonTargetArrangements * waysToChooseGaps * waysToDistributeRemaining;
-
-  console.log(`Gap method - r=${r}: chooseGaps=${waysToChooseGaps}, distribute=${waysToDistributeRemaining}, arrangements=${arrangementsWithRRuns}`);
-
-  // Calculate total possible arrangements of all groups
-  const totalArrangements = calculateMultinomialCoefficient(
-    Array.from(covariateGroups.values()).reduce((sum, count) => sum + count, 0),
-    Array.from(covariateGroups.values())
-  );
-
-  // Return probability of having exactly numberOfRuns runs of the given size
-  return arrangementsWithRRuns / totalArrangements;
-};
-
-/**
- * Calculate exact expected number of runs using combinatorial gap analysis
- * This is a truly exact calculation based on multinomial arrangements
- */
-const calculateExactExpectedRunsCombinatorial = (
+export const calculateExpectedRunsCombinatorial = (
   n: number,
   groupSize: number,
   runLength: number,
@@ -376,6 +228,7 @@ const calculateExactExpectedRunsCombinatorial = (
   }
 
   // Step 2: Calculate total arrangements of non-target groups
+  // n! / (a1! * a2! * ...)
   const nonTargetArrangements = calculateMultinomialCoefficient(totalNonTargetSize, Array.from(nonTargetGroups.values()));
 
   // Step 3: Calculate number of gaps between non-target slots
@@ -387,7 +240,7 @@ const calculateExactExpectedRunsCombinatorial = (
 
   let totalExpectedRuns = 0;
 
-  // Step 5: For each possible number of runs of the given size (r = 0, 1, 2, ...)
+  // Step 5: For each possible number of runs (r = 1, 2,...) of the given size
   for (let r = 1; r <= maxRunsOfThisSize; r++) {
     if (r > totalGaps) break; // Can't have more runs than gaps
 
@@ -473,60 +326,6 @@ const combination = (n: number, k: number): number => {
   return factorial(n) / (factorial(k) * factorial(n - k));
 };
 
-/**
- * Calculate exact expected number of runs using hypergeometric distribution (APPROXIMATION)
- * This is the previous method - kept for comparison
- */
-const calculateExactExpectedRunsHypergeometric = (
-  n: number,
-  groupSize: number,
-  runLength: number
-): number => {
-  if (groupSize < runLength) return 0;
-
-  let expectedRuns = 0;
-
-  // For each possible starting position
-  for (let startPos = 0; startPos <= n - runLength; startPos++) {
-    // Calculate probability that positions [startPos, startPos + runLength - 1]
-    // are all from the target group using hypergeometric distribution
-
-    // Probability of drawing runLength items of the target group consecutively
-    let runProbability = 1;
-    let remainingGroupSize = groupSize;
-    let remainingTotal = n;
-
-    // Calculate probability for each position in the run
-    for (let pos = 0; pos < runLength; pos++) {
-      runProbability *= remainingGroupSize / remainingTotal;
-      remainingGroupSize--;
-      remainingTotal--;
-    }
-
-    // Adjust for boundary conditions (run shouldn't be part of a longer run)
-    // Use sampling without replacement to be consistent with the run probability calculation
-    let boundaryAdjustment = 1;
-
-    // Check if position before run (if exists) should be different
-    if (startPos > 0) {
-      // At this point, no samples have been used yet, so use original composition
-      const otherGroupsSize = n - groupSize;
-      boundaryAdjustment *= otherGroupsSize / n;
-    }
-
-    // Check if position after run (if exists) should be different
-    if (startPos + runLength < n) {
-      // At this point, runLength samples from target group have been used
-      const remainingOtherGroups = n - groupSize;
-      const totalRemaining = remainingTotal; // This is n - runLength
-      boundaryAdjustment *= remainingOtherGroups / totalRemaining;
-    }
-
-    expectedRuns += runProbability * boundaryAdjustment;
-  }
-
-  return expectedRuns;
-};
 
 /**
  * Count actual runs by group and length
@@ -642,12 +441,12 @@ export const calculatePlateDiversityMetrics = (
 
     // Calculate randomization score (spatial clustering) if enabled
     const plateRows = randomizedPlates[plateIndex] || [];
-    const rowClusteringResult = displayConfig.showRandomizationScore
+    const rowClusteringResult = displayConfig.showRowScore
       ? calculateRowClusteringScore(plateRows, selectedCovariates)
       : { averageScore: 0, rowScores: [] };
 
     // Calculate overall score based on display configuration
-    const overallScore = displayConfig.showRandomizationScore
+    const overallScore = displayConfig.showRowScore
       ? (plateBalance.overallScore + rowClusteringResult.averageScore) / 2
       : plateBalance.overallScore;
 
@@ -662,7 +461,7 @@ export const calculatePlateDiversityMetrics = (
   });
 
   const averageBalanceScore = calculateMean(plateScores.map(score => score.balanceScore));
-  const averageRowClusteringScore = displayConfig.showRandomizationScore
+  const averageRowClusteringScore = displayConfig.showRowScore
     ? calculateMean(plateScores.map(score => score.rowClusteringScore))
     : 0;
 
@@ -683,7 +482,7 @@ export const calculateOverallQuality = (
   const recommendations: string[] = [];
 
   // Calculate overall score based on display configuration
-  const overallScore = displayConfig.showRandomizationScore
+  const overallScore = displayConfig.showRowScore
     ? (plateDiversity.averageBalanceScore + plateDiversity.averageRowClusteringScore) / 2
     : plateDiversity.averageBalanceScore;
 

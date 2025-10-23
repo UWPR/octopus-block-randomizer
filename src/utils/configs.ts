@@ -93,15 +93,15 @@ export type QualityLevel = keyof typeof QUALITY_LEVEL_CONFIG;
 
 // Quality display configuration
 export interface QualityDisplayConfig {
-  showRandomizationScore: boolean;
+  showRowScore: boolean;
 }
 
 // Default quality display configuration
 export const DEFAULT_QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRandomizationScore: true
+  showRowScore: true
 };
 
-// Global quality display configuration - change this flag to control randomization score visibility
+// Global quality display configuration - change this flag to control row score visibility
 export const QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRandomizationScore: true  // Set to false to hide randomization scores
+  showRowScore: true  // Set to false to hide row scores
 };

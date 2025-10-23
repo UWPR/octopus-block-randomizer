@@ -3,7 +3,7 @@
  * Run with: npm test qualityMetrics.jest.test.ts
  */
 
-import { calculateExpectedRunsByGroup, calculateExpectedSequencesGapMethod } from '../utils/qualityMetrics';
+import { calculateExpectedRunsByGroup } from '../utils/qualityMetrics';
 
 describe('calculateExpectedRunsByGroup', () => {
 

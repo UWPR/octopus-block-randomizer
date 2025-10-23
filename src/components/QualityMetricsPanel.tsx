@@ -86,7 +86,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                       {getCompactQualityLevel(metrics.plateDiversity.averageBalanceScore)}
                     </span>
                   </div>
-                  {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+                  {QUALITY_DISPLAY_CONFIG.showRowScore && (
                     <div style={styles.compactScoreItem}>
                       <span style={styles.compactItemLabel}>Avg Row Score:</span>
                       <span style={{
@@ -149,7 +149,7 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                               {' '}{formatScore(plate.balanceScore)}
                             </span>
                           </div>
-                          {QUALITY_DISPLAY_CONFIG.showRandomizationScore && (
+                          {QUALITY_DISPLAY_CONFIG.showRowScore && (
                             <div style={styles.scoreItem}>
                               <span style={styles.scoreLabel}>Row Score:</span>
                               <span style={{

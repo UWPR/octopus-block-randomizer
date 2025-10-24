@@ -26,9 +26,6 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build"
   },
-  "jest": {
-    "setupFilesAfterEnv": ["<rootDir>/src/tests/setupTests.ts"]
-  },
   "eslintConfig": {
     "extends": [
       "react-app",

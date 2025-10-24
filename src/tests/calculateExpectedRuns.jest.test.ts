@@ -6,7 +6,7 @@
 
 import { calculateExpectedRuns, calculateMultinomialCoefficient } from '../utils/qualityMetrics';
 
-describe('calculateExpectedRun', () => {
+describe('Tests for calculateExpectedRun', () => {
   
   describe('Edge Cases', () => {
     

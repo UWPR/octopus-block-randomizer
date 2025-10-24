@@ -22,10 +22,12 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "test:quality": "npx ts-node src/runTests.ts",
     "eject": "react-scripts eject",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build"
+  },
+  "jest": {
+    "setupFilesAfterEnv": ["<rootDir>/src/tests/setupTests.ts"]
   },
   "eslintConfig": {
     "extends": [

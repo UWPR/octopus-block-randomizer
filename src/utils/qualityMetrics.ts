@@ -151,10 +151,13 @@ const calculateRowClusteringScore = (
 };
 
 /**
- * Calculate expected number of runs of each length for a given sequence composition
+ * Calculate expected number of runs for the provided group-runLength combinations
+ * in actualRunCounts.
  */
-// Export for testing purposes
-export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map<number, number>> => {
+const calculateExpectedRunsByGroup = (
+  rowKeys: string[], 
+  actualRunCounts: Map<string, Map<number, number>>
+): Map<string, Map<number, number>> => {
   const n = rowKeys.length;
   const rowComposition = new Map<string, number>();
 
@@ -168,25 +171,29 @@ export const calculateExpectedRunsByGroup = (rowKeys: string[]): Map<string, Map
 
   const expectedRunsByGroup = new Map<string, Map<number, number>>();
 
-  // For each covariate group
-  rowComposition.forEach((groupSize, groupKey) => {
+  // For each group that has actual runs
+  actualRunCounts.forEach((runLengthCounts, groupKey) => {
     const groupExpectedRuns = new Map<number, number>();
 
-    if (groupSize >= 2) { // Only groups with 2+ samples can have runs
-      // For each possible run length for this group
-      for (let runLength = 2; runLength <= groupSize; runLength++) {
-        const expectedCount = calculateExpectedRuns(rowComposition, groupKey, runLength, totalArrangements);
-
-        if (expectedCount > 0.01) { // Only include if expectation is meaningful
-          groupExpectedRuns.set(runLength, expectedCount);
-        }
-      }
-    }
+    // Calculate expected # of runs for each run length that was actually observed
+    runLengthCounts.forEach((actualCount, runLength) => {
+      const expectedCount = calculateExpectedRuns(rowComposition, groupKey, runLength, totalArrangements);
+      groupExpectedRuns.set(runLength, expectedCount);
+    });
 
     expectedRunsByGroup.set(groupKey, groupExpectedRuns);
   });
 
   return expectedRunsByGroup;
+};
+
+/*
+ * Export for testing purposes
+ */
+export const calculateExpectedRunsByGroupForTest = ( rowKeys: string[] ): Map<string, Map<number, number>> => {
+  // Track runs with their covariate groups
+  const runs: Array<{ length: number; group: string; }> = getRunsByGroup(rowKeys);
+  return calculateExpectedRunsByGroup(rowKeys, getRunCountsByGroup(runs));
 };
 
 
@@ -353,25 +360,7 @@ const calculateRowScore = (rowKeys: string[]): number => {
   if (rowKeys.length <= 3) return 100;
 
   // Track runs with their covariate groups
-  const runs: Array<{ length: number; group: string }> = [];
-  let currentRun = 1;
-  let currentGroup = rowKeys[0];
-
-  for (let i = 1; i < rowKeys.length; i++) {
-    if (rowKeys[i] !== rowKeys[i - 1]) {
-      // End of current run
-      runs.push({ length: currentRun, group: currentGroup });
-      currentRun = 1;
-      currentGroup = rowKeys[i];
-    } else {
-      currentRun++;
-    }
-
-    if (i === rowKeys.length - 1) {
-      // End of sequence
-      runs.push({ length: currentRun, group: currentGroup });
-    }
-  }
+  const runs: Array<{ length: number; group: string; }> = getRunsByGroup(rowKeys);
 
   const filteredRuns = runs.filter(run => run.length > 1); // Remove runs of size 1
   console.log(`Runs: ${filteredRuns.map(r => `${r.group}:${r.length}`).join(', ')}`);
@@ -380,15 +369,15 @@ const calculateRowScore = (rowKeys: string[]): number => {
 
   const actualRunCountsByGroup = getRunCountsByGroup(filteredRuns);
 
-  // Calculate expected runs by group
-  const expectedRunsByGroup = calculateExpectedRunsByGroup(rowKeys);
+  // Calculate expected runs for the specific group-runLength combinations that occurred
+  const expectedRunsByGroup = calculateExpectedRunsByGroup(rowKeys, actualRunCountsByGroup);
   
   let totalPenalty = 0;
 
   // Compare actual vs expected runs for each group and length
   actualRunCountsByGroup.forEach((groupRunCounts, groupKey) => {
     const expectedGroupRuns = expectedRunsByGroup.get(groupKey) || new Map<number, number>();
-
+    
     groupRunCounts.forEach((actualCount, runLength) => {
       const expectedCount = expectedGroupRuns.get(runLength) || 0;
       const excess = Math.max(0, actualCount - expectedCount);
@@ -524,3 +513,26 @@ export const calculateQualityMetrics = (
     overallQuality
   };
 };
+
+function getRunsByGroup(rowKeys: string[]) {
+  const runs: Array<{ length: number; group: string; }> = [];
+  let currentRun = 1;
+  let currentGroup = rowKeys[0];
+
+  for (let i = 1; i < rowKeys.length; i++) {
+    if (rowKeys[i] !== rowKeys[i - 1]) {
+      // End of current run
+      runs.push({ length: currentRun, group: currentGroup });
+      currentRun = 1;
+      currentGroup = rowKeys[i];
+    } else {
+      currentRun++;
+    }
+
+    if (i === rowKeys.length - 1) {
+      // End of sequence
+      runs.push({ length: currentRun, group: currentGroup });
+    }
+  }
+  return runs;
+}

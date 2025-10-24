@@ -3,37 +3,33 @@
  * Run with: npm test qualityMetrics.jest.test.ts
  */
 
-import { calculateExpectedRunsByGroup } from '../utils/qualityMetrics';
+import { calculateExpectedRunsByGroupForTest } from '../utils/qualityMetrics';
 
-describe('calculateExpectedRun', () => {
+describe('Tests for calculateExpectedRunsByGroup', () => {
 
      describe('Edge Cases', () => {
 
          test('Should handle empty sequences gracefully', () => {
             const keys: string[] = [];
-            const result = calculateExpectedRunsByGroup(keys);
+            const result = calculateExpectedRunsByGroupForTest(keys);
 
             expect(result.size).toBe(0);
         });
 
         test('Should handle single element sequences', () => {
             const keys = ['R'];
-            const result = calculateExpectedRunsByGroup(keys);
+            const result = calculateExpectedRunsByGroupForTest(keys);
 
-            expect(result.size).toBe(1);
-            expect(result.has('R')).toBe(true);
-
-            const rRuns = result.get('R')!;
-            expect(rRuns.size).toBe(0); // No runs possible with single element
+            expect(result.size).toBe(0); // No runs possible with single element
         });
-      
+
     });
 
     describe('Two Groups', () => {
 
-        test('Should handle single sample groups correctly', () => {
+        test('Should handle groups with single elements correctly', () => {
             const keys = ['R', 'B', 'B', 'B'];
-            const result = calculateExpectedRunsByGroup(keys);
+            const result = calculateExpectedRunsByGroupForTest(keys);
 
             expect(result.size).toBe(2);
 
@@ -41,55 +37,42 @@ describe('calculateExpectedRun', () => {
             const bRuns = result.get('B')!;
 
             // R group has only 1 sample, should have no expected runs
-            expect(rRuns.size).toBe(0);
+            expect(rRuns.size).toBe(1);
+            expect(rRuns.has(1)).toBe(true); // Only one R, so one run of length 1;
+            expect(rRuns.get(1)).toBe(0); // Expected runs of length 1 is 0
 
-            // B group has 3 samples, should have expected runs
-            expect(bRuns.size).toBeGreaterThan(0);
-            expect(bRuns.has(2)).toBe(true);
+            // B group has 3 samples, should have <= 1 expected runs of length 3
+            expect(bRuns.size).toBe(1);
+            expect(bRuns.has(3)).toBe(true); // Run of length 3
+            expect(bRuns.get(3)).toBeLessThan(1); // Max 1 run expected of length 3
         });
 
-    });
+        test('Should have smaller expected # of runs for longer runs', () => {
+            const keys = ['R', 'R', 'B', 'R', 'R', 'R', 'R', 'B', 'B']; // 6 R's and 3 B's
+            const result = calculateExpectedRunsByGroupForTest(keys);
 
-    test('Should have smaller expected runs for longer runs', () => {
-        const keys = ['R', 'R', 'R', 'R', 'R', 'B', 'B']; // 5 Rs, 2 Bs
-        const result = calculateExpectedRunsByGroup(keys);
+            const rRuns = result.get('R')!;
+            const bRuns = result.get('B')!;
 
-        const rRuns = result.get('R')!;
-        const runLengths = Array.from(rRuns.keys()).sort((a, b) => a - b);
+            // R group has 6 samples, with runs of length 2 and 4.
+            expect(rRuns.size).toBe(2);
+            expect(rRuns.has(2)).toBe(true); // Run of length 2;
+            expect(rRuns.has(4)).toBe(true); // Run of length 4;
+            const expectedRunsLength2 = rRuns.get(2)!;
+            const expectedRunsLength4 = rRuns.get(4)!;
+            expect(expectedRunsLength4).toBeLessThanOrEqual(1) // Max 1 run expected of length 4
+            expect(expectedRunsLength2).toBeLessThanOrEqual(3); // Max 3 expected runs of length 2
+            expect(expectedRunsLength2).toBeGreaterThan(expectedRunsLength4); // More expected runs of length 2 than 4
 
-        if (runLengths.length > 1) {
-            // Longer runs should have smaller expected values
-            for (let i = 1; i < runLengths.length; i++) {
-                const shorterRunExpected = rRuns.get(runLengths[i-1])!;
-                const longerRunExpected = rRuns.get(runLengths[i])!;
-
-                // This is a general trend, but not always strict due to boundary conditions
-                // So we'll just check that the values are reasonable
-                expect(longerRunExpected).toBeGreaterThanOrEqual(0);
-                expect(shorterRunExpected).toBeGreaterThanOrEqual(0);
-            }
-        }
-    });
-
-    test('should handle equal binary groups with exact calculation', () => {
-        const keys = ['R', 'R', 'R', 'B', 'B', 'B'];
-        const result = calculateExpectedRunsByGroup(keys);
-
-        expect(result.size).toBe(2);
-        expect(result.has('R')).toBe(true);
-        expect(result.has('B')).toBe(true);
-
-        const rRuns = result.get('R')!;
-        const bRuns = result.get('B')!;
-
-        // Both groups should have expected runs for length 2 and 3
-        expect(rRuns.has(2)).toBe(true);
-        expect(rRuns.has(3)).toBe(true);
-        expect(bRuns.has(2)).toBe(true);
-        expect(bRuns.has(3)).toBe(true);
-
-        // Expected runs should be positive
-        expect(rRuns.get(2)!).toBeGreaterThan(0);
-        expect(bRuns.get(2)!).toBeGreaterThan(0);
+            // B group has 3 samples, with runs of length 1 and 2
+            expect(bRuns.size).toBe(2);
+            expect(bRuns.has(1)).toBe(true); // Run of length 1
+            expect(bRuns.has(2)).toBe(true); // Run of length 2
+            const expectedBRunsLength1 = bRuns.get(1)!;
+            const expectedBRunsLength2 = bRuns.get(2)!;
+            expect(expectedBRunsLength2).toBeLessThanOrEqual(1); // Max 1 run expected of length 2
+            expect(expectedBRunsLength1).toBe(0); // We don't look at runs of length < 2
+            expect(expectedBRunsLength2).toBeGreaterThan(expectedBRunsLength1);
+        });
     });
 });

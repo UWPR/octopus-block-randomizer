@@ -74,13 +74,24 @@ function getAvailableBlocks(
 }
 
 // Helper function to assign block capacities based on distribution strategy
-function assignBlockCapacities(
+// Exported for testing purposes
+export function assignBlockCapacities(
   totalSamples: number,
   actualBlocksNeeded: number,
   keepEmptyInLastBlock: boolean,
   blockSize: number,
   blockName: string
 ): number[] {
+
+  if (totalSamples === 0) {
+    return [0];
+  }
+
+  if (totalSamples > actualBlocksNeeded * blockSize) {
+    console.error(`Total samples (${totalSamples}) exceed total block capacity (${actualBlocksNeeded * blockSize}).`);
+    return [0];
+  }
+  
   let blockCapacities: number[];
 
   if (keepEmptyInLastBlock) {
@@ -97,6 +108,7 @@ function assignBlockCapacities(
 
     console.log(`Keep empty in last ${blockName}: ${totalSamples} samples across ${blockCapacities.length} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   } else {
+
     // Distribute empty spots randomly across all blocks
     const baseSamplesPerBlock = Math.floor(totalSamples / actualBlocksNeeded);
     const extraSamples = totalSamples % actualBlocksNeeded;

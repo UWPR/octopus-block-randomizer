@@ -73,20 +73,42 @@ function getAvailableBlocks(
   return availableBlocks;
 }
 
-// Helper function to calculate expected minimums per block (plates or rows)
-function calculateExpectedMinimums(
+// Helper function to calculate expected minimum samples per block (plates or rows) for each covariate group
+// Throws an error if the total samples exceed available capacity or if any block's expected minimums exceed its capacity
+// 
+// Exported for testing purposes
+export function calculateExpectedMinimums(
   blockCapacities: number[],
   covariateGroups: Map<string, SearchData[]>,
   fullBlockCapacity: number,
-  totalBlocksNeeded: number,
   blockType: string // "Plate" or "Row"
 ): { [blockIdx: number]: { [groupKey: string]: number } } {
 
   const expectedMinimums: { [blockIdx: number]: { [groupKey: string]: number } } = {};
+  const totalBlocksNeeded = blockCapacities.length;
+
+  // Calculate total samples across all groups
+  let totalSamples = 0;
+  covariateGroups.forEach((samples) => {
+    totalSamples += samples.length;
+  });
+
+  // Calculate total available capacity
+  const totalCapacity = blockCapacities.reduce((sum, capacity) => sum + capacity, 0);
+
+  // Validate that total samples don't exceed total capacity
+  if (totalSamples > totalCapacity) {
+    throw new Error(
+      `Cannot distribute ${totalSamples} samples across ${blockType.toLowerCase()}s with total capacity ${totalCapacity}. ` +
+      `Total samples exceed available capacity by ${totalSamples - totalCapacity}.`
+    );
+  }
 
   console.log(`Calculating expected minimums per ${blockType} based on capacities:`);
   blockCapacities.forEach((capacity, blockIdx) => {
     expectedMinimums[blockIdx] = {};
+    let blockTotalExpected = 0;
+    
     covariateGroups.forEach((samples, groupKey) => {
       // Calculate expected minimum for this covariate group on this specific block
       // Based on the block's capacity relative to a full block
@@ -94,10 +116,19 @@ function calculateExpectedMinimums(
       const globalExpected = Math.floor(samples.length / totalBlocksNeeded);
       
       expectedMinimums[blockIdx][groupKey] = Math.round(globalExpected * capacityRatio);
+      blockTotalExpected += expectedMinimums[blockIdx][groupKey];
 
       console.log(`  ${blockType} ${blockIdx + 1},  Group ${groupKey}, Samples ${samples.length}, Expected ${globalExpected},
           Capacity ratio: ${capacityRatio.toFixed(2)}, Expected minimum: ${expectedMinimums[blockIdx][groupKey]}`);
     });
+
+    // Validate that expected minimums for this block don't exceed its capacity
+    if (blockTotalExpected > capacity) {
+      throw new Error(
+        `${blockType} ${blockIdx + 1} expected minimums (${blockTotalExpected}) exceed its capacity (${capacity}). ` +
+        `This indicates an impossible distribution scenario.`
+      );
+    }
   });
 
   return expectedMinimums;
@@ -490,8 +521,7 @@ function doBalancedRandomization(
     plateCapacities,
     covariateGroups,
     plateSize,
-    actualPlatesNeeded,
-    "plate"
+    "Plate"
   );
 
   // STEP 3: Distribute samples across plates
@@ -529,8 +559,7 @@ function doBalancedRandomization(
       rowCapacities,
       plateGroups,
       numColumns,
-      actualRowsToUse,
-      "row"
+      "Row"
     );
 
 

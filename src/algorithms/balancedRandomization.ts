@@ -8,8 +8,8 @@ enum OverflowPrioritization {
 }
 
 
-
-function distributeToBlocks(
+// Exported for testing purposes
+export function distributeToBlocks(
   covariateGroups: Map<string, SearchData[]>,
   blockCapacities: number[],
   maxCapacity: number,
@@ -71,6 +71,36 @@ function getAvailableBlocks(
     }
   }
   return availableBlocks;
+}
+
+// Helper function to calculate expected minimums per block (plates or rows)
+function calculateExpectedMinimums(
+  blockCapacities: number[],
+  covariateGroups: Map<string, SearchData[]>,
+  fullBlockCapacity: number,
+  totalBlocksNeeded: number,
+  blockType: string // "Plate" or "Row"
+): { [blockIdx: number]: { [groupKey: string]: number } } {
+
+  const expectedMinimums: { [blockIdx: number]: { [groupKey: string]: number } } = {};
+
+  console.log(`Calculating expected minimums per ${blockType} based on capacities:`);
+  blockCapacities.forEach((capacity, blockIdx) => {
+    expectedMinimums[blockIdx] = {};
+    covariateGroups.forEach((samples, groupKey) => {
+      // Calculate expected minimum for this covariate group on this specific block
+      // Based on the block's capacity relative to a full block
+      const capacityRatio = totalBlocksNeeded == 1 ? 1 : capacity / fullBlockCapacity;
+      const globalExpected = Math.floor(samples.length / totalBlocksNeeded);
+      
+      expectedMinimums[blockIdx][groupKey] = Math.round(globalExpected * capacityRatio);
+
+      console.log(`  ${blockType} ${blockIdx + 1},  Group ${groupKey}, Samples ${samples.length}, Expected ${globalExpected},
+          Capacity ratio: ${capacityRatio.toFixed(2)}, Expected minimum: ${expectedMinimums[blockIdx][groupKey]}`);
+    });
+  });
+
+  return expectedMinimums;
 }
 
 // Helper function to assign block capacities based on distribution strategy
@@ -456,21 +486,13 @@ function doBalancedRandomization(
   }
 
   // STEP 2: Calculate expected minimums per plate based on plate capacities
-  const expectedMinimumsPerPlate: { [plateIdx: number]: { [groupKey: string]: number } } = {};
-
-  console.log("Calculating expected minimums per plate based on capacities:");
-  plateCapacities.forEach((capacity, plateIdx) => {
-    expectedMinimumsPerPlate[plateIdx] = {};
-    covariateGroups.forEach((samples, groupKey) => {
-      // Calculate expected minimum for this covariate group on this specific plate
-      // Based on the plate's capacity relative to a full plate
-      const capacityRatio = actualPlatesNeeded == 1 ? 1 : capacity / plateSize;
-      const globalExpected = Math.floor(samples.length / actualPlatesNeeded);
-      console.log(`  Plate ${plateIdx}, Group ${groupKey}: Global expected ${globalExpected},
-        Capacity ratio: ${capacityRatio.toFixed(2)}, Expected minimum: ${Math.round(globalExpected * capacityRatio)}`);
-      expectedMinimumsPerPlate[plateIdx][groupKey] = Math.round(globalExpected * capacityRatio);
-    });
-  });
+  const expectedMinimumsPerPlate = calculateExpectedMinimums(
+    plateCapacities,
+    covariateGroups,
+    plateSize,
+    actualPlatesNeeded,
+    "plate"
+  );
 
   // STEP 3: Distribute samples across plates
   const plateAssignments = distributeToBlocks(covariateGroups, plateCapacities, plateSize, selectedCovariates, "Plates", expectedMinimumsPerPlate);
@@ -503,21 +525,13 @@ function doBalancedRandomization(
     const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, true, numColumns, "Row");
 
     // Calculate expected minimums per row
-    console.log("Calculating expected minimums per row based on plate capacities:");
-    const expectedRowMinimums: { [rowIdx: number]: { [groupKey: string]: number } } = {};
-
-    rowCapacities.forEach((capacity, rowIdx) => {
-      expectedRowMinimums[rowIdx] = {};
-      plateGroups.forEach((samples, groupKey) => {
-        // Calculate expected minimum for this covariate group on this specific row
-        // Based on the row's capacity relative to a full row
-        const capacityRatio = actualRowsToUse == 1 ? 1 : capacity / numColumns;
-        const expectedPerRow = Math.floor(samples.length / actualRowsToUse);
-        expectedRowMinimums[rowIdx][groupKey] = Math.round(expectedPerRow * capacityRatio);
-        console.log(`  Row ${rowIdx + 1},  Group ${groupKey}, Samples ${samples.length}, Expected ${expectedPerRow},
-          Capacity ratio: ${capacityRatio.toFixed(2)}, Expected minimum: ${Math.round(expectedPerRow * capacityRatio)}`);
-      });
-    });
+    const expectedRowMinimums = calculateExpectedMinimums(
+      rowCapacities,
+      plateGroups,
+      numColumns,
+      actualRowsToUse,
+      "row"
+    );
 
 
     const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, "Rows", expectedRowMinimums);

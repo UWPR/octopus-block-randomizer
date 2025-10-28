@@ -1,4 +1,5 @@
 import { SearchData } from '../utils/types';
+import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
 
 enum OverflowPrioritization {
@@ -14,7 +15,7 @@ export function distributeToBlocks(
   blockCapacities: number[],
   maxCapacity: number,
   selectedCovariates: string[],
-  blockType: string,
+  blockType: BlockType,
   expectedMinimums?: { [blockIdx: number]: { [groupKey: string]: number } }
 ): Map<number, SearchData[]> {
   const numBlocks = blockCapacities.length;
@@ -37,7 +38,7 @@ export function distributeToBlocks(
   processUnplacedGroups(unplacedGroupsMap, blockCapacities, blockAssignments, blockCounts, blockType);
 
   // Phase 2B: Process overflow groups with appropriate prioritization strategy
-  const prioritization = blockType === "Plates" ? OverflowPrioritization.BY_CAPACITY : OverflowPrioritization.BY_GROUP_BALANCE;
+  const prioritization = blockType === BlockType.PLATE ? OverflowPrioritization.BY_CAPACITY : OverflowPrioritization.BY_GROUP_BALANCE;
   processOverflowGroups(remainingSamplesMap, blockCapacities, blockAssignments, blockCounts, prioritization, selectedCovariates, blockType, maxCapacity);
 
   return blockAssignments;
@@ -81,7 +82,7 @@ export function calculateExpectedMinimums(
   blockCapacities: number[],
   covariateGroups: Map<string, SearchData[]>,
   fullBlockCapacity: number,
-  blockType: string // "Plate" or "Row"
+  blockType: BlockType
 ): { [blockIdx: number]: { [groupKey: string]: number } } {
 
   const expectedMinimums: { [blockIdx: number]: { [groupKey: string]: number } } = {};
@@ -141,7 +142,7 @@ export function assignBlockCapacities(
   actualBlocksNeeded: number,
   keepEmptyInLastBlock: boolean,
   blockSize: number,
-  blockName: string
+  blockName: BlockType
 ): number[] {
 
   if (totalSamples === 0) {
@@ -210,7 +211,7 @@ function placeProportionalSamples(
   blockAssignments: Map<number, SearchData[]>,
   blockCounts: number[],
   maxCapacity: number = 96,
-  blockType: string = "blocks",
+  blockType: BlockType,
   expectedMinimums?: { [blockIdx: number]: { [groupKey: string]: number } }
 ): [Map<string, SearchData[]>, Map<string, SearchData[]>] {
   const numPlates = plateCapacities.length;
@@ -313,7 +314,7 @@ function processUnplacedGroups(
   blockCapacities: number[],
   blockAssignments: Map<number, SearchData[]>,
   blockCounts: number[],
-  blockType: string = "blocks"
+  blockType: BlockType
 ): void {
   const numBlocks = blockCapacities.length;
   const sortedUnplacedGroups = Array.from(unplacedGroupsMap.entries())
@@ -360,7 +361,7 @@ function processOverflowGroups(
   blockCounts: number[],
   prioritization: OverflowPrioritization,
   selectedCovariates: string[] = [],
-  blockType: string = "blocks",
+  blockType: BlockType,
   fullCapacity: number = 96
 ): void {
   const numPlates = plateCapacities.length;
@@ -436,7 +437,7 @@ function validatePerBlockDistribution(
   blockAssignments: Map<number, SearchData[]>,
   selectedCovariates: string[],
   expectedMinimumsPerBlock: { [blockIdx: number]: { [groupKey: string]: number } },
-  blockTypeName: string
+  blockTypeName: BlockType
 ): boolean {
   let isValid = true;
 
@@ -497,7 +498,7 @@ function doBalancedRandomization(
   // Calculate number of plates needed (same regardless of keepEmptyInLastPlate)
   const actualPlatesNeeded = Math.ceil(totalSamples / plateSize);
   console.log(`Calculated plates needed: ${actualPlatesNeeded}`);
-  const plateCapacities = assignBlockCapacities(totalSamples, actualPlatesNeeded, keepEmptyInLastPlate, plateSize, "Plate");
+  const plateCapacities = assignBlockCapacities(totalSamples, actualPlatesNeeded, keepEmptyInLastPlate, plateSize, BlockType.PLATE);
 
   const plates = Array.from({ length: actualPlatesNeeded }, () =>
     Array.from({ length: numRows }, () => new Array(numColumns).fill(undefined))
@@ -521,14 +522,14 @@ function doBalancedRandomization(
     plateCapacities,
     covariateGroups,
     plateSize,
-    "Plate"
+    BlockType.PLATE
   );
 
   // STEP 3: Distribute samples across plates
-  const plateAssignments = distributeToBlocks(covariateGroups, plateCapacities, plateSize, selectedCovariates, "Plates", expectedMinimumsPerPlate);
+  const plateAssignments = distributeToBlocks(covariateGroups, plateCapacities, plateSize, selectedCovariates, BlockType.PLATE, expectedMinimumsPerPlate);
 
   // STEP 4: Validate plate-level distribution
-  const plateDistributionValid = validatePerBlockDistribution(plateAssignments, selectedCovariates, expectedMinimumsPerPlate, "plate");
+  const plateDistributionValid = validatePerBlockDistribution(plateAssignments, selectedCovariates, expectedMinimumsPerPlate, BlockType.PLATE);
   if (!plateDistributionValid) {
     console.error("Plate-level distribution validation failed");
   }
@@ -552,21 +553,21 @@ function doBalancedRandomization(
     console.log(`Plate ${plateIdx + 1} has ${totalPlateSamples} samples, needs ${rowsNeeded} rows, using ${actualRowsToUse} rows`);
 
     // Calculate row capacities. Fill rows sequentially, leaving empty cells in the last row
-    const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, true, numColumns, "Row");
+    const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, true, numColumns, BlockType.ROW);
 
     // Calculate expected minimums per row
     const expectedRowMinimums = calculateExpectedMinimums(
       rowCapacities,
       plateGroups,
       numColumns,
-      "Row"
+      BlockType.ROW
     );
 
 
-    const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, "Rows", expectedRowMinimums);
+    const rowAssignments = distributeToBlocks(plateGroups, rowCapacities, numColumns, selectedCovariates, BlockType.ROW, expectedRowMinimums);
 
     // Validate row-level distribution
-    const rowDistributionValid = validatePerBlockDistribution(rowAssignments, selectedCovariates, expectedRowMinimums, "row");
+    const rowDistributionValid = validatePerBlockDistribution(rowAssignments, selectedCovariates, expectedRowMinimums, BlockType.ROW);
     if (!rowDistributionValid) {
       console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
     }

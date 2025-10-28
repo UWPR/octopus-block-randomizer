@@ -1,5 +1,11 @@
 import { ALGORITHM_CONFIG, QUALITY_LEVEL_CONFIG, QualityLevel } from './configs';
 
+// Block types for distribution algorithms
+export enum BlockType {
+  PLATE = 'Plate',
+  ROW = 'Row'
+}
+
 export interface SearchData {
   name: string;
   metadata: { [key: string]: string };

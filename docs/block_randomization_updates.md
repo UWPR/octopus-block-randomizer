@@ -31,6 +31,7 @@ This document describes the enhancements made to the Octopus Block Randomization
   - [Balanced Block Randomization](#balanced-block-randomization)
 - [Quality Score Calculation](#quality-score-calculation)
   - [Balance Score](#balance-score)
+  - [Row Score](#row-score)
 - [Usage](#usage)
 
 ---
@@ -303,6 +304,8 @@ After proportional plate distribution, this algorithm:
 
 ## Quality Score Calculation
 
+The quality assessment system evaluates randomization quality using two complementary metrics:
+
 ### Balance Score
 The balance score evaluates whether each plate contains a representative sample of the overall population based on selected covariates.
 
@@ -324,15 +327,75 @@ For each covariate group:
 
 Weighted Average Deviation = (Sum of Weighted Deviations) / TotalWeight
 Plate Balance Score = max(0, 100 - (Weighted Average Deviation × 100))
-
 ```
 
-### Randomization Score TODO
+### Row Score
+The row score evaluates randomization quality by detecting excessive clustering of samples from the same covariate group within plate rows. It penalizes runs (consecutive samples from the same group) that exceed statistical expectations.
 
+For each row with 3+ samples:
+
+1. **Identify Runs**: Detect consecutive samples from the same covariate group
+   - Example: `A A A B C C` has runs: A×3, B×1, C×2
+   - Only runs of length ≥2 are considered for scoring
+
+2. **Calculate Expected Runs**: Using combinatorial analysis based on row composition
+   ```
+   For each observed run length L and covariate group G:
+     - Count actual runs of length L for group G
+     - Calculate expected number of runs of length L for group G
+       (based on multinomial distribution and gap method)
+     - Compute excess: max(0, actual - expected)
+   ```
+
+3. **Apply Penalties**:
+   ```
+   For each excess run:
+     Base Penalty = (run_length ^ 1.5) × 10
+     Excess Penalty = excess × Base Penalty
+     Total Row Penalty = Sum of all excess penalties
+   ```
+
+4. **Convert to Score**:
+   ```
+   Row Score = max(0, min(100, 100 - Total Row Penalty))
+   ```
+
+#### Expected Runs Calculation
+The expected number of runs is calculated using exact combinatorial methods for sequences ≤24 samples:
+
+```
+E[# of runs of length L] = Σ(r × P(exactly r runs of length L))
+
+Where:
+  r = number of runs (0, 1, 2, ...)
+  P(exactly r runs) = (# sequences with r runs) / (total sequences)
+  
+Total sequences = Multinomial coefficient based on group composition
+Sequences with r runs = Calculated using gap method with stars-and-bars
+```
+
+#### Plate-Level Row Score
+```
+Plate Row Score = Average of all row scores in the plate
+(Rows with ≤2 samples receive default score of 100)
+```
+
+### Overall Plate Score
+When row scoring is enabled:
+```
+Overall Plate Score = (Balance Score + Row Score) / 2
+```
+
+When row scoring is disabled:
+```
+Overall Plate Score = Balance Score
+```
 
 ### Experiment-Level Scores
 ```
 Average Balance Score = Mean of all plate balance scores
+Average Row Score = Mean of all plate row scores
+Average Overall Score = Mean of all overall plate scores
 ```
 
 

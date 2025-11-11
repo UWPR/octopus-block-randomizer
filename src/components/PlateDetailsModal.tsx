@@ -151,7 +151,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                               .filter(sample => sample !== undefined)
                               .map((sample, colIndex) => {
                                 const key = getCovariateKey(sample!, selectedCovariates);
-                                const colorInfo = covariateColors[key] || { color: '#cccccc', useOutline: false, useStripes: false };
+                                const colorInfo = covariateColors[key] || { color: '#cccccc', useOutline: false, useStripes: false, textColor: '#000' };
                                 return (
                                   <div
                                     key={colIndex}
@@ -215,7 +215,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                       })
                       .map(([combination, globalCount]) => {
                         const count = covariateDistribution.get(combination) || 0;
-                        const colorInfo = covariateColors[combination] || { color: '#cccccc', useOutline: false, useStripes: false };
+                        const colorInfo = covariateColors[combination] || { color: '#cccccc', useOutline: false, useStripes: false, textColor: '#000' };
                         const percentage = globalCount > 0 ? ((count / globalCount) * 100).toFixed(1) : '0.0';
                         const balance = groupBalance[combination];
 

@@ -40,7 +40,8 @@ const HIGHLIGHT_STYLE: React.CSSProperties = {
 const DEFAULT_COLOR_INFO: CovariateColorInfo = {
   color: '#cccccc',
   useOutline: false,
-  useStripes: false
+  useStripes: false,
+  textColor: '#000' // Default gray is light, so use black text
 };
 
 // Utility functions
@@ -116,6 +117,7 @@ const Plate: React.FC<PlateProps> = ({
   // Memoized style generators
   const createSearchCellStyle = useCallback((colorInfo: CovariateColorInfo, isHighlighted: boolean) => {
     const pattern = compact ? STRIPE_PATTERNS.compact : STRIPE_PATTERNS.full;
+    const outlineBorderWidth = compact ? '3px' : '6px';
 
     const baseStyle: React.CSSProperties = {
       backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
@@ -123,7 +125,7 @@ const Plate: React.FC<PlateProps> = ({
         background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} ${pattern.size}, transparent ${pattern.size}, transparent ${pattern.gap})`
       }),
       border: colorInfo.useOutline
-        ? `3px solid ${colorInfo.color}`
+        ? `${outlineBorderWidth} solid ${colorInfo.color}`
         : (compact ? currentStyles.compactSearchIndicator.border : '1px solid #ccc'),
       boxSizing: 'border-box' as const
     };
@@ -153,29 +155,67 @@ const Plate: React.FC<PlateProps> = ({
 
   const renderFullCell = useCallback((search: SearchData, isHighlighted: boolean) => {
     const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || DEFAULT_COLOR_INFO;
-    const cellStyle = createSearchCellStyle(colorInfo, isHighlighted);
+    const pattern = compact ? STRIPE_PATTERNS.compact : STRIPE_PATTERNS.full;
+    const outlineBorderWidth = compact ? '3px' : '6px';
+
+    // Determine if we need white background for text (outline or stripes)
+    const needsWhiteBackground = colorInfo.useOutline || colorInfo.useStripes;
+
+    // For solid fills, use pre-calculated text color; for outline/stripes use default dark text
+    const textColor = !needsWhiteBackground ? colorInfo.textColor : '#333';
+
+    // Create header style with background color/pattern
+    const headerStyle: React.CSSProperties = {
+      backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
+      ...(colorInfo.useStripes && {
+        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} ${pattern.size}, transparent ${pattern.size}, transparent ${pattern.gap})`
+      }),
+      border: colorInfo.useOutline
+        ? `${outlineBorderWidth} solid ${colorInfo.color}`
+        : 'none',
+      padding: '8px',
+      borderRadius: '8px 8px 0 0',
+      minHeight: '32px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    };
 
     return (
       <div
         style={{
           ...currentStyles.fullSearchCard,
-          ...cellStyle
+          padding: '0',
+          backgroundColor: '#fff',
+          ...(isHighlighted ? HIGHLIGHT_STYLE : {})
         }}
         draggable={true}
         onDragStart={(event) => onDragStart(event, search.name)}
       >
-        <h3 style={currentStyles.searchTitle}>{search.name}</h3>
-        <hr style={currentStyles.searchDivider} />
-        {selectedCovariates.map((covariate: string) =>
-          search.metadata[covariate] ? (
-            <div key={covariate} style={currentStyles.searchMetadata}>
-              {`${covariate}: ${search.metadata[covariate]}`}
-            </div>
-          ) : null
-        )}
+        <div style={headerStyle}>
+          <h3 style={{
+            ...currentStyles.searchTitle,
+            backgroundColor: needsWhiteBackground ? '#fff' : 'transparent',
+            color: textColor,
+            padding: '4px 8px',
+            borderRadius: '4px',
+            margin: 0,
+          }}>
+            {search.name}
+          </h3>
+        </div>
+        <div style={{ padding: '12px' }}>
+          {selectedCovariates.map((covariate: string) =>
+            search.metadata[covariate] ? (
+              <div key={covariate} style={currentStyles.searchMetadata}>
+                {`${covariate}: ${search.metadata[covariate]}`}
+              </div>
+            ) : null
+          )}
+        </div>
       </div>
     );
-  }, [covariateColors, selectedCovariates, currentStyles, createSearchCellStyle, onDragStart]);
+  }, [covariateColors, selectedCovariates, currentStyles, onDragStart, compact]);
 
   // Unified cell renderer
   const renderSearchCell = useCallback((search: SearchData, isHighlighted: boolean) => {
@@ -406,11 +446,11 @@ const baseStyles = {
   fullSearchCard: {
     borderRadius: '8px',
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    padding: '16px',
     width: '150px',
     boxSizing: 'border-box' as const,
     cursor: 'move',
     transition: 'all 0.2s ease',
+    overflow: 'hidden',
   },
   searchTitle: {
     fontSize: '14px',

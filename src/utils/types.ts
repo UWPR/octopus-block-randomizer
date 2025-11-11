@@ -45,6 +45,7 @@ export interface CovariateColorInfo {
   color: string;
   useOutline: boolean;
   useStripes: boolean;
+  textColor: string; // Pre-calculated text color for readability (white or black)
 }
 
 // Quality Metrics Levels

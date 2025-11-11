@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { SearchData, SummaryItem, CovariateColorInfo } from '../utils/types';
-import { getCovariateKey } from '../utils/utils';
+import { getCovariateKey, getTextColorForBackground } from '../utils/utils';
 import { BRIGHT_COLOR_PALETTE } from '../utils/configs';
 
 export function useCovariateColors() {
@@ -57,11 +57,13 @@ export function useCovariateColors() {
       sortedCombinations.forEach((combination, colorIndex) => {
         const paletteIndex = colorIndex % BRIGHT_COLOR_PALETTE.length;
         const cycle = Math.floor(colorIndex / BRIGHT_COLOR_PALETTE.length);
+        const color = BRIGHT_COLOR_PALETTE[paletteIndex];
 
         covariateColorsMap[combination] = {
-          color: BRIGHT_COLOR_PALETTE[paletteIndex],
+          color: color,
           useOutline: cycle === 1, // Second cycle (25-48)
-          useStripes: cycle === 2   // Third cycle (49-72)
+          useStripes: cycle === 2,  // Third cycle (49-72)
+          textColor: getTextColorForBackground(color) // Pre-calculate text color
         };
       });
 
@@ -105,7 +107,12 @@ export function useCovariateColors() {
 
       // Convert to summary data with colors
       const summary: SummaryItem[] = Array.from(combinationsMap.entries()).map(([combinationKey, data]) => {
-        const colorInfo = colors[combinationKey] || { color: '#cccccc', useOutline: false, useStripes: false };
+        const colorInfo = colors[combinationKey] || {
+          color: '#cccccc',
+          useOutline: false,
+          useStripes: false,
+          textColor: '#000' // Default gray is light, so use black text
+        };
         return {
           combination: combinationKey, // Use the same key format as colors
           values: data.values,

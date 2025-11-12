@@ -15,8 +15,15 @@ This document provides a step-by-step implementation plan for adding repeated-me
   - Ensure type safety across the codebase
   - _Requirements: 1.1, 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 2. Implement repeated-measures grouping logic
-  - [ ] 2.1 Create `repeatedMeasuresGrouping.ts` module with group creation function
+- [-] 2. Implement repeated-measures grouping logic
+
+
+
+  - [x] 2.1 Create `repeatedMeasuresGrouping.ts` module with group creation function
+
+
+
+
     - Implement `createRepeatedMeasuresGroups()` function
     - Handle samples with and without subject IDs (singleton creation)
     - Calculate treatment composition for each group

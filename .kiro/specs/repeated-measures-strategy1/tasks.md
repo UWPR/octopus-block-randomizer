@@ -29,7 +29,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Calculate treatment composition for each group
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 8.1, 8.2_
 
-  - [ ] 2.2 Implement group validation function
+  - [x] 2.2 Implement group validation function
+
+
+
+
+
     - Check for oversized groups (exceed plate capacity)
     - Warn about large groups (> 50% plate capacity)
     - Warn about high singleton ratio (> 80%)

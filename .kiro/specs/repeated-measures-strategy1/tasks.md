@@ -50,7 +50,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 3. Implement plate distribution algorithm
-  - [ ] 3.1 Create `repeatedMeasuresDistribution.ts` module with distribution function
+  - [x] 3.1 Create `repeatedMeasuresDistribution.ts` module with distribution function
+
+
+
+
+
     - Implement `distributeGroupsToPlates()` function
     - Calculate global treatment distribution from samples
     - Sort groups by size (largest first)

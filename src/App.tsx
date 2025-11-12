@@ -8,6 +8,7 @@ import QualityMetricsPanel from './components/QualityMetricsPanel';
 import QualityLegend from './components/QualityLegend';
 import { SearchData, RandomizationAlgorithm } from './utils/types';
 import { downloadCSV, getCovariateKey, getQualityLevelColor, formatScore } from './utils/utils';
+import { exportToExcel } from './utils/excelExport';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useModalDrag } from './hooks/useModalDrag';
 import { useRandomization } from './hooks/useRandomization';
@@ -210,7 +211,22 @@ const App: React.FC = () => {
   // Download CSV handler
   const handleDownloadCSV = () => {
     if (selectedIdColumn) {
-      downloadCSV(searches, randomizedPlates, selectedIdColumn);
+      downloadCSV(searches, randomizedPlates, selectedIdColumn, selectedFileName);
+    }
+  };
+
+  // Download Excel handler
+  const handleDownloadExcel = async () => {
+    if (selectedCovariates.length > 0 && randomizedPlates.length > 0) {
+      await exportToExcel({
+        searches,
+        randomizedPlates,
+        covariateColors,
+        selectedCovariates,
+        numRows: plateRows,
+        numColumns: plateColumns,
+        inputFileName: selectedFileName
+      });
     }
   };
 
@@ -395,6 +411,10 @@ const App: React.FC = () => {
                 <button onClick={handleDownloadCSV} style={styles.downloadButton}>
                   Download CSV
                 </button>
+
+                <button onClick={handleDownloadExcel} style={styles.downloadButton}>
+                  Download Excel
+                </button>
               </div>
 
               <SummaryPanel
@@ -454,16 +474,16 @@ const App: React.FC = () => {
         {/* Help Section */}
         {/* <div style={styles.helpSection}>
           <div style={styles.helpLinks}>
-            <a 
-              href="https://github.com/uwpr/octopus-block-randomizer/blob/main/docs/block_randomization_updates.md" 
-              target="_blank" 
+            <a
+              href="https://github.com/uwpr/octopus-block-randomizer/blob/main/docs/block_randomization_updates.md"
+              target="_blank"
               rel="noopener noreferrer"
               style={styles.helpLink}
             >
               <i className="fa-regular fa-circle-question" style={{marginRight: '4px'}}></i> Documentation
             </a>
-            <a 
-              href="/test-data/simple-metadata.csv" 
+            <a
+              href="/test-data/simple-metadata.csv"
               download="example-metadata.csv"
               style={styles.helpLink}
             >

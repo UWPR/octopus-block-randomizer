@@ -78,23 +78,34 @@ export function randomizeSearches(
 
 
 // Updated to accept idColumn parameter instead of hardcoding "search name"
-export function downloadCSV(searches: SearchData[], randomizedPlates: (SearchData | undefined)[][][], idColumn: string) {
+export function downloadCSV(
+  searches: SearchData[],
+  randomizedPlates: (SearchData | undefined)[][][],
+  idColumn: string,
+  inputFileName?: string
+) {
   const csv = Papa.unparse(
     searches.map((search) => ({
       [idColumn]: search.name, // Use the selected ID column name
       ...search.metadata,
       plate: getPlateNumber(search.name, randomizedPlates),
-      row: getRowName(search.name, randomizedPlates),
-      column: getColumnNumber(search.name, randomizedPlates),
+      well: getWell(search.name, randomizedPlates),
     })),
     { header: true }
   );
+
+  // Generate output filename based on input filename
+  let outputFileName = 'randomized_searches_octopus.csv';
+  if (inputFileName) {
+    const baseName = inputFileName.replace(/\.[^/.]+$/, ''); // Remove extension
+    outputFileName = `${baseName}_octopus.csv`;
+  }
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', 'randomized_searches.csv');
+  link.setAttribute('download', outputFileName);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -108,6 +119,23 @@ export function getPlateNumber(searchName: string, randomizedPlates: (SearchData
       const row = plate[rowIndex];
       if (row.find((search) => search?.name === searchName)) {
         return plateIndex + 1;
+      }
+    }
+  }
+  return '';
+}
+
+export function getWell(searchName: string, randomizedPlates: (SearchData | undefined)[][][]): string {
+  for (let plateIndex = 0; plateIndex < randomizedPlates.length; plateIndex++) {
+    const plate = randomizedPlates[plateIndex];
+    for (let rowIndex = 0; rowIndex < plate.length; rowIndex++) {
+      const row = plate[rowIndex];
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
+        if (row[columnIndex]?.name === searchName) {
+          const rowLabel = String.fromCharCode(65 + rowIndex); // A, B, C...
+          const colLabel = (columnIndex + 1).toString().padStart(2, '0'); // 01, 02, 03...
+          return `${rowLabel}${colLabel}`;
+        }
       }
     }
   }

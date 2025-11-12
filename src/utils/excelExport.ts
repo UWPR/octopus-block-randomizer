@@ -6,7 +6,8 @@ interface ExcelExportOptions {
   searches: SearchData[];
   randomizedPlates: (SearchData | undefined)[][][];
   covariateColors: { [key: string]: CovariateColorInfo };
-  selectedCovariates: string[];
+  treatmentCovariates: string[]; // Covariates used for randomization (for color lookup)
+  exportCovariates: string[]; // Covariates to display in plate cells of Excel export
   numRows: number;
   numColumns: number;
   inputFileName?: string;
@@ -14,6 +15,13 @@ interface ExcelExportOptions {
 
 // Style constants
 const THIN_BORDER: Partial<ExcelJS.Border> = { style: 'thin' };
+
+const THIN_BLACK_BORDERS: Partial<ExcelJS.Borders> = {
+  top: { style: 'thin' },
+  left: { style: 'thin' },
+  bottom: { style: 'thin' },
+  right: { style: 'thin' }
+};
 
 const THICK_BORDER_STYLE: ExcelJS.BorderStyle = 'thick';
 
@@ -47,25 +55,25 @@ const createSolidFill = (argbColor: string): ExcelJS.Fill => ({
  * Export plate layouts to Excel with colored cells and formatting
  */
 export async function exportToExcel(options: ExcelExportOptions): Promise<void> {
-  const { searches, randomizedPlates, covariateColors, selectedCovariates, numRows, numColumns, inputFileName } = options;
+  const { searches, randomizedPlates, covariateColors, treatmentCovariates, exportCovariates, numRows, numColumns, inputFileName } = options;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Octopus Block Randomizer';
   workbook.created = new Date();
 
   // Calculate optimal column width once for all plates
-  const columnWidth = calculateOptimalColumnWidth(searches, selectedCovariates);
+  const columnWidth = calculateOptimalColumnWidth(searches, exportCovariates);
 
   // Create a sheet for each plate
   randomizedPlates.forEach((plate, plateIndex) => {
-    createPlateSheet(workbook, plate, plateIndex, covariateColors, selectedCovariates, numRows, numColumns, columnWidth);
+    createPlateSheet(workbook, plate, plateIndex, covariateColors, treatmentCovariates, exportCovariates, numRows, numColumns, columnWidth);
   });
 
-  // Create legend sheet
-  createLegendSheet(workbook, searches, covariateColors, selectedCovariates, randomizedPlates);
+  // Create legend sheet (always uses treatment covariates for color grouping)
+  createLegendSheet(workbook, searches, covariateColors, treatmentCovariates, randomizedPlates);
 
-  // Create sample details sheet
-  createSampleDetailsSheet(workbook, searches, selectedCovariates, randomizedPlates, covariateColors);
+  // Create sample details sheet (uses treatment covariates for color lookup)
+  createSampleDetailsSheet(workbook, searches, treatmentCovariates, randomizedPlates, covariateColors);
 
   // Generate output filename based on input filename
   let outputFileName = 'plate-randomization_octopus.xlsx';
@@ -94,8 +102,8 @@ function calculateOptimalColumnWidth(
   selectedCovariates: string[]
 ): number {
   const CHAR_WIDTH = 0.9; // Approximate character width in Excel units
-  const MIN_WIDTH = 15;
-  const MAX_WIDTH = 40;
+  const MIN_WIDTH = 10;
+  const MAX_WIDTH = 20;
 
   let maxLength = 0;
 
@@ -124,7 +132,8 @@ function createPlateSheet(
   plate: (SearchData | undefined)[][],
   plateIndex: number,
   covariateColors: { [key: string]: CovariateColorInfo },
-  selectedCovariates: string[],
+  treatmentCovariates: string[],
+  exportCovariates: string[],
   numRows: number,
   numColumns: number,
   columnWidth: number
@@ -167,15 +176,11 @@ function createPlateSheet(
         const cell = excelRow.getCell(colIndex + 2); // +2 because column 1 is row label
 
         // Add default thin border to all cells first
-        cell.border = {
-          top: THIN_BORDER,
-          left: THIN_BORDER,
-          bottom: THIN_BORDER,
-          right: THIN_BORDER
-        };
+        cell.border = THIN_BLACK_BORDERS;
 
         if (sample) {
-          const colorInfo = covariateColors[getCovariateKey(sample, selectedCovariates)];
+          // Use treatment covariates for color lookup
+          const colorInfo = covariateColors[getCovariateKey(sample, treatmentCovariates)];
 
           if (subRow === 0) {
             // Row 1: Color indicator (this will override the border if needed)
@@ -187,7 +192,7 @@ function createPlateSheet(
             cell.font = { bold: true };
           } else {
             // Row 3: Covariate values
-            const covariateText = selectedCovariates
+            const covariateText = exportCovariates
               .map(cov => `${cov}: ${sample.metadata[cov] || 'N/A'}`)
               .join('\n');
             cell.value = covariateText;
@@ -210,7 +215,7 @@ function createPlateSheet(
         // Each covariate line needs approximately 15-18 pixels, plus some padding
         const lineHeight = 16;
         const padding = 8;
-        const calculatedHeight = (selectedCovariates.length * lineHeight) + padding;
+        const calculatedHeight = (exportCovariates.length * lineHeight) + padding;
         excelRow.height = Math.max(30, calculatedHeight); // Minimum 30, scales with covariates
       }
     }
@@ -245,7 +250,7 @@ function createLegendSheet(
   workbook: ExcelJS.Workbook,
   searches: SearchData[],
   covariateColors: { [key: string]: CovariateColorInfo },
-  selectedCovariates: string[],
+  treatmentCovariates: string[],
   randomizedPlates: (SearchData | undefined)[][][]
 ): void {
   const sheet = workbook.addWorksheet('Legend');
@@ -255,20 +260,20 @@ function createLegendSheet(
   titleRow.font = { bold: true, size: 14 };
   sheet.mergeCells(1, 1, 1, 4);
 
-  // Count samples by covariate combination (total)
+  // Count samples by covariate combination (total) - use treatment covariates
   const combinationCounts = new Map<string, number>();
   searches.forEach(search => {
-    const key = getCovariateKey(search, selectedCovariates);
+    const key = getCovariateKey(search, treatmentCovariates);
     combinationCounts.set(key, (combinationCounts.get(key) || 0) + 1);
   });
 
-  // Count samples by covariate combination per plate
+  // Count samples by covariate combination per plate - use treatment covariates
   const plateCounts = new Map<string, Map<number, number>>(); // combination -> plate -> count
   randomizedPlates.forEach((plate, plateIndex) => {
     plate.forEach(row => {
       row.forEach(sample => {
         if (sample) {
-          const key = getCovariateKey(sample, selectedCovariates);
+          const key = getCovariateKey(sample, treatmentCovariates);
           if (!plateCounts.has(key)) {
             plateCounts.set(key, new Map());
           }
@@ -282,7 +287,7 @@ function createLegendSheet(
   // Headers
   sheet.addRow([]);
   const plateHeaders = randomizedPlates.map((_, i) => `Plate ${i + 1}`);
-  const headerRow = sheet.addRow(['Color', ...selectedCovariates, 'Total', ...plateHeaders]);
+  const headerRow = sheet.addRow(['Color', ...treatmentCovariates, 'Total', ...plateHeaders]);
   headerRow.font = { bold: true };
 
   // Sort by count (descending)
@@ -311,6 +316,7 @@ function createLegendSheet(
     if (colorInfo.useStripes) {
       // Striped pattern: diagonal stripes with color and white background
       colorCell.fill = createStripedFill(argbColor);
+      colorCell.border = THIN_BLACK_BORDERS;
     } else if (colorInfo.useOutline) {
       // Outline: thick colored border with white background
       colorCell.fill = WHITE_FILL;
@@ -318,18 +324,19 @@ function createLegendSheet(
     } else {
       // Solid fill
       colorCell.fill = createSolidFill(argbColor);
+      colorCell.border = THIN_BLACK_BORDERS;
     }
   });
 
   // Set column widths
   sheet.getColumn(1).width = 10; // Color
-  selectedCovariates.forEach((_, index) => {
+  treatmentCovariates.forEach((_, index) => {
     sheet.getColumn(index + 2).width = 15; // Covariate columns
   });
-  sheet.getColumn(selectedCovariates.length + 2).width = 10; // Total count
+  sheet.getColumn(treatmentCovariates.length + 2).width = 10; // Total count
   // Plate columns
   randomizedPlates.forEach((_, index) => {
-    sheet.getColumn(selectedCovariates.length + 3 + index).width = 10;
+    sheet.getColumn(treatmentCovariates.length + 3 + index).width = 10;
   });
 }
 
@@ -339,7 +346,7 @@ function createLegendSheet(
 function createSampleDetailsSheet(
   workbook: ExcelJS.Workbook,
   searches: SearchData[],
-  selectedCovariates: string[],
+  treatmentCovariates: string[],
   randomizedPlates: (SearchData | undefined)[][][],
   covariateColors: { [key: string]: CovariateColorInfo }
 ): void {
@@ -361,20 +368,20 @@ function createSampleDetailsSheet(
     });
   });
 
-  // Get all covariates (not just selected ones)
+  // Get all covariates (not just treatment ones)
   const allCovariates = Array.from(new Set(searches.flatMap(s => Object.keys(s.metadata))));
 
-  // Separate selected covariates and other covariates
-  const otherCovariates = allCovariates.filter(cov => !selectedCovariates.includes(cov));
+  // Separate treatment covariates and other covariates
+  const otherCovariates = allCovariates.filter(cov => !treatmentCovariates.includes(cov));
 
-  // Headers: Sample Name, Plate, Well, Color, [Selected Covariates], [Other Covariates]
-  const headerRow = sheet.addRow(['Sample Name', 'Plate', 'Well', 'Color', ...selectedCovariates, ...otherCovariates]);
+  // Headers: Sample Name, Plate, Well, Color, [Treatment Covariates], [Other Covariates]
+  const headerRow = sheet.addRow(['Sample Name', 'Plate', 'Well', 'Color', ...treatmentCovariates, ...otherCovariates]);
   headerRow.font = { bold: true };
 
   // Add each sample
   searches.forEach(search => {
     const location = sampleLocations.get(search.name);
-    const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)];
+    const colorInfo = covariateColors[getCovariateKey(search, treatmentCovariates)];
 
     const rowData = [
       search.name,
@@ -383,8 +390,8 @@ function createSampleDetailsSheet(
       '' // Color cell (will be formatted below)
     ];
 
-    // Add selected covariate values
-    selectedCovariates.forEach(cov => {
+    // Add treatment covariate values
+    treatmentCovariates.forEach(cov => {
       rowData.push(search.metadata[cov] || '');
     });
 
@@ -402,11 +409,13 @@ function createSampleDetailsSheet(
 
       if (colorInfo.useStripes) {
         colorCell.fill = createStripedFill(argbColor);
+        colorCell.border = THIN_BLACK_BORDERS;
       } else if (colorInfo.useOutline) {
         colorCell.fill = WHITE_FILL;
         colorCell.border = createThickColoredBorder(argbColor);
       } else {
         colorCell.fill = createSolidFill(argbColor);
+        colorCell.border = THIN_BLACK_BORDERS;
       }
     }
   });
@@ -416,11 +425,11 @@ function createSampleDetailsSheet(
   sheet.getColumn(2).width = 8;  // Plate
   sheet.getColumn(3).width = 8;  // Well
   sheet.getColumn(4).width = 10; // Color
-  selectedCovariates.forEach((_, index) => {
-    sheet.getColumn(index + 5).width = 15; // Selected covariates
+  treatmentCovariates.forEach((_, index) => {
+    sheet.getColumn(index + 5).width = 15; // Treatment covariates
   });
   otherCovariates.forEach((_, index) => {
-    sheet.getColumn(selectedCovariates.length + 5 + index).width = 15; // Other covariates
+    sheet.getColumn(treatmentCovariates.length + 5 + index).width = 15; // Other covariates
   });
 
   // Freeze header row

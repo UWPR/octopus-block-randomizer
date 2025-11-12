@@ -3,6 +3,7 @@ import FileUploadSection from './components/FileUploadSection';
 import ConfigurationForm from './components/ConfigurationForm';
 import SummaryPanel from './components/SummaryPanel';
 import PlateDetailsModal from './components/PlateDetailsModal';
+import ExcelExportModal from './components/ExcelExportModal';
 import PlatesGrid from './components/PlatesGrid';
 import QualityMetricsPanel from './components/QualityMetricsPanel';
 import QualityLegend from './components/QualityLegend';
@@ -102,6 +103,7 @@ const App: React.FC = () => {
   const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
   const [showPlateDetails, setShowPlateDetails] = useState<boolean>(false);
   const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
+  const [showExcelExportModal, setShowExcelExportModal] = useState<boolean>(false);
 
 
   // Calculate quality metrics when randomization completes or plates change
@@ -215,19 +217,25 @@ const App: React.FC = () => {
     }
   };
 
-  // Download Excel handler
-  const handleDownloadExcel = async () => {
+  // Download Excel handler - opens modal for covariate selection
+  const handleDownloadExcel = () => {
     if (selectedCovariates.length > 0 && randomizedPlates.length > 0) {
-      await exportToExcel({
-        searches,
-        randomizedPlates,
-        covariateColors,
-        selectedCovariates,
-        numRows: plateRows,
-        numColumns: plateColumns,
-        inputFileName: selectedFileName
-      });
+      setShowExcelExportModal(true);
     }
+  };
+
+  // Actual export after covariate selection
+  const handleExcelExport = async (exportCovariates: string[]) => {
+    await exportToExcel({
+      searches,
+      randomizedPlates,
+      covariateColors,
+      treatmentCovariates: selectedCovariates, // Original treatment covariates for color lookup
+      exportCovariates: exportCovariates, // User-selected covariates to display
+      numRows: plateRows,
+      numColumns: plateColumns,
+      inputFileName: selectedFileName
+    });
   };
 
   // Re-randomization handler
@@ -469,6 +477,17 @@ const App: React.FC = () => {
           metrics={metrics}
           show={showMetrics}
           onClose={toggleMetrics}
+        />
+
+        {/* Excel Export Modal */}
+        <ExcelExportModal
+          isOpen={showExcelExportModal}
+          onClose={() => setShowExcelExportModal(false)}
+          onExport={handleExcelExport}
+          availableCovariates={availableColumns}
+          treatmentCovariates={selectedCovariates}
+          searches={searches}
+          sampleIdColumn={selectedIdColumn}
         />
 
         {/* Help Section */}

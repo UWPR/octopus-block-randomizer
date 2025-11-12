@@ -100,3 +100,94 @@ export interface QualityMetrics {
   overallQuality: OverallQualityAssessment;
 }
 
+// Repeated-measures interfaces
+
+/**
+ * Represents a group of samples from the same subject that must
+ * stay together on the same plate
+ */
+export interface RepeatedMeasuresGroup {
+  /** Unique identifier for this group (e.g., "Patient_001") */
+  subjectId: string;
+
+  /** All samples belonging to this group */
+  samples: SearchData[];
+
+  /**
+   * Treatment composition of this group
+   * Maps treatment combination key to count of samples
+   * Example: {"Drug|Timepoint_0": 2, "Drug|Timepoint_10": 1}
+   *
+   * Note: A repeated-measures group can contain samples with
+   * DIFFERENT treatment variable values (e.g., different timepoints)
+   */
+  treatmentComposition: Map<string, number>;
+
+  /** Total number of samples in this group */
+  size: number;
+
+  /** Whether this is a singleton group (sample without subject ID) */
+  isSingleton: boolean;
+}
+
+/**
+ * Configuration for randomization with optional repeated-measures support
+ */
+export interface RandomizationConfig {
+  /** Variables used for treatment balancing */
+  treatmentVariables: string[];
+
+  /** Variable used for repeated-measures grouping (optional) */
+  repeatedMeasuresVariable?: string;
+
+  /** Standard randomization parameters */
+  keepEmptyInLastPlate: boolean;
+  numRows: number;
+  numColumns: number;
+}
+
+/**
+ * Enhanced return type for randomization with repeated-measures metadata
+ */
+export interface RandomizationResult {
+  /** 3D array: plates[plateIdx][rowIdx][colIdx] = SearchData | undefined */
+  plates: (SearchData | undefined)[][][];
+
+  /** Map of plate index to samples assigned to that plate */
+  plateAssignments?: Map<number, SearchData[]>;
+
+  /** Repeated-measures groups created (if applicable) */
+  repeatedMeasuresGroups?: RepeatedMeasuresGroup[];
+
+  /** Quality metrics for the randomization */
+  qualityMetrics?: RepeatedMeasuresQualityMetrics;
+}
+
+/**
+ * Quality metrics specific to repeated-measures randomization
+ */
+export interface RepeatedMeasuresQualityMetrics {
+  /** Whether repeated-measures constraints are satisfied */
+  repeatedMeasuresConstraintsSatisfied: boolean;
+
+  /** Number of groups split across plates (should be 0) */
+  repeatedMeasuresViolations: number;
+
+  /** Treatment balance score (0-100, higher is better) */
+  treatmentBalanceScore: number;
+
+  /** Per-plate repeated-measures group counts */
+  plateGroupCounts: number[];
+
+  /** Distribution of group sizes */
+  groupSizeDistribution: {
+    singletons: number;
+    small: number;    // 2-5 samples
+    medium: number;   // 6-15 samples
+    large: number;    // 16+ samples
+  };
+
+  /** Standard quality metrics */
+  standardMetrics: QualityMetrics;
+}
+

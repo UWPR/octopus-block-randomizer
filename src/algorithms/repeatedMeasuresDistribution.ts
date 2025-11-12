@@ -67,3 +67,86 @@ export function distributeGroupsToPlates(
 
   return plateAssignments;
 }
+
+/**
+ * Calculates treatment balance score for adding a group to a plate
+ *
+ * The balance score measures how much adding a group to a plate would deviate
+ * from the expected treatment proportions based on global distribution.
+ * Lower score = better balance.
+ *
+ * Algorithm:
+ * 1. Calculate current plate composition from already assigned groups
+ * 2. Calculate hypothetical composition if we add the candidate group
+ * 3. For each treatment combination:
+ *    - Calculate expected count based on global proportion
+ *    - Calculate deviation from expected count
+ * 4. Sum all deviations to get total balance score
+ *
+ * Handles rare treatment groups with fractional expected counts correctly.
+ * For example, if a treatment appears 4 times across 7 plates, expected count
+ * per plate is ~0.57, and deviations are calculated from this fractional value.
+ *
+ * @param plateIdx Index of candidate plate
+ * @param group Group to potentially add
+ * @param currentAssignments Current plate assignments
+ * @param plateCounts Current sample counts per plate
+ * @param globalTreatmentCounts Global treatment distribution
+ * @param totalSamples Total number of samples
+ * @returns Balance score (lower is better)
+ */
+function calculateBalanceScore(
+  plateIdx: number,
+  group: RepeatedMeasuresGroup,
+  currentAssignments: Map<number, RepeatedMeasuresGroup[]>,
+  plateCounts: number[],
+  globalTreatmentCounts: Map<string, number>,
+  totalSamples: number
+): number {
+  // Step 1: Calculate current plate composition
+  const currentComposition = new Map<string, number>();
+  const assignedGroups = currentAssignments.get(plateIdx) || [];
+
+  assignedGroups.forEach(assignedGroup => {
+    assignedGroup.treatmentComposition.forEach((count, treatmentKey) => {
+      currentComposition.set(
+        treatmentKey,
+        (currentComposition.get(treatmentKey) || 0) + count
+      );
+    });
+  });
+
+  // Step 2: Calculate hypothetical composition (current + candidate group)
+  const hypotheticalComposition = new Map<string, number>(currentComposition);
+
+  group.treatmentComposition.forEach((count, treatmentKey) => {
+    hypotheticalComposition.set(
+      treatmentKey,
+      (hypotheticalComposition.get(treatmentKey) || 0) + count
+    );
+  });
+
+  // Step 3: Calculate hypothetical plate size
+  const hypotheticalPlateSize = plateCounts[plateIdx] + group.size;
+
+  // Step 4: Calculate deviation from expected proportions
+  let totalDeviation = 0;
+
+  globalTreatmentCounts.forEach((globalCount, treatmentKey) => {
+    // Calculate expected proportion based on global distribution
+    const expectedProportion = globalCount / totalSamples;
+
+    // Calculate expected count for this plate size
+    const expectedCount = expectedProportion * hypotheticalPlateSize;
+
+    // Get actual count (0 if treatment not present on plate)
+    const actualCount = hypotheticalComposition.get(treatmentKey) || 0;
+
+    // Calculate absolute deviation
+    const deviation = Math.abs(actualCount - expectedCount);
+
+    totalDeviation += deviation;
+  });
+
+  return totalDeviation;
+}

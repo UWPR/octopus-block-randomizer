@@ -62,7 +62,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Initialize plate assignments and tracking
     - _Requirements: 5.1, 5.2, 6.1, 7.1, 7.2, 7.3, 7.4_
 
-  - [ ] 3.2 Implement balance score calculation
+  - [x] 3.2 Implement balance score calculation
+
+
+
+
+
     - Calculate current and hypothetical plate compositions
     - Compute deviation from expected treatment proportions
     - Handle rare treatment groups with fractional expected counts

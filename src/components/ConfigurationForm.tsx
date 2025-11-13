@@ -21,6 +21,7 @@ interface ConfigurationFormProps {
   onPlateRowsChange: (value: number) => void;
   onPlateColumnsChange: (value: number) => void;
   onResetCovariateState: () => void;
+  hasVariableConflict?: boolean;
 }
 
 const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
@@ -43,6 +44,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   onPlateRowsChange,
   onPlateColumnsChange,
   onResetCovariateState,
+  hasVariableConflict = false,
 }) => {
   if (availableColumns.length === 0) return null;
 
@@ -50,6 +52,10 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   const availableRepeatedMeasuresColumns = searches.length > 0
     ? Object.keys(searches[0].metadata).filter(col => !selectedCovariates.includes(col))
     : [];
+
+  // Check for variable conflict (same variable used as both treatment and repeated-measures)
+  const variableConflict = selectedRepeatedMeasuresVariable &&
+    selectedCovariates.includes(selectedRepeatedMeasuresVariable);
 
   return (
     <div style={styles.compactFormContainer}>
@@ -159,7 +165,14 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             <small style={styles.compactHint}>
               Select a variable to group samples from the same subject that must stay on the same plate (e.g., PatientID)
             </small>
-            {selectedRepeatedMeasuresVariable && (
+            {variableConflict && (
+              <div style={styles.errorBox}>
+                <small style={styles.errorText}>
+                  ⚠ A variable cannot be both a treatment variable and a repeated-measures variable. Please select different variables.
+                </small>
+              </div>
+            )}
+            {selectedRepeatedMeasuresVariable && !variableConflict && (
               <div style={styles.repeatedMeasuresInfoBox}>
                 <small style={styles.repeatedMeasuresInfoText}>
                   ℹ All samples with the same <strong>{selectedRepeatedMeasuresVariable}</strong> value will be assigned to the same plate
@@ -373,6 +386,19 @@ const styles = {
     fontSize: '13px',
     color: '#1565c0',
     lineHeight: '1.4',
+  },
+  errorBox: {
+    marginTop: '8px',
+    padding: '10px',
+    backgroundColor: '#ffebee',
+    borderRadius: '4px',
+    border: '1px solid #ef5350',
+  },
+  errorText: {
+    fontSize: '13px',
+    color: '#c62828',
+    lineHeight: '1.4',
+    fontWeight: '500',
   },
 };
 

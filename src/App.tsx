@@ -325,7 +325,11 @@ const App: React.FC = () => {
 
 
 
-  const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0;
+  // Check for variable conflict
+  const hasVariableConflict = Boolean(selectedRepeatedMeasuresVariable &&
+    selectedCovariates.includes(selectedRepeatedMeasuresVariable));
+
+  const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0 && !hasVariableConflict;
 
   return (
     <div style={styles.container}>
@@ -358,6 +362,7 @@ const App: React.FC = () => {
           onPlateRowsChange={setPlateRows}
           onPlateColumnsChange={setPlateColumns}
           onResetCovariateState={resetCovariateState}
+          hasVariableConflict={hasVariableConflict}
         />
 
 

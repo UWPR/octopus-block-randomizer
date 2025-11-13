@@ -189,7 +189,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Exclude columns already selected as treatment variables
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 12.1, 12.2_
 
-  - [ ] 6.2 Implement variable mutual exclusivity validation
+  - [x] 6.2 Implement variable mutual exclusivity validation
+
+
+
+
+
     - Prevent same variable being both treatment and repeated-measures
     - Display error message when conflict detected
     - Disable randomization button while error exists

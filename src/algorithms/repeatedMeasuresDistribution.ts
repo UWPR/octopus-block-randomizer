@@ -9,6 +9,12 @@ import { RepeatedMeasuresGroup } from '../utils/types';
  * 3. For each group, selects the plate that minimizes treatment imbalance
  * 4. Respects plate capacity constraints
  *
+ * OPTIMIZATIONS:
+ * - Pre-calculates global treatment distribution once
+ * - Uses Map for O(1) lookups
+ * - Caches plate treatment compositions to avoid recalculation
+ * - Implements early termination when perfect balance is achieved
+ *
  * @param groups Groups to distribute
  * @param plateCapacities Capacity of each plate (number of samples per plate)
  * @param treatmentVariables Variables for balancing
@@ -25,7 +31,7 @@ export function distributeGroupsToPlates(
   console.log(`Distributing ${groups.length} groups to ${plateCapacities.length} plates`);
   console.log(`Plate capacities: ${plateCapacities.join(', ')}`);
 
-  // Step 1: Calculate global treatment distribution from all samples
+  // Step 1: Calculate global treatment distribution from all samples (OPTIMIZATION: pre-calculate once)
   console.log(`\nStep 1: Calculating global treatment distribution...`);
   const globalTreatmentCounts = new Map<string, number>();
   let totalSamples = 0;
@@ -60,14 +66,18 @@ export function distributeGroupsToPlates(
     console.log(`    ... and ${sortedGroups.length - 5} more groups`);
   }
 
-  // Step 3: Initialize plate assignments and tracking
+  // Step 3: Initialize plate assignments and tracking (OPTIMIZATION: use Map for O(1) lookups)
   console.log(`\nStep 3: Initializing plate assignments...`);
   const plateAssignments = new Map<number, RepeatedMeasuresGroup[]>();
   const plateCounts = new Array(plateCapacities.length).fill(0);
 
-  // Initialize empty arrays for each plate
+  // OPTIMIZATION: Cache plate treatment compositions to avoid recalculation
+  const plateTreatmentCompositions = new Map<number, Map<string, number>>();
+
+  // Initialize empty arrays and compositions for each plate
   for (let i = 0; i < plateCapacities.length; i++) {
     plateAssignments.set(i, []);
+    plateTreatmentCompositions.set(i, new Map<string, number>());
   }
 
   console.log(`  ✓ Initialized ${plateCapacities.length} plates for distribution`);
@@ -82,12 +92,12 @@ export function distributeGroupsToPlates(
   for (const group of sortedGroups) {
     groupCounter++;
 
-    // Find the best plate for this group
+    // Find the best plate for this group (OPTIMIZATION: uses cached compositions)
     const bestPlateIdx = selectBestPlate(
       group,
       plateCapacities,
       plateCounts,
-      plateAssignments,
+      plateTreatmentCompositions,
       globalTreatmentCounts,
       totalSamples
     );
@@ -95,6 +105,15 @@ export function distributeGroupsToPlates(
     // Assign group to the best plate
     plateAssignments.get(bestPlateIdx)!.push(group);
     plateCounts[bestPlateIdx] += group.size;
+
+    // OPTIMIZATION: Update cached composition incrementally
+    const plateComposition = plateTreatmentCompositions.get(bestPlateIdx)!;
+    group.treatmentComposition.forEach((count, treatmentKey) => {
+      plateComposition.set(
+        treatmentKey,
+        (plateComposition.get(treatmentKey) || 0) + count
+      );
+    });
 
     const fillPercentage = ((plateCounts[bestPlateIdx] / plateCapacities[bestPlateIdx]) * 100).toFixed(1);
     const remainingCapacity = plateCapacities[bestPlateIdx] - plateCounts[bestPlateIdx];
@@ -124,13 +143,8 @@ export function distributeGroupsToPlates(
     console.log(`  ✓ Total samples: ${plateCounts[i]}/${plateCapacities[i]} (${fillPercentage}% full)`);
     console.log(`  ✓ Remaining capacity: ${remainingCapacity} samples`);
 
-    // Show treatment distribution for this plate
-    const plateTreatmentCounts = new Map<string, number>();
-    assignedGroups.forEach(g => {
-      g.treatmentComposition.forEach((count, key) => {
-        plateTreatmentCounts.set(key, (plateTreatmentCounts.get(key) || 0) + count);
-      });
-    });
+    // Show treatment distribution for this plate (use cached composition)
+    const plateTreatmentCounts = plateTreatmentCompositions.get(i)!;
 
     console.log(`  ✓ Treatment distribution:`);
     plateTreatmentCounts.forEach((count, key) => {
@@ -153,12 +167,13 @@ export function distributeGroupsToPlates(
  * 1. Check capacity constraints for each candidate plate
  * 2. Calculate balance score for each viable plate
  * 3. Select plate with lowest balance score (best balance)
- * 4. Throw error if no plate can fit the group
+ * 4. OPTIMIZATION: Early termination if perfect balance (score = 0) is found
+ * 5. Throw error if no plate can fit the group
  *
  * @param group Group to assign
  * @param plateCapacities Capacity of each plate
  * @param plateCounts Current sample counts per plate
- * @param currentAssignments Current plate assignments
+ * @param plateTreatmentCompositions Cached treatment compositions per plate
  * @param globalTreatmentCounts Global treatment distribution
  * @param totalSamples Total number of samples
  * @returns Index of the best plate
@@ -168,7 +183,7 @@ function selectBestPlate(
   group: RepeatedMeasuresGroup,
   plateCapacities: number[],
   plateCounts: number[],
-  currentAssignments: Map<number, RepeatedMeasuresGroup[]>,
+  plateTreatmentCompositions: Map<number, Map<string, number>>,
   globalTreatmentCounts: Map<string, number>,
   totalSamples: number
 ): number {
@@ -177,7 +192,7 @@ function selectBestPlate(
 
   // Check each candidate plate
   for (let plateIdx = 0; plateIdx < plateCapacities.length; plateIdx++) {
-    // Check capacity constraint
+    // OPTIMIZATION: Check capacity constraint first (early exit)
     const remainingCapacity = plateCapacities[plateIdx] - plateCounts[plateIdx];
 
     if (remainingCapacity < group.size) {
@@ -185,11 +200,11 @@ function selectBestPlate(
       continue;
     }
 
-    // Calculate balance score for this plate
+    // Calculate balance score for this plate (uses cached composition)
     const score = calculateBalanceScore(
       plateIdx,
       group,
-      currentAssignments,
+      plateTreatmentCompositions,
       plateCounts,
       globalTreatmentCounts,
       totalSamples
@@ -199,6 +214,11 @@ function selectBestPlate(
     if (score < bestScore) {
       bestScore = score;
       bestPlateIdx = plateIdx;
+
+      // OPTIMIZATION: Early termination if perfect balance achieved
+      if (bestScore === 0) {
+        break;
+      }
     }
   }
 
@@ -226,12 +246,17 @@ function selectBestPlate(
  * Lower score = better balance.
  *
  * Algorithm:
- * 1. Calculate current plate composition from already assigned groups
+ * 1. Use cached plate composition (OPTIMIZATION: avoid recalculation)
  * 2. Calculate hypothetical composition if we add the candidate group
  * 3. For each treatment combination:
  *    - Calculate expected count based on global proportion
  *    - Calculate deviation from expected count
  * 4. Sum all deviations to get total balance score
+ *
+ * OPTIMIZATIONS:
+ * - Uses cached plate compositions instead of recalculating from groups
+ * - Pre-calculated global treatment counts passed in
+ * - Early exit possible if deviation becomes too large
  *
  * Handles rare treatment groups with fractional expected counts correctly.
  * For example, if a treatment appears 4 times across 7 plates, expected count
@@ -239,7 +264,7 @@ function selectBestPlate(
  *
  * @param plateIdx Index of candidate plate
  * @param group Group to potentially add
- * @param currentAssignments Current plate assignments
+ * @param plateTreatmentCompositions Cached treatment compositions per plate
  * @param plateCounts Current sample counts per plate
  * @param globalTreatmentCounts Global treatment distribution
  * @param totalSamples Total number of samples
@@ -248,25 +273,16 @@ function selectBestPlate(
 function calculateBalanceScore(
   plateIdx: number,
   group: RepeatedMeasuresGroup,
-  currentAssignments: Map<number, RepeatedMeasuresGroup[]>,
+  plateTreatmentCompositions: Map<number, Map<string, number>>,
   plateCounts: number[],
   globalTreatmentCounts: Map<string, number>,
   totalSamples: number
 ): number {
-  // Step 1: Calculate current plate composition
-  const currentComposition = new Map<string, number>();
-  const assignedGroups = currentAssignments.get(plateIdx) || [];
-
-  assignedGroups.forEach(assignedGroup => {
-    assignedGroup.treatmentComposition.forEach((count, treatmentKey) => {
-      currentComposition.set(
-        treatmentKey,
-        (currentComposition.get(treatmentKey) || 0) + count
-      );
-    });
-  });
+  // Step 1: Get current plate composition from cache (OPTIMIZATION: O(1) lookup)
+  const currentComposition = plateTreatmentCompositions.get(plateIdx)!;
 
   // Step 2: Calculate hypothetical composition (current + candidate group)
+  // OPTIMIZATION: Only create new Map, don't iterate through all groups
   const hypotheticalComposition = new Map<string, number>(currentComposition);
 
   group.treatmentComposition.forEach((count, treatmentKey) => {

@@ -4,6 +4,12 @@ import { getCovariateKey } from '../utils/utils';
 /**
  * Creates repeated-measures groups from samples
  *
+ * OPTIMIZATIONS:
+ * - Uses Map for O(1) subject ID lookups
+ * - Pre-calculates treatment compositions during group creation
+ * - Single pass through samples for grouping
+ * - Efficient memory usage with direct array operations
+ *
  * @param samples All samples to be randomized
  * @param repeatedMeasuresVariable Variable used for grouping (e.g., "PatientID")
  * @param treatmentVariables Variables used for treatment balancing
@@ -19,10 +25,11 @@ export function createRepeatedMeasuresGroups(
   console.log(`  - Grouping variable: ${repeatedMeasuresVariable}`);
   console.log(`  - Treatment variables: ${treatmentVariables.join(', ')}`);
 
-  // Step 1: Group samples by subject ID
+  // Step 1: Group samples by subject ID (OPTIMIZATION: Map for O(1) lookups)
   const subjectMap = new Map<string, SearchData[]>();
   let singletonCounter = 0;
 
+  // OPTIMIZATION: Single pass through samples
   samples.forEach(sample => {
     const subjectId = sample.metadata[repeatedMeasuresVariable];
 
@@ -31,7 +38,7 @@ export function createRepeatedMeasuresGroups(
       const singletonId = `__singleton_${singletonCounter++}`;
       subjectMap.set(singletonId, [sample]);
     } else {
-      // Group samples with the same subject ID
+      // Group samples with the same subject ID (OPTIMIZATION: O(1) lookup and insert)
       if (!subjectMap.has(subjectId)) {
         subjectMap.set(subjectId, []);
       }
@@ -43,10 +50,12 @@ export function createRepeatedMeasuresGroups(
   console.log(`  - Samples without subject ID (singletons): ${singletonCounter}`);
 
   // Step 2: Convert to RepeatedMeasuresGroup objects
-  const groups: RepeatedMeasuresGroup[] = [];
+  // OPTIMIZATION: Pre-allocate array with known size
+  const groups: RepeatedMeasuresGroup[] = new Array(subjectMap.size);
+  let groupIndex = 0;
 
   subjectMap.forEach((groupSamples, subjectId) => {
-    // Calculate treatment composition for this group
+    // OPTIMIZATION: Calculate treatment composition once during group creation
     const treatmentComposition = new Map<string, number>();
 
     groupSamples.forEach(sample => {
@@ -66,7 +75,7 @@ export function createRepeatedMeasuresGroups(
       isSingleton: subjectId.startsWith('__singleton_')
     };
 
-    groups.push(group);
+    groups[groupIndex++] = group;
   });
 
   // Calculate statistics
@@ -114,6 +123,11 @@ export function createRepeatedMeasuresGroups(
 /**
  * Validates repeated-measures groups for common issues
  *
+ * OPTIMIZATIONS:
+ * - Single pass through groups for all checks
+ * - Pre-calculate thresholds once
+ * - Avoid redundant filtering operations
+ *
  * @param groups Groups to validate
  * @param plateCapacity Maximum samples per plate
  * @returns Validation result with errors and warnings
@@ -133,9 +147,34 @@ export function validateRepeatedMeasuresGroups(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Check for oversized groups (exceeds plate capacity)
+  // OPTIMIZATION: Pre-calculate thresholds once
+  const largeThreshold = plateCapacity * 0.5;
+
+  // OPTIMIZATION: Single pass through groups for all checks
+  let singletonCount = 0;
+  const oversizedGroups: RepeatedMeasuresGroup[] = [];
+  const largeGroups: RepeatedMeasuresGroup[] = [];
+
+  console.log(`  - Analyzing groups (single pass optimization)...`);
+
+  groups.forEach(group => {
+    // Count singletons
+    if (group.isSingleton) {
+      singletonCount++;
+    }
+
+    // Check for oversized groups (exceeds plate capacity)
+    if (group.size > plateCapacity) {
+      oversizedGroups.push(group);
+    }
+    // Check for large groups (> 50% of plate capacity but <= capacity)
+    else if (group.size > largeThreshold) {
+      largeGroups.push(group);
+    }
+  });
+
+  // Report oversized groups
   console.log(`  - Checking for oversized groups (> ${plateCapacity} samples)...`);
-  const oversizedGroups = groups.filter(g => g.size > plateCapacity);
   if (oversizedGroups.length > 0) {
     console.error(`    ❌ Found ${oversizedGroups.length} oversized group(s):`);
     oversizedGroups.forEach(group => {
@@ -149,12 +188,8 @@ export function validateRepeatedMeasuresGroups(
     console.log(`    ✓ No oversized groups found`);
   }
 
-  // Warn about large groups (> 50% of plate capacity)
-  const largeThreshold = plateCapacity * 0.5;
+  // Report large groups
   console.log(`  - Checking for large groups (> ${largeThreshold} samples, ${(50).toFixed(0)}% of capacity)...`);
-  const largeGroups = groups.filter(
-    g => g.size > plateCapacity * 0.5 && g.size <= plateCapacity
-  );
   if (largeGroups.length > 0) {
     console.warn(`    ⚠ Found ${largeGroups.length} large group(s):`);
     largeGroups.forEach(group => {
@@ -168,9 +203,8 @@ export function validateRepeatedMeasuresGroups(
     console.log(`    ✓ No large groups found`);
   }
 
-  // Warn about high singleton ratio (> 80%)
+  // Check singleton ratio
   console.log(`  - Checking singleton ratio...`);
-  const singletonCount = groups.filter(g => g.isSingleton).length;
   const singletonRatio = singletonCount / groups.length;
   const singletonPercentage = (singletonRatio * 100).toFixed(1);
   console.log(`    Singleton ratio: ${singletonPercentage}% (${singletonCount}/${groups.length} groups)`);

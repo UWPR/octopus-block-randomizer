@@ -1,5 +1,4 @@
-import { SearchData, RepeatedMeasuresGroup } from '../utils/types';
-import { getCovariateKey } from '../utils/utils';
+import { RepeatedMeasuresGroup } from '../utils/types';
 
 /**
  * Distributes repeated-measures groups to plates using balanced best-fit algorithm
@@ -65,7 +64,113 @@ export function distributeGroupsToPlates(
 
   console.log(`\nInitialized ${plateCapacities.length} plates for distribution`);
 
+  // Step 4: Distribute each group to the best plate
+  console.log(`\nDistributing groups to plates...`);
+
+  for (const group of sortedGroups) {
+    // Find the best plate for this group
+    const bestPlateIdx = selectBestPlate(
+      group,
+      plateCapacities,
+      plateCounts,
+      plateAssignments,
+      globalTreatmentCounts,
+      totalSamples
+    );
+
+    // Assign group to the best plate
+    plateAssignments.get(bestPlateIdx)!.push(group);
+    plateCounts[bestPlateIdx] += group.size;
+
+    console.log(
+      `  - Assigned group ${group.subjectId} (${group.size} samples) to plate ${bestPlateIdx + 1} ` +
+      `(now ${plateCounts[bestPlateIdx]}/${plateCapacities[bestPlateIdx]} samples)`
+    );
+  }
+
+  // Log final distribution summary
+  console.log(`\nFinal distribution:`);
+  for (let i = 0; i < plateCapacities.length; i++) {
+    const groups = plateAssignments.get(i)!;
+    console.log(
+      `  - Plate ${i + 1}: ${groups.length} groups, ${plateCounts[i]} samples ` +
+      `(${((plateCounts[i] / plateCapacities[i]) * 100).toFixed(1)}% full)`
+    );
+  }
+
   return plateAssignments;
+}
+
+/**
+ * Selects the best plate for a group based on capacity constraints and balance score
+ *
+ * Algorithm:
+ * 1. Check capacity constraints for each candidate plate
+ * 2. Calculate balance score for each viable plate
+ * 3. Select plate with lowest balance score (best balance)
+ * 4. Throw error if no plate can fit the group
+ *
+ * @param group Group to assign
+ * @param plateCapacities Capacity of each plate
+ * @param plateCounts Current sample counts per plate
+ * @param currentAssignments Current plate assignments
+ * @param globalTreatmentCounts Global treatment distribution
+ * @param totalSamples Total number of samples
+ * @returns Index of the best plate
+ * @throws Error if no plate can fit the group
+ */
+function selectBestPlate(
+  group: RepeatedMeasuresGroup,
+  plateCapacities: number[],
+  plateCounts: number[],
+  currentAssignments: Map<number, RepeatedMeasuresGroup[]>,
+  globalTreatmentCounts: Map<string, number>,
+  totalSamples: number
+): number {
+  let bestPlateIdx = -1;
+  let bestScore = Infinity;
+
+  // Check each candidate plate
+  for (let plateIdx = 0; plateIdx < plateCapacities.length; plateIdx++) {
+    // Check capacity constraint
+    const remainingCapacity = plateCapacities[plateIdx] - plateCounts[plateIdx];
+
+    if (remainingCapacity < group.size) {
+      // Plate cannot fit this group, skip it
+      continue;
+    }
+
+    // Calculate balance score for this plate
+    const score = calculateBalanceScore(
+      plateIdx,
+      group,
+      currentAssignments,
+      plateCounts,
+      globalTreatmentCounts,
+      totalSamples
+    );
+
+    // Update best plate if this score is better
+    if (score < bestScore) {
+      bestScore = score;
+      bestPlateIdx = plateIdx;
+    }
+  }
+
+  // Handle case where no plate can fit the group
+  if (bestPlateIdx === -1) {
+    throw new Error(
+      `Cannot fit repeated-measures group '${group.subjectId}' (${group.size} samples) ` +
+      `in any available plate. This may indicate insufficient total capacity or ` +
+      `the group is too large for the plate size. ` +
+      `Current plate capacities: ${plateCapacities.join(', ')}. ` +
+      `Current plate usage: ${plateCounts.map((count, idx) =>
+        `${count}/${plateCapacities[idx]}`
+      ).join(', ')}.`
+    );
+  }
+
+  return bestPlateIdx;
 }
 
 /**

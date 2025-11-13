@@ -74,7 +74,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Return balance score (lower = better)
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 3.3 Implement best plate selection logic
+  - [x] 3.3 Implement best plate selection logic
+
+
+
+
+
     - Check capacity constraints for each candidate plate
     - Calculate balance score for each viable plate
     - Select plate with lowest balance score

@@ -150,8 +150,15 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Test backward compatibility (no repeated-measures variable)
     - _Requirements: 5.1, 5.2, 6.1, 6.5, 8.1, 8.2, 8.3, 8.4, 10.1, 10.2_
 
-- [ ] 5. Implement quality metrics and reporting
-  - [ ] 5.1 Extend quality metrics calculation
+- [x] 5. Implement quality metrics and reporting
+
+
+
+
+
+
+  - [x] 5.1 Extend quality metrics calculation
+
     - Calculate repeated-measures constraint satisfaction
     - Calculate treatment balance score
     - Calculate group size distribution
@@ -159,7 +166,9 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Include standard quality metrics
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-  - [ ] 5.2 Add console logging for debugging
+  - [x] 5.2 Add console logging for debugging
+
+
     - Log group creation summary
     - Log validation results
     - Log distribution progress

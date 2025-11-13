@@ -542,10 +542,13 @@ function calculateRepeatedMeasuresQualityMetrics(
   treatmentVariables: string[],
   repeatedMeasuresVariable: string
 ): RepeatedMeasuresQualityMetrics {
+  console.log(`\nCalculating quality metrics for repeated-measures randomization...`);
+
   // Import quality metrics calculation
   const { calculateQualityMetrics } = require('../utils/qualityMetrics');
 
   // Calculate standard quality metrics
+  console.log(`  - Calculating standard quality metrics (balance and row clustering)...`);
   const standardMetrics = calculateQualityMetrics(
     searches,
     plateAssignments,
@@ -554,6 +557,7 @@ function calculateRepeatedMeasuresQualityMetrics(
   );
 
   // Check if repeated-measures constraints are satisfied
+  console.log(`  - Validating repeated-measures constraint satisfaction...`);
   let repeatedMeasuresConstraintsSatisfied = true;
   let repeatedMeasuresViolations = 0;
 
@@ -584,6 +588,7 @@ function calculateRepeatedMeasuresQualityMetrics(
   const treatmentBalanceScore = standardMetrics.plateDiversity.averageBalanceScore;
 
   // Calculate per-plate group counts
+  console.log(`  - Calculating per-plate group counts...`);
   const plateGroupCounts: number[] = [];
   plateAssignments.forEach((samples, plateIdx) => {
     const plateSubjectIds = new Set<string>();
@@ -597,9 +602,11 @@ function calculateRepeatedMeasuresQualityMetrics(
       }
     });
     plateGroupCounts.push(plateSubjectIds.size);
+    console.log(`    Plate ${plateIdx + 1}: ${plateSubjectIds.size} groups, ${samples.length} samples`);
   });
 
   // Calculate group size distribution
+  console.log(`  - Calculating group size distribution...`);
   const groupSizeDistribution = {
     singletons: 0,
     small: 0,    // 2-5 samples
@@ -619,12 +626,37 @@ function calculateRepeatedMeasuresQualityMetrics(
     }
   });
 
-  console.log(`Quality Metrics:`);
-  console.log(`  Repeated-measures constraints satisfied: ${repeatedMeasuresConstraintsSatisfied}`);
-  console.log(`  Repeated-measures violations: ${repeatedMeasuresViolations}`);
-  console.log(`  Treatment balance score: ${treatmentBalanceScore.toFixed(2)}`);
-  console.log(`  Group size distribution:`, groupSizeDistribution);
-  console.log(`  Per-plate group counts:`, plateGroupCounts);
+  // Log comprehensive quality metrics summary
+  console.log(`\n┌─────────────────────────────────────────────────────────────┐`);
+  console.log(`│           QUALITY METRICS SUMMARY                           │`);
+  console.log(`└─────────────────────────────────────────────────────────────┘`);
+  console.log(`\nRepeated-Measures Constraints:`);
+  console.log(`  ✓ Constraints satisfied: ${repeatedMeasuresConstraintsSatisfied ? 'YES' : 'NO'}`);
+  console.log(`  ✓ Violations detected: ${repeatedMeasuresViolations}`);
+  console.log(`  ✓ Unique subject IDs tracked: ${subjectIdToPlate.size}`);
+
+  console.log(`\nTreatment Balance:`);
+  console.log(`  ✓ Overall balance score: ${treatmentBalanceScore.toFixed(2)}/100`);
+  console.log(`  ✓ Quality level: ${standardMetrics.overallQuality.level}`);
+
+  console.log(`\nGroup Size Distribution:`);
+  console.log(`  ✓ Singletons: ${groupSizeDistribution.singletons} groups`);
+  console.log(`  ✓ Small (2-5 samples): ${groupSizeDistribution.small} groups`);
+  console.log(`  ✓ Medium (6-15 samples): ${groupSizeDistribution.medium} groups`);
+  console.log(`  ✓ Large (16+ samples): ${groupSizeDistribution.large} groups`);
+  console.log(`  ✓ Total groups: ${groups.length}`);
+
+  console.log(`\nPer-Plate Group Distribution:`);
+  plateGroupCounts.forEach((count, idx) => {
+    const samples = plateAssignments.get(idx)?.length || 0;
+    const avgGroupSize = samples > 0 ? (samples / count).toFixed(1) : '0';
+    console.log(`  ✓ Plate ${idx + 1}: ${count} groups (avg size: ${avgGroupSize} samples)`);
+  });
+
+  console.log(`\nStandard Quality Metrics:`);
+  console.log(`  ✓ Average balance score: ${standardMetrics.plateDiversity.averageBalanceScore.toFixed(2)}/100`);
+  console.log(`  ✓ Average row clustering score: ${standardMetrics.plateDiversity.averageRowClusteringScore.toFixed(2)}/100`);
+  console.log(`  ✓ Overall quality score: ${standardMetrics.overallQuality.score.toFixed(2)}/100`);
 
   return {
     repeatedMeasuresConstraintsSatisfied,
@@ -819,7 +851,9 @@ function doRepeatedMeasuresAwareRandomization(
   });
 
   // Step 7: Validate repeated-measures constraints
-  console.log(`\n--- Step 7: Validating repeated-measures constraints ---`);
+  console.log(`\n┌─────────────────────────────────────────────────────────────┐`);
+  console.log(`│           CONSTRAINT VALIDATION                             │`);
+  console.log(`└─────────────────────────────────────────────────────────────┘`);
   validateRepeatedMeasuresConstraints(plateAssignments, repeatedMeasuresVariable);
 
   // Step 8: Calculate quality metrics
@@ -859,21 +893,34 @@ function validateRepeatedMeasuresConstraints(
   plateAssignments: Map<number, SearchData[]>,
   repeatedMeasuresVariable: string
 ): void {
-  console.log(`Validating repeated-measures constraints for variable: ${repeatedMeasuresVariable}`);
+  console.log(`\nValidating repeated-measures constraints...`);
+  console.log(`  - Variable: ${repeatedMeasuresVariable}`);
+  console.log(`  - Plates to validate: ${plateAssignments.size}`);
 
   // Track which plate each subject ID is assigned to
   const subjectIdToPlate = new Map<string, number>();
   const violations: string[] = [];
+  let totalSamplesChecked = 0;
+  let singletonsFound = 0;
 
   // Check each plate's samples
+  console.log(`\n  Checking plate assignments...`);
   plateAssignments.forEach((samples, plateIdx) => {
+    let plateSubjectIds = 0;
+    let plateSingletons = 0;
+
     samples.forEach(sample => {
+      totalSamplesChecked++;
       const subjectId = sample.metadata[repeatedMeasuresVariable];
 
       // Skip samples without a subject ID (singletons are allowed anywhere)
       if (!subjectId || subjectId === '') {
+        singletonsFound++;
+        plateSingletons++;
         return;
       }
+
+      plateSubjectIds++;
 
       // Check if this subject ID has been seen before
       if (subjectIdToPlate.has(subjectId)) {
@@ -886,7 +933,7 @@ function validateRepeatedMeasuresConstraints(
           // Only add this violation once
           if (!violations.includes(violationMsg)) {
             violations.push(violationMsg);
-            console.error(`  ❌ VIOLATION: ${violationMsg}`);
+            console.error(`    ❌ VIOLATION: ${violationMsg}`);
           }
         }
       } else {
@@ -894,17 +941,27 @@ function validateRepeatedMeasuresConstraints(
         subjectIdToPlate.set(subjectId, plateIdx);
       }
     });
+
+    console.log(`    Plate ${plateIdx + 1}: ${samples.length} samples (${plateSubjectIds} with subject ID, ${plateSingletons} singletons)`);
   });
 
   // Log validation results
+  console.log(`\n  Validation statistics:`);
+  console.log(`    - Total samples checked: ${totalSamplesChecked}`);
+  console.log(`    - Unique subject IDs found: ${subjectIdToPlate.size}`);
+  console.log(`    - Singletons found: ${singletonsFound}`);
+  console.log(`    - Violations detected: ${violations.length}`);
+
   if (violations.length === 0) {
+    console.log(`\n  ✓✓✓ VALIDATION PASSED ✓✓✓`);
     console.log(`  ✓ All repeated-measures groups are kept together on the same plate`);
     console.log(`  ✓ Validated ${subjectIdToPlate.size} unique subject IDs across ${plateAssignments.size} plates`);
+    console.log(`  ✓ No constraint violations detected`);
   } else {
-    console.error(`\n❌ Repeated-measures constraint validation FAILED:`);
-    console.error(`  Found ${violations.length} violation(s):`);
+    console.error(`\n  ❌❌❌ VALIDATION FAILED ❌❌❌`);
+    console.error(`  ❌ Found ${violations.length} constraint violation(s):`);
     violations.forEach((violation, idx) => {
-      console.error(`  ${idx + 1}. ${violation}`);
+      console.error(`     ${idx + 1}. ${violation}`);
     });
 
     // Throw error with all violations

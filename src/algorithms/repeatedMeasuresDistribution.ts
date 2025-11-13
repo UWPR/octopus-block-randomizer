@@ -19,10 +19,14 @@ export function distributeGroupsToPlates(
   plateCapacities: number[],
   treatmentVariables: string[]
 ): Map<number, RepeatedMeasuresGroup[]> {
-  console.log(`\nDistributing ${groups.length} groups to ${plateCapacities.length} plates`);
+  console.log(`\n┌─────────────────────────────────────────────────────────────┐`);
+  console.log(`│           DISTRIBUTION INITIALIZATION                       │`);
+  console.log(`└─────────────────────────────────────────────────────────────┘`);
+  console.log(`Distributing ${groups.length} groups to ${plateCapacities.length} plates`);
   console.log(`Plate capacities: ${plateCapacities.join(', ')}`);
 
   // Step 1: Calculate global treatment distribution from all samples
+  console.log(`\nStep 1: Calculating global treatment distribution...`);
   const globalTreatmentCounts = new Map<string, number>();
   let totalSamples = 0;
 
@@ -36,24 +40,28 @@ export function distributeGroupsToPlates(
     });
   });
 
-  console.log(`Total samples: ${totalSamples}`);
-  console.log(`Treatment distribution:`);
+  console.log(`  ✓ Total samples: ${totalSamples}`);
+  console.log(`  ✓ Treatment combinations found: ${globalTreatmentCounts.size}`);
+  console.log(`\n  Global treatment distribution:`);
   globalTreatmentCounts.forEach((count, key) => {
     const proportion = ((count / totalSamples) * 100).toFixed(1);
-    console.log(`  - ${key}: ${count} (${proportion}%)`);
+    console.log(`    - ${key}: ${count} samples (${proportion}%)`);
   });
 
   // Step 2: Sort groups by size (largest first) for better bin packing
+  console.log(`\nStep 2: Sorting groups by size (largest first)...`);
   const sortedGroups = [...groups].sort((a, b) => b.size - a.size);
-  console.log(`\nSorted groups (largest first):`);
-  sortedGroups.slice(0, 5).forEach(g => {
-    console.log(`  - ${g.subjectId}: ${g.size} samples`);
+  console.log(`  ✓ Sorted ${sortedGroups.length} groups`);
+  console.log(`\n  Largest groups (top ${Math.min(5, sortedGroups.length)}):`);
+  sortedGroups.slice(0, 5).forEach((g, idx) => {
+    console.log(`    ${idx + 1}. ${g.subjectId}: ${g.size} samples`);
   });
   if (sortedGroups.length > 5) {
-    console.log(`  ... and ${sortedGroups.length - 5} more groups`);
+    console.log(`    ... and ${sortedGroups.length - 5} more groups`);
   }
 
   // Step 3: Initialize plate assignments and tracking
+  console.log(`\nStep 3: Initializing plate assignments...`);
   const plateAssignments = new Map<number, RepeatedMeasuresGroup[]>();
   const plateCounts = new Array(plateCapacities.length).fill(0);
 
@@ -62,12 +70,18 @@ export function distributeGroupsToPlates(
     plateAssignments.set(i, []);
   }
 
-  console.log(`\nInitialized ${plateCapacities.length} plates for distribution`);
+  console.log(`  ✓ Initialized ${plateCapacities.length} plates for distribution`);
 
   // Step 4: Distribute each group to the best plate
-  console.log(`\nDistributing groups to plates...`);
+  console.log(`\n┌─────────────────────────────────────────────────────────────┐`);
+  console.log(`│           DISTRIBUTION PROGRESS                             │`);
+  console.log(`└─────────────────────────────────────────────────────────────┘`);
+  console.log(`Distributing groups to plates (greedy best-fit algorithm)...\n`);
 
+  let groupCounter = 0;
   for (const group of sortedGroups) {
+    groupCounter++;
+
     // Find the best plate for this group
     const bestPlateIdx = selectBestPlate(
       group,
@@ -82,20 +96,51 @@ export function distributeGroupsToPlates(
     plateAssignments.get(bestPlateIdx)!.push(group);
     plateCounts[bestPlateIdx] += group.size;
 
-    console.log(
-      `  - Assigned group ${group.subjectId} (${group.size} samples) to plate ${bestPlateIdx + 1} ` +
-      `(now ${plateCounts[bestPlateIdx]}/${plateCapacities[bestPlateIdx]} samples)`
-    );
+    const fillPercentage = ((plateCounts[bestPlateIdx] / plateCapacities[bestPlateIdx]) * 100).toFixed(1);
+    const remainingCapacity = plateCapacities[bestPlateIdx] - plateCounts[bestPlateIdx];
+
+    // Log progress for every group (or every 10th group if there are many)
+    if (sortedGroups.length <= 20 || groupCounter % 10 === 0 || groupCounter === sortedGroups.length) {
+      console.log(
+        `[${groupCounter}/${sortedGroups.length}] Assigned ${group.subjectId} (${group.size} samples) → Plate ${bestPlateIdx + 1} ` +
+        `[${plateCounts[bestPlateIdx]}/${plateCapacities[bestPlateIdx]} samples, ${fillPercentage}% full, ${remainingCapacity} remaining]`
+      );
+    }
   }
 
   // Log final distribution summary
-  console.log(`\nFinal distribution:`);
+  console.log(`\n┌─────────────────────────────────────────────────────────────┐`);
+  console.log(`│           DISTRIBUTION SUMMARY                              │`);
+  console.log(`└─────────────────────────────────────────────────────────────┘`);
+  console.log(`Distribution complete! Final plate assignments:\n`);
+
   for (let i = 0; i < plateCapacities.length; i++) {
-    const groups = plateAssignments.get(i)!;
-    console.log(
-      `  - Plate ${i + 1}: ${groups.length} groups, ${plateCounts[i]} samples ` +
-      `(${((plateCounts[i] / plateCapacities[i]) * 100).toFixed(1)}% full)`
-    );
+    const assignedGroups = plateAssignments.get(i)!;
+    const fillPercentage = ((plateCounts[i] / plateCapacities[i]) * 100).toFixed(1);
+    const remainingCapacity = plateCapacities[i] - plateCounts[i];
+
+    console.log(`Plate ${i + 1}:`);
+    console.log(`  ✓ Groups assigned: ${assignedGroups.length}`);
+    console.log(`  ✓ Total samples: ${plateCounts[i]}/${plateCapacities[i]} (${fillPercentage}% full)`);
+    console.log(`  ✓ Remaining capacity: ${remainingCapacity} samples`);
+
+    // Show treatment distribution for this plate
+    const plateTreatmentCounts = new Map<string, number>();
+    assignedGroups.forEach(g => {
+      g.treatmentComposition.forEach((count, key) => {
+        plateTreatmentCounts.set(key, (plateTreatmentCounts.get(key) || 0) + count);
+      });
+    });
+
+    console.log(`  ✓ Treatment distribution:`);
+    plateTreatmentCounts.forEach((count, key) => {
+      const expectedProportion = (globalTreatmentCounts.get(key) || 0) / totalSamples;
+      const expectedCount = expectedProportion * plateCounts[i];
+      const deviation = count - expectedCount;
+      const deviationSign = deviation >= 0 ? '+' : '';
+      console.log(`    - ${key}: ${count} samples (expected: ${expectedCount.toFixed(1)}, deviation: ${deviationSign}${deviation.toFixed(1)})`);
+    });
+    console.log('');
   }
 
   return plateAssignments;

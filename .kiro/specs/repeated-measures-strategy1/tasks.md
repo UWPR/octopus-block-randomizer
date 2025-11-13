@@ -106,7 +106,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Maintain backward compatibility when no repeated-measures variable
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-  - [ ] 4.2 Implement repeated-measures-aware randomization function
+  - [x] 4.2 Implement repeated-measures-aware randomization function
+
+
+
+
+
     - Create repeated-measures groups
     - Validate groups
     - Calculate plate capacities

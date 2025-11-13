@@ -1,6 +1,8 @@
 import { SearchData, RandomizationConfig, RandomizationResult } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
+import { createRepeatedMeasuresGroups, validateRepeatedMeasuresGroups } from './repeatedMeasuresGrouping';
+import { distributeGroupsToPlates } from './repeatedMeasuresDistribution';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -523,7 +525,14 @@ export function balancedBlockRandomization(
 
 /**
  * Repeated-measures-aware randomization implementation
- * This function will be implemented in task 4.2
+ *
+ * This function implements the repeated-measures randomization algorithm:
+ * 1. Create repeated-measures groups from samples
+ * 2. Validate groups (check for oversized groups, etc.)
+ * 3. Calculate plate capacities
+ * 4. Distribute groups to plates (keeping groups together)
+ * 5. Flatten groups back to samples
+ * 6. Apply existing row distribution to each plate
  *
  * @param searches All samples to randomize
  * @param config Configuration including treatment and repeated-measures variables
@@ -533,9 +542,177 @@ function doRepeatedMeasuresAwareRandomization(
   searches: SearchData[],
   config: RandomizationConfig
 ): RandomizationResult {
-  // TODO: Implement in task 4.2
-  // This is a placeholder that will be replaced with the full implementation
-  throw new Error('Repeated-measures-aware randomization not yet implemented. This will be completed in task 4.2.');
+  const {
+    treatmentVariables,
+    repeatedMeasuresVariable,
+    keepEmptyInLastPlate,
+    numRows,
+    numColumns
+  } = config;
+
+  if (!repeatedMeasuresVariable) {
+    throw new Error('repeatedMeasuresVariable is required for repeated-measures-aware randomization');
+  }
+
+  const totalSamples = searches.length;
+  const plateSize = numRows * numColumns;
+
+  console.log(`\n=== Starting Repeated-Measures-Aware Randomization ===`);
+  console.log(`Total samples: ${totalSamples}`);
+  console.log(`Plate size: ${plateSize} (${numRows} rows × ${numColumns} columns)`);
+  console.log(`Treatment variables: ${treatmentVariables.join(', ')}`);
+  console.log(`Repeated-measures variable: ${repeatedMeasuresVariable}`);
+
+  // Step 1: Create repeated-measures groups
+  console.log(`\n--- Step 1: Creating repeated-measures groups ---`);
+  const groups = createRepeatedMeasuresGroups(
+    searches,
+    repeatedMeasuresVariable,
+    treatmentVariables
+  );
+
+  // Step 2: Validate groups
+  console.log(`\n--- Step 2: Validating repeated-measures groups ---`);
+  const validation = validateRepeatedMeasuresGroups(groups, plateSize);
+
+  if (!validation.isValid) {
+    // Throw error with all validation errors
+    throw new Error(
+      `Repeated-measures group validation failed:\n${validation.errors.join('\n')}`
+    );
+  }
+
+  // Log warnings if any
+  if (validation.warnings.length > 0) {
+    console.warn('Validation warnings:');
+    validation.warnings.forEach(warning => console.warn(`  - ${warning}`));
+  }
+
+  // Step 3: Calculate plate capacities
+  console.log(`\n--- Step 3: Calculating plate capacities ---`);
+  const actualPlatesNeeded = Math.ceil(totalSamples / plateSize);
+  const plateCapacities = assignBlockCapacities(
+    totalSamples,
+    actualPlatesNeeded,
+    keepEmptyInLastPlate,
+    plateSize,
+    BlockType.PLATE
+  );
+
+  console.log(`Plates needed: ${actualPlatesNeeded}`);
+  console.log(`Plate capacities: ${plateCapacities.join(', ')}`);
+
+  // Step 4: Distribute groups to plates
+  console.log(`\n--- Step 4: Distributing groups to plates ---`);
+  const plateGroupAssignments = distributeGroupsToPlates(
+    groups,
+    plateCapacities,
+    treatmentVariables
+  );
+
+  // Step 5: Flatten groups back to samples
+  console.log(`\n--- Step 5: Flattening groups to samples ---`);
+  const plateAssignments = new Map<number, SearchData[]>();
+
+  plateGroupAssignments.forEach((assignedGroups, plateIdx) => {
+    const plateSamples: SearchData[] = [];
+
+    assignedGroups.forEach(group => {
+      plateSamples.push(...group.samples);
+    });
+
+    plateAssignments.set(plateIdx, plateSamples);
+
+    console.log(
+      `Plate ${plateIdx + 1}: ${assignedGroups.length} groups → ${plateSamples.length} samples`
+    );
+  });
+
+  // Step 6: Apply existing row distribution to each plate
+  console.log(`\n--- Step 6: Applying row distribution within each plate ---`);
+
+  // Initialize plates array
+  const plates = Array.from({ length: actualPlatesNeeded }, () =>
+    Array.from({ length: numRows }, () => new Array(numColumns).fill(undefined))
+  );
+
+  plateAssignments.forEach((plateSamples, plateIdx) => {
+    console.log(`\nProcessing plate ${plateIdx + 1} with ${plateSamples.length} samples`);
+
+    // Shuffle plate samples before grouping to add initial randomization
+    const shuffledPlateSamples = shuffleArray([...plateSamples]);
+
+    // Group samples by treatment covariates for this plate
+    const plateGroups = groupByCovariates(shuffledPlateSamples, treatmentVariables);
+
+    // Calculate how many rows we need
+    const totalPlateSamples = plateSamples.length;
+    const rowsNeeded = Math.ceil(totalPlateSamples / numColumns);
+    const actualRowsToUse = Math.min(rowsNeeded, numRows);
+
+    console.log(`  Rows needed: ${rowsNeeded}, using: ${actualRowsToUse}`);
+
+    // Calculate row capacities (fill rows sequentially, leaving empty cells in last row)
+    const rowCapacities = assignBlockCapacities(
+      totalPlateSamples,
+      actualRowsToUse,
+      true, // Always keep empty in last row
+      numColumns,
+      BlockType.ROW
+    );
+
+    // Calculate expected minimums per row
+    const expectedRowMinimums = calculateExpectedMinimums(
+      rowCapacities,
+      plateGroups,
+      numColumns,
+      BlockType.ROW
+    );
+
+    // Distribute samples to rows
+    const rowAssignments = distributeToBlocks(
+      plateGroups,
+      rowCapacities,
+      numColumns,
+      treatmentVariables,
+      BlockType.ROW,
+      expectedRowMinimums
+    );
+
+    // Validate row-level distribution
+    const rowDistributionValid = validatePerBlockDistribution(
+      rowAssignments,
+      treatmentVariables,
+      expectedRowMinimums,
+      BlockType.ROW
+    );
+
+    if (!rowDistributionValid) {
+      console.error(`Row-level distribution validation failed for plate ${plateIdx + 1}`);
+    }
+
+    // Fill positions and shuffle within rows
+    rowAssignments.forEach((rowSamples, rowIdx) => {
+      if (rowIdx < numRows) {
+        // Shuffle samples within this row for final randomization
+        const shuffledRowSamples = shuffleArray([...rowSamples]);
+
+        // Place samples in the row
+        for (let colIdx = 0; colIdx < Math.min(numColumns, shuffledRowSamples.length); colIdx++) {
+          plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
+        }
+      }
+    });
+  });
+
+  console.log(`\n=== Repeated-Measures-Aware Randomization Complete ===\n`);
+
+  // Return result with repeated-measures metadata
+  return {
+    plates,
+    plateAssignments,
+    repeatedMeasuresGroups: groups
+  };
 }
 
 // Standard randomization implementation (existing algorithm)

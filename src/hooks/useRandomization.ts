@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { SearchData, RandomizationAlgorithm } from '../utils/types';
+import { SearchData, RandomizationAlgorithm, RepeatedMeasuresGroup, RepeatedMeasuresQualityMetrics } from '../utils/types';
 import { randomizeSearches } from '../utils/utils';
 
 export function useRandomization() {
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
   const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
   const [plateAssignments, setPlateAssignments] = useState<Map<number, SearchData[]> | undefined>(undefined);
+  const [repeatedMeasuresGroups, setRepeatedMeasuresGroups] = useState<RepeatedMeasuresGroup[] | undefined>(undefined);
+  const [repeatedMeasuresQualityMetrics, setRepeatedMeasuresQualityMetrics] = useState<RepeatedMeasuresQualityMetrics | undefined>(undefined);
 
   const processRandomization = (
     searches: SearchData[],
@@ -13,7 +15,8 @@ export function useRandomization() {
     selectedAlgorithm: RandomizationAlgorithm,
     keepEmptyInLastPlate: boolean,
     plateRows: number,
-    plateColumns: number
+    plateColumns: number,
+    repeatedMeasuresVariable?: string
   ) => {
     if (searches.length > 0 && selectedCovariates.length > 0) {
       const result = randomizeSearches(
@@ -22,10 +25,13 @@ export function useRandomization() {
         selectedAlgorithm,
         keepEmptyInLastPlate,
         plateRows,
-        plateColumns
+        plateColumns,
+        repeatedMeasuresVariable
       );
       setRandomizedPlates(result.plates);
       setPlateAssignments(result.plateAssignments);
+      setRepeatedMeasuresGroups(result.repeatedMeasuresGroups);
+      setRepeatedMeasuresQualityMetrics(result.qualityMetrics);
       setIsProcessed(true);
       return true;
     }
@@ -38,7 +44,8 @@ export function useRandomization() {
     selectedAlgorithm: RandomizationAlgorithm,
     keepEmptyInLastPlate: boolean,
     plateRows: number,
-    plateColumns: number
+    plateColumns: number,
+    repeatedMeasuresVariable?: string
   ) => {
     if (searches.length > 0 && selectedCovariates.length > 0) {
       const result = randomizeSearches(
@@ -47,10 +54,13 @@ export function useRandomization() {
         selectedAlgorithm,
         keepEmptyInLastPlate,
         plateRows,
-        plateColumns
+        plateColumns,
+        repeatedMeasuresVariable
       );
       setRandomizedPlates(result.plates);
       setPlateAssignments(result.plateAssignments);
+      setRepeatedMeasuresGroups(result.repeatedMeasuresGroups);
+      setRepeatedMeasuresQualityMetrics(result.qualityMetrics);
     }
   };
 
@@ -58,6 +68,8 @@ export function useRandomization() {
     setIsProcessed(false);
     setRandomizedPlates([]);
     setPlateAssignments(undefined);
+    setRepeatedMeasuresGroups(undefined);
+    setRepeatedMeasuresQualityMetrics(undefined);
   };
 
   const updatePlates = (
@@ -191,6 +203,8 @@ export function useRandomization() {
     isProcessed,
     randomizedPlates,
     plateAssignments,
+    repeatedMeasuresGroups,
+    repeatedMeasuresQualityMetrics,
     processRandomization,
     reRandomize,
     reRandomizeSinglePlate,

@@ -222,7 +222,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Provide clear, actionable messages
     - _Requirements: 4.2, 4.3, 4.4, 12.4, 12.5, 14.1, 14.2_
 
-  - [ ] 6.5 Update SummaryPanel to display repeated-measures metrics
+  - [x] 6.5 Update SummaryPanel to display repeated-measures metrics
+
+
+
+
+
     - Add section for repeated-measures groups
     - Show total groups, multi-sample groups, singleton groups
     - Show largest group information

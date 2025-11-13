@@ -62,14 +62,29 @@ export function randomizeSearches(
   algorithm: RandomizationAlgorithm = 'balanced',
   keepEmptyInLastPlate: boolean = true,
   numRows: number = 8,
-  numColumns: number = 12
+  numColumns: number = 12,
+  repeatedMeasuresVariable?: string
 ): {
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
+  repeatedMeasuresGroups?: any[];
+  qualityMetrics?: any;
 } {
   switch (algorithm) {
     case 'balanced':
-      return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
+      if (repeatedMeasuresVariable) {
+        // Use new config-based signature for repeated-measures
+        return balancedBlockRandomization(searches, {
+          treatmentVariables: selectedCovariates,
+          repeatedMeasuresVariable,
+          keepEmptyInLastPlate,
+          numRows,
+          numColumns
+        });
+      } else {
+        // Use legacy signature for backward compatibility
+        return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
+      }
     case 'greedy':
     default:
       return greedyRandomization(searches, selectedCovariates);

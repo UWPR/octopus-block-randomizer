@@ -49,6 +49,8 @@ const App: React.FC = () => {
     isProcessed,
     randomizedPlates,
     plateAssignments,
+    repeatedMeasuresGroups,
+    repeatedMeasuresQualityMetrics,
     processRandomization,
     reRandomize,
     reRandomizeSinglePlate,
@@ -253,7 +255,8 @@ const App: React.FC = () => {
         selectedAlgorithm,
         keepEmptyInLastPlate,
         plateRows,
-        plateColumns
+        plateColumns,
+        selectedRepeatedMeasuresVariable
       );
 
       if (success) {
@@ -304,7 +307,8 @@ const App: React.FC = () => {
         selectedAlgorithm,
         keepEmptyInLastPlate,
         plateRows,
-        plateColumns
+        plateColumns,
+        selectedRepeatedMeasuresVariable
       );
     }
   };
@@ -496,6 +500,9 @@ const App: React.FC = () => {
                 onToggleSummary={() => setShowSummary(!showSummary)}
                 selectedCombination={selectedCombination}
                 onSummaryItemClick={handleSummaryItemClick}
+                repeatedMeasuresGroups={repeatedMeasuresGroups}
+                repeatedMeasuresQualityMetrics={repeatedMeasuresQualityMetrics}
+                repeatedMeasuresVariable={selectedRepeatedMeasuresVariable}
               />
 
               <QualityLegend />

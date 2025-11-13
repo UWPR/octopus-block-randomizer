@@ -1,5 +1,5 @@
 import React from 'react';
-import { SummaryItem } from '../utils/types';
+import { SummaryItem, RepeatedMeasuresGroup, RepeatedMeasuresQualityMetrics } from '../utils/types';
 
 interface SummaryPanelProps {
   summaryData: SummaryItem[];
@@ -7,6 +7,9 @@ interface SummaryPanelProps {
   onToggleSummary: () => void;
   selectedCombination: string | null;
   onSummaryItemClick: (combination: string) => void;
+  repeatedMeasuresGroups?: RepeatedMeasuresGroup[];
+  repeatedMeasuresQualityMetrics?: RepeatedMeasuresQualityMetrics;
+  repeatedMeasuresVariable?: string;
 }
 
 const SummaryPanel: React.FC<SummaryPanelProps> = ({
@@ -15,12 +18,101 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
   onToggleSummary,
   selectedCombination,
   onSummaryItemClick,
+  repeatedMeasuresGroups,
+  repeatedMeasuresQualityMetrics,
+  repeatedMeasuresVariable,
 }) => {
   if (summaryData.length === 0 || !showSummary) return null;
+
+  // Calculate repeated-measures statistics
+  const hasRepeatedMeasures = repeatedMeasuresGroups && repeatedMeasuresGroups.length > 0;
+  let totalGroups = 0;
+  let multiSampleGroups = 0;
+  let singletonGroups = 0;
+  let largestGroup: { subjectId: string; size: number } | null = null;
+
+  if (hasRepeatedMeasures && repeatedMeasuresGroups) {
+    totalGroups = repeatedMeasuresGroups.length;
+    multiSampleGroups = repeatedMeasuresGroups.filter(g => !g.isSingleton && g.size > 1).length;
+    singletonGroups = repeatedMeasuresGroups.filter(g => g.isSingleton || g.size === 1).length;
+
+    // Find largest group
+    const largest = repeatedMeasuresGroups.reduce((max, group) =>
+      group.size > max.size ? group : max
+    , { subjectId: '', size: 0 });
+
+    if (largest.size > 0) {
+      largestGroup = { subjectId: largest.subjectId, size: largest.size };
+    }
+  }
 
   return (
     <div style={styles.summaryContainer}>
       <div style={styles.summaryPanel}>
+        {/* Repeated-measures metrics section */}
+        {hasRepeatedMeasures && repeatedMeasuresQualityMetrics && (
+          <div style={styles.repeatedMeasuresSection}>
+            <div style={styles.sectionTitle}>
+              Repeated-measures Groups ({repeatedMeasuresVariable})
+            </div>
+            <div style={styles.metricsGrid}>
+              <div style={styles.metricItem}>
+                <span style={styles.metricLabel}>Total groups:</span>
+                <span style={styles.metricValue}>{totalGroups}</span>
+              </div>
+              <div style={styles.metricItem}>
+                <span style={styles.metricLabel}>Multi-sample groups:</span>
+                <span style={styles.metricValue}>{multiSampleGroups}</span>
+              </div>
+              <div style={styles.metricItem}>
+                <span style={styles.metricLabel}>Singleton groups:</span>
+                <span style={styles.metricValue}>{singletonGroups}</span>
+              </div>
+              {largestGroup && (
+                <div style={styles.metricItem}>
+                  <span style={styles.metricLabel}>Largest group:</span>
+                  <span style={styles.metricValue}>
+                    {largestGroup.subjectId} ({largestGroup.size} samples)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div style={styles.metricsGrid}>
+              <div style={styles.metricItem}>
+                <span style={styles.metricLabel}>Treatment balance score:</span>
+                <span style={styles.metricValue}>
+                  {repeatedMeasuresQualityMetrics.treatmentBalanceScore.toFixed(1)}/100
+                </span>
+              </div>
+              <div style={styles.metricItem}>
+                <span style={styles.metricLabel}>Constraints satisfied:</span>
+                <span style={{
+                  ...styles.metricValue,
+                  color: repeatedMeasuresQualityMetrics.repeatedMeasuresConstraintsSatisfied ? '#28a745' : '#dc3545'
+                }}>
+                  {repeatedMeasuresQualityMetrics.repeatedMeasuresConstraintsSatisfied ? '✓ Yes' : '✗ No'}
+                </span>
+              </div>
+            </div>
+
+            {/* Per-plate group counts */}
+            {repeatedMeasuresQualityMetrics.plateGroupCounts.length > 0 && (
+              <div style={styles.plateGroupCounts}>
+                <span style={styles.metricLabel}>Groups per plate:</span>
+                <div style={styles.plateCountsList}>
+                  {repeatedMeasuresQualityMetrics.plateGroupCounts.map((count, idx) => (
+                    <span key={idx} style={styles.plateCountItem}>
+                      Plate {idx + 1}: {count}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Treatment combination summary */}
         <div style={styles.summaryGrid}>
           {summaryData.map((item, index) => (
             <div
@@ -73,6 +165,61 @@ const styles = {
     borderRadius: '6px',
     padding: '12px',
     border: '1px solid #dee2e6',
+  },
+  repeatedMeasuresSection: {
+    backgroundColor: '#fff',
+    borderRadius: '4px',
+    padding: '12px',
+    marginBottom: '12px',
+    border: '1px solid #e9ecef',
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: '8px',
+    borderBottom: '1px solid #e9ecef',
+    paddingBottom: '4px',
+  },
+  metricsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '8px',
+    marginBottom: '8px',
+  },
+  metricItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '12px',
+    padding: '4px 0',
+  },
+  metricLabel: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  metricValue: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  plateGroupCounts: {
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px solid #e9ecef',
+  },
+  plateCountsList: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: '8px',
+    marginTop: '4px',
+  },
+  plateCountItem: {
+    fontSize: '11px',
+    color: '#555',
+    backgroundColor: '#f8f9fa',
+    padding: '2px 8px',
+    borderRadius: '3px',
+    border: '1px solid #e9ecef',
   },
   summaryGrid: {
     display: 'flex',

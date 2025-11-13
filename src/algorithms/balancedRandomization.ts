@@ -1,4 +1,4 @@
-import { SearchData, RandomizationConfig, RandomizationResult } from '../utils/types';
+import { SearchData, RandomizationConfig, RandomizationResult, RepeatedMeasuresGroup, RepeatedMeasuresQualityMetrics } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
 import { createRepeatedMeasuresGroups, validateRepeatedMeasuresGroups } from './repeatedMeasuresGrouping';
@@ -524,6 +524,119 @@ export function balancedBlockRandomization(
 }
 
 /**
+ * Calculate quality metrics for repeated-measures randomization
+ *
+ * @param searches All samples
+ * @param groups Repeated-measures groups
+ * @param plateAssignments Map of plate index to samples
+ * @param plates 3D array of plate layout
+ * @param treatmentVariables Variables used for treatment balancing
+ * @param repeatedMeasuresVariable Variable used for grouping
+ * @returns Quality metrics for repeated-measures randomization
+ */
+function calculateRepeatedMeasuresQualityMetrics(
+  searches: SearchData[],
+  groups: RepeatedMeasuresGroup[],
+  plateAssignments: Map<number, SearchData[]>,
+  plates: (SearchData | undefined)[][][],
+  treatmentVariables: string[],
+  repeatedMeasuresVariable: string
+): RepeatedMeasuresQualityMetrics {
+  // Import quality metrics calculation
+  const { calculateQualityMetrics } = require('../utils/qualityMetrics');
+
+  // Calculate standard quality metrics
+  const standardMetrics = calculateQualityMetrics(
+    searches,
+    plateAssignments,
+    plates,
+    treatmentVariables
+  );
+
+  // Check if repeated-measures constraints are satisfied
+  let repeatedMeasuresConstraintsSatisfied = true;
+  let repeatedMeasuresViolations = 0;
+
+  // Track which plate each subject ID is assigned to
+  const subjectIdToPlate = new Map<string, number>();
+
+  plateAssignments.forEach((samples, plateIdx) => {
+    samples.forEach(sample => {
+      const subjectId = sample.metadata[repeatedMeasuresVariable];
+
+      if (!subjectId || subjectId === '') {
+        return; // Skip singletons
+      }
+
+      if (subjectIdToPlate.has(subjectId)) {
+        const previousPlateIdx = subjectIdToPlate.get(subjectId)!;
+        if (previousPlateIdx !== plateIdx) {
+          repeatedMeasuresConstraintsSatisfied = false;
+          repeatedMeasuresViolations++;
+        }
+      } else {
+        subjectIdToPlate.set(subjectId, plateIdx);
+      }
+    });
+  });
+
+  // Calculate treatment balance score
+  const treatmentBalanceScore = standardMetrics.plateDiversity.averageBalanceScore;
+
+  // Calculate per-plate group counts
+  const plateGroupCounts: number[] = [];
+  plateAssignments.forEach((samples, plateIdx) => {
+    const plateSubjectIds = new Set<string>();
+    samples.forEach(sample => {
+      const subjectId = sample.metadata[repeatedMeasuresVariable];
+      if (subjectId && subjectId !== '') {
+        plateSubjectIds.add(subjectId);
+      } else {
+        // Each singleton counts as its own group
+        plateSubjectIds.add(`singleton_${sample.name}`);
+      }
+    });
+    plateGroupCounts.push(plateSubjectIds.size);
+  });
+
+  // Calculate group size distribution
+  const groupSizeDistribution = {
+    singletons: 0,
+    small: 0,    // 2-5 samples
+    medium: 0,   // 6-15 samples
+    large: 0     // 16+ samples
+  };
+
+  groups.forEach(group => {
+    if (group.isSingleton) {
+      groupSizeDistribution.singletons++;
+    } else if (group.size <= 5) {
+      groupSizeDistribution.small++;
+    } else if (group.size <= 15) {
+      groupSizeDistribution.medium++;
+    } else {
+      groupSizeDistribution.large++;
+    }
+  });
+
+  console.log(`Quality Metrics:`);
+  console.log(`  Repeated-measures constraints satisfied: ${repeatedMeasuresConstraintsSatisfied}`);
+  console.log(`  Repeated-measures violations: ${repeatedMeasuresViolations}`);
+  console.log(`  Treatment balance score: ${treatmentBalanceScore.toFixed(2)}`);
+  console.log(`  Group size distribution:`, groupSizeDistribution);
+  console.log(`  Per-plate group counts:`, plateGroupCounts);
+
+  return {
+    repeatedMeasuresConstraintsSatisfied,
+    repeatedMeasuresViolations,
+    treatmentBalanceScore,
+    plateGroupCounts,
+    groupSizeDistribution,
+    standardMetrics
+  };
+}
+
+/**
  * Repeated-measures-aware randomization implementation
  *
  * This function implements the repeated-measures randomization algorithm:
@@ -709,13 +822,25 @@ function doRepeatedMeasuresAwareRandomization(
   console.log(`\n--- Step 7: Validating repeated-measures constraints ---`);
   validateRepeatedMeasuresConstraints(plateAssignments, repeatedMeasuresVariable);
 
+  // Step 8: Calculate quality metrics
+  console.log(`\n--- Step 8: Calculating quality metrics ---`);
+  const qualityMetrics = calculateRepeatedMeasuresQualityMetrics(
+    searches,
+    groups,
+    plateAssignments,
+    plates,
+    treatmentVariables,
+    repeatedMeasuresVariable
+  );
+
   console.log(`\n=== Repeated-Measures-Aware Randomization Complete ===\n`);
 
   // Return result with repeated-measures metadata
   return {
     plates,
     plateAssignments,
-    repeatedMeasuresGroups: groups
+    repeatedMeasuresGroups: groups,
+    qualityMetrics
   };
 }
 

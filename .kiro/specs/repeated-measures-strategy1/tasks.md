@@ -131,7 +131,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Throw error if constraints violated
     - _Requirements: 5.2, 5.4, 14.1, 14.3, 14.4_
 
-  - [ ] 4.4 Update return type to include repeated-measures metadata
+  - [x] 4.4 Update return type to include repeated-measures metadata
+
+
+
+
+
     - Return repeated-measures groups array
     - Return quality metrics
     - Maintain backward compatibility

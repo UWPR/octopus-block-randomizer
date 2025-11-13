@@ -200,12 +200,22 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Disable randomization button while error exists
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 12.4_
 
-  - [ ] 6.3 Add informational message for selected repeated-measures variable
+  - [x] 6.3 Add informational message for selected repeated-measures variable
+
+
+
+
+
     - Display below selector when variable is selected
     - Show message: "All samples with the same [VariableName] value will be assigned to the same plate"
     - _Requirements: 12.3_
 
-  - [ ] 6.4 Display validation errors and warnings
+  - [x] 6.4 Display validation errors and warnings
+
+
+
+
+
     - Show oversized group errors in red
     - Show large group warnings in yellow/orange
     - Show high singleton ratio warnings

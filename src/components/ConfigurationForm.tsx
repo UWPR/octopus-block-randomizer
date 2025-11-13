@@ -22,6 +22,8 @@ interface ConfigurationFormProps {
   onPlateColumnsChange: (value: number) => void;
   onResetCovariateState: () => void;
   hasVariableConflict?: boolean;
+  validationErrors?: string[];
+  validationWarnings?: string[];
 }
 
 const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
@@ -45,6 +47,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   onPlateColumnsChange,
   onResetCovariateState,
   hasVariableConflict = false,
+  validationErrors = [],
+  validationWarnings = [],
 }) => {
   if (availableColumns.length === 0) return null;
 
@@ -177,6 +181,28 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                 <small style={styles.repeatedMeasuresInfoText}>
                   ℹ All samples with the same <strong>{selectedRepeatedMeasuresVariable}</strong> value will be assigned to the same plate
                 </small>
+              </div>
+            )}
+            {validationErrors.length > 0 && (
+              <div style={styles.validationErrorsContainer}>
+                {validationErrors.map((error, index) => (
+                  <div key={`error-${index}`} style={styles.validationErrorBox}>
+                    <small style={styles.validationErrorText}>
+                      ❌ {error}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            )}
+            {validationWarnings.length > 0 && (
+              <div style={styles.validationWarningsContainer}>
+                {validationWarnings.map((warning, index) => (
+                  <div key={`warning-${index}`} style={styles.validationWarningBox}>
+                    <small style={styles.validationWarningText}>
+                      ⚠ {warning}
+                    </small>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -399,6 +425,44 @@ const styles = {
     color: '#c62828',
     lineHeight: '1.4',
     fontWeight: '500',
+  },
+  validationErrorsContainer: {
+    marginTop: '8px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+  },
+  validationErrorBox: {
+    padding: '12px',
+    backgroundColor: '#ffebee',
+    borderRadius: '4px',
+    border: '2px solid #ef5350',
+  },
+  validationErrorText: {
+    fontSize: '13px',
+    color: '#c62828',
+    lineHeight: '1.5',
+    fontWeight: '500',
+    display: 'block',
+  },
+  validationWarningsContainer: {
+    marginTop: '8px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+  },
+  validationWarningBox: {
+    padding: '12px',
+    backgroundColor: '#fff3e0',
+    borderRadius: '4px',
+    border: '2px solid #ff9800',
+  },
+  validationWarningText: {
+    fontSize: '13px',
+    color: '#e65100',
+    lineHeight: '1.5',
+    fontWeight: '500',
+    display: 'block',
   },
 };
 

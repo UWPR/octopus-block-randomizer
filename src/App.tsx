@@ -16,6 +16,7 @@ import { useRandomization } from './hooks/useRandomization';
 import { useCovariateColors } from './hooks/useCovariateColors';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import { useQualityMetrics } from './hooks/useQualityMetrics';
+import { createRepeatedMeasuresGroups, validateRepeatedMeasuresGroups } from './algorithms/repeatedMeasuresGrouping';
 
 
 
@@ -90,6 +91,10 @@ const App: React.FC = () => {
   const [selectedRepeatedMeasuresVariable, setSelectedRepeatedMeasuresVariable] = useState<string>('');
   const [controlLabels, setControlLabels] = useState<string>('');
 
+  // Validation states
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>(defaultAlgorithm);
   const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
@@ -118,6 +123,43 @@ const App: React.FC = () => {
       );
     }
   }, [isProcessed, randomizedPlates, plateAssignments, selectedCovariates, searches, calculateMetrics]);
+
+  // Validate repeated-measures groups when configuration changes
+  useEffect(() => {
+    // Clear validation when no repeated-measures variable is selected
+    if (!selectedRepeatedMeasuresVariable || selectedAlgorithm !== 'balanced') {
+      setValidationErrors([]);
+      setValidationWarnings([]);
+      return;
+    }
+
+    // Only validate if we have samples and covariates
+    if (searches.length === 0 || selectedCovariates.length === 0) {
+      setValidationErrors([]);
+      setValidationWarnings([]);
+      return;
+    }
+
+    try {
+      // Create groups
+      const groups = createRepeatedMeasuresGroups(
+        searches,
+        selectedRepeatedMeasuresVariable,
+        selectedCovariates
+      );
+
+      // Validate groups
+      const plateCapacity = plateRows * plateColumns;
+      const validation = validateRepeatedMeasuresGroups(groups, plateCapacity);
+
+      setValidationErrors(validation.errors);
+      setValidationWarnings(validation.warnings);
+    } catch (error) {
+      console.error('Error during validation:', error);
+      setValidationErrors(['An error occurred during validation. Please check your configuration.']);
+      setValidationWarnings([]);
+    }
+  }, [selectedRepeatedMeasuresVariable, selectedCovariates, searches, plateRows, plateColumns, selectedAlgorithm]);
 
   // Reset all state when a new file is uploaded (but not on initial load)
   useEffect(() => {
@@ -148,6 +190,10 @@ const App: React.FC = () => {
       setSelectedCombination(null);
       setShowPlateDetails(false);
       setSelectedPlateIndex(null);
+
+      // Reset validation states
+      setValidationErrors([]);
+      setValidationWarnings([]);
     }
   }, [selectedFileName, searches.length]); // Trigger when filename changes or searches are loaded
 
@@ -157,6 +203,8 @@ const App: React.FC = () => {
     resetMetrics();
     setShowSummary(false);
     setSelectedCombination(null);
+    setValidationErrors([]);
+    setValidationWarnings([]);
   };
 
 
@@ -329,7 +377,7 @@ const App: React.FC = () => {
   const hasVariableConflict = Boolean(selectedRepeatedMeasuresVariable &&
     selectedCovariates.includes(selectedRepeatedMeasuresVariable));
 
-  const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0 && !hasVariableConflict;
+  const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0 && !hasVariableConflict && validationErrors.length === 0;
 
   return (
     <div style={styles.container}>
@@ -363,6 +411,8 @@ const App: React.FC = () => {
           onPlateColumnsChange={setPlateColumns}
           onResetCovariateState={resetCovariateState}
           hasVariableConflict={hasVariableConflict}
+          validationErrors={validationErrors}
+          validationWarnings={validationWarnings}
         />
 
 

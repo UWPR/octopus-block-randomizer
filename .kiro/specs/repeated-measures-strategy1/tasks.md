@@ -176,7 +176,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - _Requirements: 11.5, 14.4_
 
 - [ ] 6. Update user interface components
-  - [ ] 6.1 Add repeated-measures variable selector to ConfigurationForm
+  - [x] 6.1 Add repeated-measures variable selector to ConfigurationForm
+
+
+
+
+
     - Add dropdown below treatment variables selector
     - Label as "Select Repeated-measures Variables (Optional)"
     - Add descriptive help text

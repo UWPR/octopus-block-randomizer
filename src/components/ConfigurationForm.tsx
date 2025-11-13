@@ -8,6 +8,8 @@ interface ConfigurationFormProps {
   searches: any[];
   selectedCovariates: string[];
   onCovariateChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  selectedRepeatedMeasuresVariable: string;
+  onRepeatedMeasuresVariableChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   controlLabels: string;
   onControlLabelsChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   selectedAlgorithm: RandomizationAlgorithm;
@@ -28,6 +30,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   searches,
   selectedCovariates,
   onCovariateChange,
+  selectedRepeatedMeasuresVariable,
+  onRepeatedMeasuresVariableChange,
   controlLabels,
   onControlLabelsChange,
   selectedAlgorithm,
@@ -41,6 +45,11 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   onResetCovariateState,
 }) => {
   if (availableColumns.length === 0) return null;
+
+  // Get available columns for repeated-measures variable (exclude treatment variables)
+  const availableRepeatedMeasuresColumns = searches.length > 0
+    ? Object.keys(searches[0].metadata).filter(col => !selectedCovariates.includes(col))
+    : [];
 
   return (
     <div style={styles.compactFormContainer}>
@@ -126,6 +135,40 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
           </div>
         )}
       </div>
+
+      {/* Repeated-measures Variable Selection Row */}
+      {searches.length > 0 && selectedAlgorithm === 'balanced' && (
+        <div style={styles.compactRow}>
+          <div style={styles.fullWidthColumn}>
+            <label htmlFor="repeatedMeasuresVariable" style={styles.compactLabel}>
+              Select Repeated-measures Variables (Optional):
+            </label>
+            <select
+              id="repeatedMeasuresVariable"
+              value={selectedRepeatedMeasuresVariable}
+              onChange={onRepeatedMeasuresVariableChange}
+              style={styles.compactSelect}
+            >
+              <option value="">None</option>
+              {availableRepeatedMeasuresColumns.map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+            </select>
+            <small style={styles.compactHint}>
+              Select a variable to group samples from the same subject that must stay on the same plate (e.g., PatientID)
+            </small>
+            {selectedRepeatedMeasuresVariable && (
+              <div style={styles.repeatedMeasuresInfoBox}>
+                <small style={styles.repeatedMeasuresInfoText}>
+                  ℹ All samples with the same <strong>{selectedRepeatedMeasuresVariable}</strong> value will be assigned to the same plate
+                </small>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Non-greedy Algorithm Options */}
       {selectedAlgorithm !== 'greedy' && (
@@ -318,6 +361,18 @@ const styles = {
     fontSize: '12px',
     color: '#666',
     fontStyle: 'italic',
+  },
+  repeatedMeasuresInfoBox: {
+    marginTop: '8px',
+    padding: '10px',
+    backgroundColor: '#e3f2fd',
+    borderRadius: '4px',
+    border: '1px solid #bbdefb',
+  },
+  repeatedMeasuresInfoText: {
+    fontSize: '13px',
+    color: '#1565c0',
+    lineHeight: '1.4',
   },
 };
 

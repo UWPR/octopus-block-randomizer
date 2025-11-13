@@ -87,6 +87,7 @@ const App: React.FC = () => {
 
   // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
+  const [selectedRepeatedMeasuresVariable, setSelectedRepeatedMeasuresVariable] = useState<string>('');
   const [controlLabels, setControlLabels] = useState<string>('');
 
   // Algorithm selection
@@ -130,6 +131,7 @@ const App: React.FC = () => {
 
       // Reset configuration states
       setSelectedCovariates([]);
+      setSelectedRepeatedMeasuresVariable('');
       setControlLabels('');
 
       // Reset algorithm selection (keep defaults)
@@ -176,6 +178,12 @@ const App: React.FC = () => {
   const handleCovariateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedOptions = Array.from(event.target.selectedOptions, (option) => option.value);
     setSelectedCovariates(selectedOptions);
+    resetCovariateState();
+  };
+
+  // Repeated-measures variable selection handler
+  const handleRepeatedMeasuresVariableChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedRepeatedMeasuresVariable(event.target.value);
     resetCovariateState();
   };
 
@@ -337,6 +345,8 @@ const App: React.FC = () => {
           searches={searches}
           selectedCovariates={selectedCovariates}
           onCovariateChange={handleCovariateChange}
+          selectedRepeatedMeasuresVariable={selectedRepeatedMeasuresVariable}
+          onRepeatedMeasuresVariableChange={handleRepeatedMeasuresVariableChange}
           controlLabels={controlLabels}
           onControlLabelsChange={handleControlLabelsChange}
           selectedAlgorithm={selectedAlgorithm}

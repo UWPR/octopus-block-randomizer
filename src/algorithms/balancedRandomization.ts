@@ -705,6 +705,10 @@ function doRepeatedMeasuresAwareRandomization(
     });
   });
 
+  // Step 7: Validate repeated-measures constraints
+  console.log(`\n--- Step 7: Validating repeated-measures constraints ---`);
+  validateRepeatedMeasuresConstraints(plateAssignments, repeatedMeasuresVariable);
+
   console.log(`\n=== Repeated-Measures-Aware Randomization Complete ===\n`);
 
   // Return result with repeated-measures metadata
@@ -713,6 +717,77 @@ function doRepeatedMeasuresAwareRandomization(
     plateAssignments,
     repeatedMeasuresGroups: groups
   };
+}
+
+/**
+ * Validates that repeated-measures constraints are satisfied
+ *
+ * This function verifies that no repeated-measures group is split across multiple plates.
+ * It checks that all samples with the same repeated-measures variable value are assigned
+ * to the same plate.
+ *
+ * @param plateAssignments Map of plate index to samples assigned to that plate
+ * @param repeatedMeasuresVariable Variable used for repeated-measures grouping
+ * @throws Error if any repeated-measures group is split across multiple plates
+ */
+function validateRepeatedMeasuresConstraints(
+  plateAssignments: Map<number, SearchData[]>,
+  repeatedMeasuresVariable: string
+): void {
+  console.log(`Validating repeated-measures constraints for variable: ${repeatedMeasuresVariable}`);
+
+  // Track which plate each subject ID is assigned to
+  const subjectIdToPlate = new Map<string, number>();
+  const violations: string[] = [];
+
+  // Check each plate's samples
+  plateAssignments.forEach((samples, plateIdx) => {
+    samples.forEach(sample => {
+      const subjectId = sample.metadata[repeatedMeasuresVariable];
+
+      // Skip samples without a subject ID (singletons are allowed anywhere)
+      if (!subjectId || subjectId === '') {
+        return;
+      }
+
+      // Check if this subject ID has been seen before
+      if (subjectIdToPlate.has(subjectId)) {
+        const previousPlateIdx = subjectIdToPlate.get(subjectId)!;
+
+        // If it's on a different plate, we have a violation
+        if (previousPlateIdx !== plateIdx) {
+          const violationMsg = `Repeated-measures group '${subjectId}' is split across plates ${previousPlateIdx + 1} and ${plateIdx + 1}`;
+
+          // Only add this violation once
+          if (!violations.includes(violationMsg)) {
+            violations.push(violationMsg);
+            console.error(`  ❌ VIOLATION: ${violationMsg}`);
+          }
+        }
+      } else {
+        // First time seeing this subject ID, record its plate
+        subjectIdToPlate.set(subjectId, plateIdx);
+      }
+    });
+  });
+
+  // Log validation results
+  if (violations.length === 0) {
+    console.log(`  ✓ All repeated-measures groups are kept together on the same plate`);
+    console.log(`  ✓ Validated ${subjectIdToPlate.size} unique subject IDs across ${plateAssignments.size} plates`);
+  } else {
+    console.error(`\n❌ Repeated-measures constraint validation FAILED:`);
+    console.error(`  Found ${violations.length} violation(s):`);
+    violations.forEach((violation, idx) => {
+      console.error(`  ${idx + 1}. ${violation}`);
+    });
+
+    // Throw error with all violations
+    throw new Error(
+      `Repeated-measures constraint validation failed:\n${violations.join('\n')}\n\n` +
+      `All samples with the same ${repeatedMeasuresVariable} value must be assigned to the same plate.`
+    );
+  }
 }
 
 // Standard randomization implementation (existing algorithm)

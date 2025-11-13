@@ -120,7 +120,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Apply existing row distribution to each plate
     - _Requirements: 3.1, 4.1, 5.1, 6.1, 7.1, 9.1, 9.2, 9.3_
 
-  - [ ] 4.3 Implement repeated-measures constraint validation
+  - [x] 4.3 Implement repeated-measures constraint validation
+
+
+
+
+
     - Verify no groups are split across plates
     - Log validation results
     - Throw error if constraints violated

@@ -95,7 +95,12 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - _Requirements: 5.1, 5.2, 6.1, 6.2, 6.3, 7.1, 7.2_
 
 - [ ] 4. Integrate with main randomization algorithm
-  - [ ] 4.1 Modify `balancedRandomization.ts` to support repeated-measures path
+  - [x] 4.1 Modify `balancedRandomization.ts` to support repeated-measures path
+
+
+
+
+
     - Update function signature to accept `RandomizationConfig`
     - Add routing logic: if `repeatedMeasuresVariable` is set, use new path
     - Maintain backward compatibility when no repeated-measures variable

@@ -1,4 +1,4 @@
-import { SearchData } from '../utils/types';
+import { SearchData, RandomizationConfig, RandomizationResult } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
 
@@ -76,7 +76,7 @@ function getAvailableBlocks(
 
 // Helper function to calculate expected minimum samples per block (plates or rows) for each covariate group
 // Throws an error if the total samples exceed available capacity or if any block's expected minimums exceed its capacity
-// 
+//
 // Exported for testing purposes
 export function calculateExpectedMinimums(
   blockCapacities: number[],
@@ -109,13 +109,13 @@ export function calculateExpectedMinimums(
   blockCapacities.forEach((capacity, blockIdx) => {
     expectedMinimums[blockIdx] = {};
     let blockTotalExpected = 0;
-    
+
     covariateGroups.forEach((samples, groupKey) => {
       // Calculate expected minimum for this covariate group on this specific block
       // Based on the block's capacity relative to a full block
       const capacityRatio = totalBlocksNeeded == 1 ? 1 : capacity / fullBlockCapacity;
       const globalExpected = Math.floor(samples.length / totalBlocksNeeded);
-      
+
       expectedMinimums[blockIdx][groupKey] = Math.round(globalExpected * capacityRatio);
       blockTotalExpected += expectedMinimums[blockIdx][groupKey];
 
@@ -153,7 +153,7 @@ export function assignBlockCapacities(
     console.error(`Total samples (${totalSamples}) exceed total block capacity (${actualBlocksNeeded * blockSize}).`);
     return [0];
   }
-  
+
   let blockCapacities: number[];
 
   if (keepEmptyInLastBlock) {
@@ -467,21 +467,79 @@ function validatePerBlockDistribution(
 
 
 // Balanced randomization (proportional distribution in plates and rows + row shuffling)
+// Overload 1: New signature with RandomizationConfig
+export function balancedBlockRandomization(
+  searches: SearchData[],
+  config: RandomizationConfig
+): RandomizationResult;
+
+// Overload 2: Legacy signature for backward compatibility
 export function balancedBlockRandomization(
   searches: SearchData[],
   selectedCovariates: string[],
-  keepEmptyInLastPlate: boolean = true,
-  numRows: number = 8,
-  numColumns: number = 12
+  keepEmptyInLastPlate?: boolean,
+  numRows?: number,
+  numColumns?: number
 ): {
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
+};
+
+// Implementation
+export function balancedBlockRandomization(
+  searches: SearchData[],
+  configOrCovariates: RandomizationConfig | string[],
+  keepEmptyInLastPlate: boolean = true,
+  numRows: number = 8,
+  numColumns: number = 12
+): RandomizationResult | {
+  plates: (SearchData | undefined)[][][];
+  plateAssignments?: Map<number, SearchData[]>;
 } {
-  return doBalancedRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);
+  // Determine if we're using the new config-based signature or legacy signature
+  if (Array.isArray(configOrCovariates)) {
+    // Legacy signature: (searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns)
+    return doStandardRandomization(searches, configOrCovariates, keepEmptyInLastPlate, numRows, numColumns);
+  } else {
+    // New signature: (searches, config)
+    const config = configOrCovariates;
+
+    // Route to appropriate algorithm based on whether repeated-measures variable is set
+    if (config.repeatedMeasuresVariable) {
+      // Use repeated-measures-aware randomization
+      return doRepeatedMeasuresAwareRandomization(searches, config);
+    } else {
+      // Use standard randomization
+      return doStandardRandomization(
+        searches,
+        config.treatmentVariables,
+        config.keepEmptyInLastPlate,
+        config.numRows,
+        config.numColumns
+      );
+    }
+  }
 }
 
-// Core balanced randomization implementation
-function doBalancedRandomization(
+/**
+ * Repeated-measures-aware randomization implementation
+ * This function will be implemented in task 4.2
+ *
+ * @param searches All samples to randomize
+ * @param config Configuration including treatment and repeated-measures variables
+ * @returns Randomization result with plates and repeated-measures metadata
+ */
+function doRepeatedMeasuresAwareRandomization(
+  searches: SearchData[],
+  config: RandomizationConfig
+): RandomizationResult {
+  // TODO: Implement in task 4.2
+  // This is a placeholder that will be replaced with the full implementation
+  throw new Error('Repeated-measures-aware randomization not yet implemented. This will be completed in task 4.2.');
+}
+
+// Standard randomization implementation (existing algorithm)
+function doStandardRandomization(
   searches: SearchData[],
   selectedCovariates: string[],
   keepEmptyInLastPlate: boolean = true,

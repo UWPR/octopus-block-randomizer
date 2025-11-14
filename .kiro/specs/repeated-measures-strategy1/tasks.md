@@ -86,7 +86,13 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Handle case where no plate can fit the group
     - _Requirements: 5.1, 5.3, 6.2, 6.3, 7.1, 7.2_
 
-  - [ ]* 3.4 Write unit tests for distribution algorithm
+  - [x] 3.4 Write unit tests for distribution algorithm
+
+
+
+
+
+
     - Test distribution respects capacity constraints
     - Test groups stay together on same plate
     - Test balance score calculation
@@ -142,7 +148,13 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Maintain backward compatibility
     - _Requirements: 11.6_
 
-  - [ ]* 4.5 Write integration tests for end-to-end randomization
+  - [x] 4.5 Write integration tests for end-to-end randomization
+
+
+
+
+
+
     - Test simple case with equal-sized groups
     - Test uneven group sizes
     - Test mixed groups and singletons
@@ -248,20 +260,37 @@ This document provides a step-by-step implementation plan for adding repeated-me
     - Implement early termination in distribution
     - _Requirements: 13.2, 13.3_
 
-  - [ ]* 7.2 Write performance tests
+  - [x] 7.2 Write performance tests
+
+
+
+
+
+
+
     - Test with 1000 samples and 100 groups (< 2 seconds)
     - Test with 5000 samples and 500 groups (< 10 seconds)
     - Monitor memory usage
     - _Requirements: 13.1_
 
 - [ ] 8. Documentation and final polish
-  - [ ] 8.1 Update code documentation
+  - [x] 8.1 Update code documentation
+
+
+
+
+
     - Add JSDoc comments to all new functions
     - Document parameters and return types
     - Add usage examples
     - Document edge cases and limitations
 
-  - [ ] 8.2 Update user-facing documentation
+  - [x] 8.2 Update user-facing documentation
+
+
+
+
+
     - Add section on repeated-measures variables
     - Provide examples of when to use this feature
     - Document limitations and best practices

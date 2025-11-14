@@ -1,24 +1,94 @@
 import { RepeatedMeasuresGroup } from '../utils/types';
 
 /**
- * Distributes repeated-measures groups to plates using balanced best-fit algorithm
+ * Distributes repeated-measures groups to plates using a balanced best-fit greedy algorithm.
  *
- * This function implements a greedy algorithm that:
- * 1. Calculates global treatment distribution from all samples
- * 2. Sorts groups by size (largest first) for better bin packing
- * 3. For each group, selects the plate that minimizes treatment imbalance
- * 4. Respects plate capacity constraints
+ * This function implements the core distribution algorithm that assigns repeated-measures groups
+ * to plates while maintaining approximate treatment balance across plates and respecting capacity
+ * constraints. The algorithm uses a greedy approach with balance scoring to make locally optimal
+ * decisions that result in good global balance.
  *
- * OPTIMIZATIONS:
- * - Pre-calculates global treatment distribution once
- * - Uses Map for O(1) lookups
- * - Caches plate treatment compositions to avoid recalculation
- * - Implements early termination when perfect balance is achieved
+ * **Algorithm Steps:**
+ * 1. **Calculate Global Distribution:** Compute the overall treatment proportions across all samples
+ *    to establish target proportions for each plate
+ * 2. **Sort Groups:** Order groups by size (largest first) for better bin packing efficiency
+ * 3. **Initialize Tracking:** Set up plate assignments and cached treatment compositions
+ * 4. **Greedy Assignment:** For each group in sorted order:
+ *    - Evaluate all plates that have sufficient capacity
+ *    - Calculate balance score for adding group to each candidate plate
+ *    - Assign group to plate with lowest balance score (best balance)
+ *    - Update cached compositions incrementally
+ * 5. **Return Assignments:** Provide final mapping of plates to groups
  *
- * @param groups Groups to distribute
- * @param plateCapacities Capacity of each plate (number of samples per plate)
- * @param treatmentVariables Variables for balancing
- * @returns Map of plate index to assigned groups
+ * **Performance Optimizations:**
+ * - Pre-calculates global treatment distribution once (O(n)) instead of recalculating per group
+ * - Uses Map data structures for O(1) lookups instead of array searches
+ * - Caches plate treatment compositions and updates incrementally (avoids O(n) recalculation)
+ * - Implements early termination in balance scoring when perfect balance (score = 0) is found
+ * - Sorts groups once upfront rather than repeatedly during distribution
+ * - Pre-allocates data structures with known sizes
+ *
+ * **Balance Scoring:**
+ * The algorithm calculates a balance score for each candidate plate by:
+ * - Computing hypothetical treatment composition if group were added
+ * - Comparing to expected proportions based on global distribution
+ * - Summing absolute deviations across all treatment combinations
+ * - Lower score = better balance (0 = perfect balance)
+ *
+ * **Example Usage:**
+ * ```typescript
+ * const groups = createRepeatedMeasuresGroups(samples, 'PatientID', ['Treatment']);
+ * const plateCapacities = [96, 96, 48]; // 2 full plates, 1 partial
+ * const assignments = distributeGroupsToPlates(groups, plateCapacities, ['Treatment']);
+ *
+ * // assignments is a Map:
+ * // 0 -> [group1, group3, group5, ...] (groups assigned to plate 1)
+ * // 1 -> [group2, group4, group7, ...] (groups assigned to plate 2)
+ * // 2 -> [group6, group8, ...]         (groups assigned to plate 3)
+ * ```
+ *
+ * **Capacity Handling:**
+ * - Plates can have different capacities (e.g., last plate may be partial)
+ * - Algorithm checks capacity constraints before calculating balance scores
+ * - Groups that don't fit are excluded from consideration for that plate
+ * - If no plate can fit a group, an error is thrown with diagnostic information
+ *
+ * **Edge Cases:**
+ * - Single plate: All groups assigned to that plate (balance is automatic)
+ * - Empty groups array: Returns empty assignments for all plates
+ * - Group larger than any plate: Throws error with detailed message
+ * - Perfect balance achievable: Early termination optimization activates
+ * - Rare treatment groups: Handles fractional expected counts correctly
+ *
+ * **Limitations:**
+ * - Greedy algorithm may not find globally optimal solution (but is fast and effective)
+ * - Does not perform post-distribution optimization (e.g., swapping groups between plates)
+ * - Assumes all groups must be assigned (no optional groups)
+ * - Does not consider spatial constraints or batch effects
+ * - Balance is approximate, not guaranteed to be perfect (especially with large groups)
+ *
+ * **Rare Treatment Groups:**
+ * The algorithm correctly handles rare treatment combinations (e.g., 4 samples across 7 plates):
+ * - Expected count per plate will be fractional (e.g., 0.57 samples)
+ * - Balance score calculation uses these fractional values
+ * - Some plates will have 0, others will have 1+ (depending on group composition)
+ * - This is expected behavior - perfect balance is impossible with rare groups
+ *
+ * @param groups - Array of repeated-measures groups to distribute. Each group contains samples
+ *                that must stay together on the same plate.
+ * @param plateCapacities - Array of plate capacities (number of samples per plate). Length determines
+ *                         number of plates. Values can differ (e.g., [96, 96, 48] for 2 full + 1 partial).
+ * @param treatmentVariables - Array of metadata field names used for treatment balancing (e.g., ["Treatment", "Timepoint"]).
+ *                            Used to calculate balance scores and maintain proportional distribution.
+ * @returns Map where keys are plate indices (0-based) and values are arrays of groups assigned to that plate.
+ *          All groups in the input array will be assigned to exactly one plate.
+ *
+ * @throws {Error} If any group cannot fit in any available plate due to capacity constraints.
+ *                The error message includes diagnostic information about group size and plate capacities.
+ *
+ * @see {@link selectBestPlate} for the plate selection logic
+ * @see {@link calculateBalanceScore} for balance score calculation
+ * @see {@link createRepeatedMeasuresGroups} for group creation
  */
 export function distributeGroupsToPlates(
   groups: RepeatedMeasuresGroup[],
@@ -161,23 +231,92 @@ export function distributeGroupsToPlates(
 }
 
 /**
- * Selects the best plate for a group based on capacity constraints and balance score
+ * Selects the best plate for a repeated-measures group based on capacity and treatment balance.
  *
- * Algorithm:
- * 1. Check capacity constraints for each candidate plate
- * 2. Calculate balance score for each viable plate
- * 3. Select plate with lowest balance score (best balance)
- * 4. OPTIMIZATION: Early termination if perfect balance (score = 0) is found
- * 5. Throw error if no plate can fit the group
+ * This function evaluates all candidate plates to find the one that can accommodate the group
+ * while maintaining the best treatment balance. It uses a two-phase approach: first filtering
+ * by capacity constraints, then selecting based on balance scores.
  *
- * @param group Group to assign
- * @param plateCapacities Capacity of each plate
- * @param plateCounts Current sample counts per plate
- * @param plateTreatmentCompositions Cached treatment compositions per plate
- * @param globalTreatmentCounts Global treatment distribution
- * @param totalSamples Total number of samples
- * @returns Index of the best plate
- * @throws Error if no plate can fit the group
+ * **Algorithm:**
+ * 1. **Capacity Check:** For each plate, verify sufficient remaining capacity (early exit optimization)
+ * 2. **Balance Scoring:** Calculate balance score for each viable plate
+ * 3. **Best Selection:** Track plate with lowest balance score
+ * 4. **Early Termination:** Stop immediately if perfect balance (score = 0) is found
+ * 5. **Error Handling:** Throw detailed error if no plate can accommodate the group
+ *
+ * **Selection Criteria:**
+ * - Primary: Plate must have sufficient remaining capacity
+ * - Secondary: Among viable plates, select one with lowest balance score
+ * - Tie-breaking: First plate encountered with best score wins (deterministic)
+ *
+ * **Performance Optimizations:**
+ * - Checks capacity constraint first (cheap operation) before expensive balance calculation
+ * - Early termination when perfect balance (score = 0) is achieved
+ * - Uses cached treatment compositions (passed in) to avoid recalculation
+ * - Short-circuits loop when optimal solution is found
+ *
+ * **Example Usage:**
+ * ```typescript
+ * const bestPlate = selectBestPlate(
+ *   group,                          // Group with 8 samples
+ *   [96, 96, 48],                  // Plate capacities
+ *   [80, 90, 40],                  // Current counts
+ *   plateTreatmentCompositions,    // Cached compositions
+ *   globalTreatmentCounts,         // Global distribution
+ *   240                            // Total samples
+ * );
+ * // Returns: 0 (plate 1 has most capacity and best balance)
+ * ```
+ *
+ * **Capacity Constraint Logic:**
+ * ```
+ * remainingCapacity = plateCapacity - currentCount
+ * if (remainingCapacity < group.size) {
+ *   skip this plate (cannot fit)
+ * }
+ * ```
+ *
+ * **Balance Score Comparison:**
+ * - Score represents total deviation from expected treatment proportions
+ * - Lower score = better balance
+ * - Score of 0 = perfect balance (rare but possible)
+ * - Typical scores range from 0.5 to 10+ depending on group size and composition
+ *
+ * **Edge Cases:**
+ * - All plates full: Throws error with current usage information
+ * - Only one viable plate: Returns that plate without comparison
+ * - Multiple plates with same score: Returns first one encountered
+ * - Perfect balance achievable: Returns immediately without checking remaining plates
+ * - Group larger than all plates: Throws error with diagnostic details
+ *
+ * **Error Handling:**
+ * If no plate can fit the group, throws a detailed error including:
+ * - Group identifier and size
+ * - All plate capacities
+ * - Current usage for each plate
+ * - Suggestions for resolution (increase capacity or split group)
+ *
+ * **Limitations:**
+ * - Does not consider future groups (greedy approach)
+ * - Does not attempt to reserve space for large groups coming later
+ * - Tie-breaking is deterministic but arbitrary (first plate wins)
+ * - Does not consider spatial or batch constraints
+ *
+ * @param group - The repeated-measures group to assign. Must have size and treatmentComposition properties.
+ * @param plateCapacities - Array of maximum samples per plate (e.g., [96, 96, 48]).
+ * @param plateCounts - Array of current sample counts per plate (e.g., [80, 90, 40]).
+ * @param plateTreatmentCompositions - Map of plate index to cached treatment composition.
+ *                                     Used to avoid recalculating compositions from scratch.
+ * @param globalTreatmentCounts - Map of treatment combination keys to total counts across all samples.
+ *                               Defines target proportions for balancing.
+ * @param totalSamples - Total number of samples across all groups. Used to calculate expected proportions.
+ * @returns Zero-based index of the best plate for this group (0 = first plate, 1 = second plate, etc.).
+ *
+ * @throws {Error} If no plate has sufficient capacity to fit the group. Error includes diagnostic information
+ *                about group size, plate capacities, and current usage to help troubleshoot the issue.
+ *
+ * @see {@link calculateBalanceScore} for balance score calculation details
+ * @see {@link distributeGroupsToPlates} for the overall distribution algorithm
  */
 function selectBestPlate(
   group: RepeatedMeasuresGroup,
@@ -239,36 +378,105 @@ function selectBestPlate(
 }
 
 /**
- * Calculates treatment balance score for adding a group to a plate
+ * Calculates treatment balance score for adding a group to a plate.
  *
- * The balance score measures how much adding a group to a plate would deviate
- * from the expected treatment proportions based on global distribution.
- * Lower score = better balance.
+ * This function computes a numerical score that represents how much adding a specific group
+ * to a specific plate would deviate from ideal treatment balance. The score is based on
+ * comparing the hypothetical treatment composition (current + candidate group) against
+ * expected proportions derived from the global treatment distribution.
  *
- * Algorithm:
- * 1. Use cached plate composition (OPTIMIZATION: avoid recalculation)
- * 2. Calculate hypothetical composition if we add the candidate group
- * 3. For each treatment combination:
- *    - Calculate expected count based on global proportion
- *    - Calculate deviation from expected count
- * 4. Sum all deviations to get total balance score
+ * **Balance Score Interpretation:**
+ * - **Lower score = better balance** (closer to expected proportions)
+ * - **Score of 0 = perfect balance** (actual matches expected exactly)
+ * - **Higher score = worse balance** (larger deviation from expected)
+ * - Typical scores range from 0.5 to 10+ depending on group size and composition
  *
- * OPTIMIZATIONS:
- * - Uses cached plate compositions instead of recalculating from groups
- * - Pre-calculated global treatment counts passed in
- * - Early exit possible if deviation becomes too large
+ * **Algorithm:**
+ * 1. **Get Current Composition:** Retrieve cached treatment composition for the plate (O(1) lookup)
+ * 2. **Calculate Hypothetical:** Add candidate group's composition to current composition
+ * 3. **Compute Expected Counts:** For each treatment combination:
+ *    - Calculate global proportion (globalCount / totalSamples)
+ *    - Multiply by hypothetical plate size to get expected count
+ * 4. **Calculate Deviations:** For each treatment combination:
+ *    - Compare actual count to expected count
+ *    - Take absolute deviation
+ * 5. **Sum Deviations:** Total all deviations to get final balance score
  *
- * Handles rare treatment groups with fractional expected counts correctly.
- * For example, if a treatment appears 4 times across 7 plates, expected count
- * per plate is ~0.57, and deviations are calculated from this fractional value.
+ * **Performance Optimizations:**
+ * - Uses cached plate compositions instead of recalculating from all groups (O(1) vs O(n))
+ * - Pre-calculated global treatment counts passed in (avoids recalculation)
+ * - Direct Map operations for efficient composition merging
+ * - Could implement early exit if deviation exceeds threshold (not currently used)
  *
- * @param plateIdx Index of candidate plate
- * @param group Group to potentially add
- * @param plateTreatmentCompositions Cached treatment compositions per plate
- * @param plateCounts Current sample counts per plate
- * @param globalTreatmentCounts Global treatment distribution
- * @param totalSamples Total number of samples
- * @returns Balance score (lower is better)
+ * **Mathematical Formula:**
+ * ```
+ * For each treatment combination t:
+ *   expectedProportion[t] = globalCount[t] / totalSamples
+ *   expectedCount[t] = expectedProportion[t] × hypotheticalPlateSize
+ *   actualCount[t] = hypotheticalComposition[t] || 0
+ *   deviation[t] = |actualCount[t] - expectedCount[t]|
+ *
+ * balanceScore = Σ deviation[t] for all t
+ * ```
+ *
+ * **Example Calculation:**
+ * ```typescript
+ * // Global distribution: 100 Drug, 100 Placebo (200 total)
+ * // Plate currently has: 40 Drug, 40 Placebo (80 samples)
+ * // Candidate group has: 4 Drug, 4 Placebo (8 samples)
+ *
+ * // Hypothetical composition: 44 Drug, 44 Placebo (88 samples)
+ * // Expected proportions: Drug = 0.5, Placebo = 0.5
+ * // Expected counts: Drug = 44, Placebo = 44
+ * // Actual counts: Drug = 44, Placebo = 44
+ * // Deviations: Drug = 0, Placebo = 0
+ * // Balance score = 0 (perfect balance!)
+ * ```
+ *
+ * **Rare Treatment Groups:**
+ * The algorithm correctly handles rare treatment combinations with fractional expected counts:
+ *
+ * ```typescript
+ * // Example: 4 samples of rare treatment across 7 plates (672 total samples)
+ * // Plate 1 currently has 80 samples, considering group with 8 samples (none rare)
+ *
+ * // expectedProportion = 4 / 672 = 0.00595
+ * // hypotheticalPlateSize = 80 + 8 = 88
+ * // expectedCount = 0.00595 × 88 = 0.524 (fractional!)
+ * // actualCount = 0 (no rare samples on this plate)
+ * // deviation = |0 - 0.524| = 0.524
+ *
+ * // This small deviation is acceptable and expected for rare groups.
+ * // The algorithm will naturally spread rare samples across plates.
+ * ```
+ *
+ * **Edge Cases:**
+ * - Empty plate (no current composition): All expected counts are based on group alone
+ * - Treatment not in global distribution: Expected count is 0 (shouldn't happen in practice)
+ * - Treatment not on plate: Actual count is 0 (common, especially for rare treatments)
+ * - Perfect balance achievable: Returns score of 0
+ * - Very large group: May result in high score if composition differs from global
+ *
+ * **Limitations:**
+ * - Does not consider future groups (greedy, local decision)
+ * - Treats all treatment combinations equally (no weighting)
+ * - Does not account for row-level balance (only plate-level)
+ * - Fractional expected counts are not rounded (uses exact values)
+ * - Does not penalize imbalance more heavily for important treatments
+ *
+ * @param plateIdx - Zero-based index of the candidate plate being evaluated.
+ * @param group - The repeated-measures group being considered for assignment. Must have treatmentComposition and size.
+ * @param plateTreatmentCompositions - Map of plate index to cached treatment composition (Map<treatmentKey, count>).
+ *                                     Used to avoid recalculating compositions from scratch.
+ * @param plateCounts - Array of current sample counts per plate. Used to calculate hypothetical plate size.
+ * @param globalTreatmentCounts - Map of treatment combination keys to total counts across all samples.
+ *                               Defines the target proportions for balancing.
+ * @param totalSamples - Total number of samples across all groups. Used to calculate expected proportions.
+ * @returns Balance score as a non-negative number. Lower values indicate better balance.
+ *          A score of 0 indicates perfect balance (actual matches expected exactly).
+ *
+ * @see {@link selectBestPlate} for how this score is used in plate selection
+ * @see {@link distributeGroupsToPlates} for the overall distribution algorithm
  */
 function calculateBalanceScore(
   plateIdx: number,

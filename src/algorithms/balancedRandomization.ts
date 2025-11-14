@@ -524,15 +524,99 @@ export function balancedBlockRandomization(
 }
 
 /**
- * Calculate quality metrics for repeated-measures randomization
+ * Calculates comprehensive quality metrics for repeated-measures randomization.
  *
- * @param searches All samples
- * @param groups Repeated-measures groups
- * @param plateAssignments Map of plate index to samples
- * @param plates 3D array of plate layout
- * @param treatmentVariables Variables used for treatment balancing
- * @param repeatedMeasuresVariable Variable used for grouping
- * @returns Quality metrics for repeated-measures randomization
+ * This function evaluates the quality of a repeated-measures randomization by calculating
+ * both repeated-measures-specific metrics (constraint satisfaction, group distribution) and
+ * standard quality metrics (treatment balance, row clustering). It provides a comprehensive
+ * assessment of randomization quality for reporting and validation.
+ *
+ * **Metrics Calculated:**
+ *
+ * 1. **Repeated-Measures Constraint Satisfaction:**
+ *    - Validates that no groups are split across plates
+ *    - Counts any violations (should be 0)
+ *    - Tracks unique subject IDs and their plate assignments
+ *
+ * 2. **Treatment Balance Score:**
+ *    - Uses standard balance calculation from quality metrics
+ *    - Measures how well treatment proportions match across plates
+ *    - Score of 100 = perfect balance, lower = more imbalance
+ *
+ * 3. **Per-Plate Group Counts:**
+ *    - Counts how many groups are assigned to each plate
+ *    - Includes both multi-sample groups and singletons
+ *    - Useful for assessing distribution evenness
+ *
+ * 4. **Group Size Distribution:**
+ *    - Categorizes groups by size: singletons, small (2-5), medium (6-15), large (16+)
+ *    - Provides overview of group composition
+ *    - Helps identify potential balancing challenges
+ *
+ * 5. **Standard Quality Metrics:**
+ *    - Treatment balance across plates
+ *    - Row clustering scores
+ *    - Overall quality assessment
+ *
+ * **Example Usage:**
+ * ```typescript
+ * const metrics = calculateRepeatedMeasuresQualityMetrics(
+ *   samples,
+ *   groups,
+ *   plateAssignments,
+ *   plates,
+ *   ['Treatment', 'Timepoint'],
+ *   'PatientID'
+ * );
+ *
+ * console.log(`Constraints satisfied: ${metrics.repeatedMeasuresConstraintsSatisfied}`);
+ * console.log(`Balance score: ${metrics.treatmentBalanceScore}/100`);
+ * console.log(`Total groups: ${metrics.groupSizeDistribution.singletons +
+ *                              metrics.groupSizeDistribution.small +
+ *                              metrics.groupSizeDistribution.medium +
+ *                              metrics.groupSizeDistribution.large}`);
+ * ```
+ *
+ * **Constraint Validation Logic:**
+ * - Tracks which plate each subject ID is assigned to
+ * - If same subject ID appears on multiple plates, counts as violation
+ * - Singletons (no subject ID) are skipped in validation
+ * - Any violations indicate a critical error in the algorithm
+ *
+ * **Group Size Categories:**
+ * - **Singletons:** Groups with isSingleton = true (samples without subject ID)
+ * - **Small:** 2-5 samples (typical for most repeated-measures designs)
+ * - **Medium:** 6-15 samples (larger longitudinal studies)
+ * - **Large:** 16+ samples (extensive time series or technical replicates)
+ *
+ * **Edge Cases:**
+ * - No groups: Returns metrics with all counts at 0
+ * - All singletons: High singleton count, no multi-sample groups
+ * - Single plate: Balance score may be perfect (no cross-plate comparison)
+ * - Violations detected: Sets repeatedMeasuresConstraintsSatisfied to false
+ *
+ * **Limitations:**
+ * - Does not calculate spatial clustering metrics
+ * - Does not assess batch effect mitigation
+ * - Group size categories are fixed (not configurable)
+ * - Does not provide per-treatment balance scores
+ *
+ * @param searches - All samples that were randomized. Used for standard quality metrics calculation.
+ * @param groups - Array of repeated-measures groups created during randomization. Used for group size distribution.
+ * @param plateAssignments - Map of plate index to samples assigned to that plate. Used for constraint validation.
+ * @param plates - 3D array representing the final plate layout [plate][row][col]. Used for standard quality metrics.
+ * @param treatmentVariables - Array of treatment variable names used for balancing. Used for standard quality metrics.
+ * @param repeatedMeasuresVariable - Variable name used for grouping (e.g., "PatientID"). Used for constraint validation.
+ * @returns RepeatedMeasuresQualityMetrics object containing:
+ *          - repeatedMeasuresConstraintsSatisfied: Boolean indicating if all groups stayed together
+ *          - repeatedMeasuresViolations: Count of groups split across plates (should be 0)
+ *          - treatmentBalanceScore: Overall balance score (0-100, higher is better)
+ *          - plateGroupCounts: Array of group counts per plate
+ *          - groupSizeDistribution: Object with counts for each size category
+ *          - standardMetrics: Full standard quality metrics object
+ *
+ * @see {@link validateRepeatedMeasuresConstraints} for constraint validation details
+ * @see {@link calculateQualityMetrics} from utils/qualityMetrics for standard metrics
  */
 function calculateRepeatedMeasuresQualityMetrics(
   searches: SearchData[],
@@ -669,19 +753,103 @@ function calculateRepeatedMeasuresQualityMetrics(
 }
 
 /**
- * Repeated-measures-aware randomization implementation
+ * Performs repeated-measures-aware randomization with constraint satisfaction.
  *
- * This function implements the repeated-measures randomization algorithm:
- * 1. Create repeated-measures groups from samples
- * 2. Validate groups (check for oversized groups, etc.)
- * 3. Calculate plate capacities
- * 4. Distribute groups to plates (keeping groups together)
- * 5. Flatten groups back to samples
- * 6. Apply existing row distribution to each plate
+ * This function implements the complete repeated-measures randomization algorithm that ensures
+ * samples from the same subject (sharing the same repeated-measures variable value) are assigned
+ * to the same plate while maintaining approximate treatment balance across plates. It extends
+ * the standard randomization algorithm with group-based distribution at the plate level.
  *
- * @param searches All samples to randomize
- * @param config Configuration including treatment and repeated-measures variables
- * @returns Randomization result with plates and repeated-measures metadata
+ * **Algorithm Overview:**
+ *
+ * 1. **Group Creation:** Create repeated-measures groups from samples based on shared identifier
+ * 2. **Validation:** Check for oversized groups and other issues that would prevent distribution
+ * 3. **Capacity Calculation:** Determine how many plates are needed and their capacities
+ * 4. **Group Distribution:** Assign groups to plates using balanced best-fit algorithm
+ * 5. **Flattening:** Convert group assignments back to individual sample assignments
+ * 6. **Row Distribution:** Apply standard row-level distribution within each plate
+ * 7. **Constraint Validation:** Verify no groups were split across plates
+ * 8. **Quality Metrics:** Calculate comprehensive quality metrics for reporting
+ *
+ * **Key Differences from Standard Randomization:**
+ * - Operates on groups at plate level (not individual samples)
+ * - Uses balanced best-fit algorithm for plate distribution (not proportional distribution)
+ * - Validates repeated-measures constraints after distribution
+ * - Returns additional metadata (groups, quality metrics)
+ * - May achieve less perfect balance due to group atomicity constraints
+ *
+ * **Example Usage:**
+ * ```typescript
+ * const config: RandomizationConfig = {
+ *   treatmentVariables: ['Treatment', 'Timepoint'],
+ *   repeatedMeasuresVariable: 'PatientID',
+ *   keepEmptyInLastPlate: true,
+ *   numRows: 8,
+ *   numColumns: 12
+ * };
+ *
+ * const result = doRepeatedMeasuresAwareRandomization(samples, config);
+ *
+ * console.log(`Created ${result.repeatedMeasuresGroups.length} groups`);
+ * console.log(`Distributed across ${result.plates.length} plates`);
+ * console.log(`Constraints satisfied: ${result.qualityMetrics.repeatedMeasuresConstraintsSatisfied}`);
+ * ```
+ *
+ * **Plate-Level Distribution:**
+ * - Groups are assigned to plates using balanced best-fit algorithm
+ * - Each group is assigned to the plate that minimizes treatment imbalance
+ * - Groups are never split across plates (atomic assignment)
+ * - Capacity constraints are strictly enforced
+ *
+ * **Row-Level Distribution:**
+ * - After plate assignment, samples within each plate are distributed to rows
+ * - Uses standard proportional distribution algorithm
+ * - Maintains treatment balance at row level within each plate
+ * - Samples are shuffled within rows for final randomization
+ *
+ * **Validation and Error Handling:**
+ * - Throws error if any group exceeds plate capacity (oversized group)
+ * - Throws error if group cannot fit in any available plate
+ * - Throws error if repeated-measures constraints are violated after distribution
+ * - Logs warnings for large groups or high singleton ratios
+ *
+ * **Edge Cases:**
+ * - All samples have same subject ID: Single group assigned to one plate
+ * - No samples have subject ID: All singletons, behaves like standard randomization
+ * - Mixed groups and singletons: Handles both correctly
+ * - Single plate: All groups assigned to that plate
+ * - Partial last plate: Capacity calculated based on keepEmptyInLastPlate setting
+ *
+ * **Limitations:**
+ * - Balance may be less perfect than standard randomization due to group constraints
+ * - Large groups can significantly limit balancing flexibility
+ * - Does not perform post-distribution optimization (e.g., group swapping)
+ * - Assumes all groups must be assigned (no optional groups)
+ * - Does not consider spatial or batch constraints beyond plate boundaries
+ *
+ * @param searches - All samples to randomize. Each sample must have metadata with repeated-measures variable.
+ * @param config - Configuration object containing:
+ *                 - treatmentVariables: Variables to balance across plates
+ *                 - repeatedMeasuresVariable: Variable used for grouping (e.g., "PatientID")
+ *                 - keepEmptyInLastPlate: Whether to keep empty cells in last plate
+ *                 - numRows: Number of rows per plate
+ *                 - numColumns: Number of columns per plate
+ * @returns RandomizationResult object containing:
+ *          - plates: 3D array [plate][row][col] with sample assignments
+ *          - plateAssignments: Map of plate index to samples
+ *          - repeatedMeasuresGroups: Array of groups created
+ *          - qualityMetrics: Comprehensive quality metrics
+ *
+ * @throws {Error} If repeated-measures variable is not provided in config
+ * @throws {Error} If any group exceeds plate capacity (oversized group)
+ * @throws {Error} If any group cannot fit in any available plate
+ * @throws {Error} If repeated-measures constraints are violated after distribution
+ *
+ * @see {@link createRepeatedMeasuresGroups} for group creation
+ * @see {@link validateRepeatedMeasuresGroups} for validation
+ * @see {@link distributeGroupsToPlates} for plate distribution
+ * @see {@link validateRepeatedMeasuresConstraints} for constraint validation
+ * @see {@link calculateRepeatedMeasuresQualityMetrics} for quality metrics
  */
 function doRepeatedMeasuresAwareRandomization(
   searches: SearchData[],
@@ -879,15 +1047,101 @@ function doRepeatedMeasuresAwareRandomization(
 }
 
 /**
- * Validates that repeated-measures constraints are satisfied
+ * Validates that repeated-measures constraints are satisfied after distribution.
  *
- * This function verifies that no repeated-measures group is split across multiple plates.
- * It checks that all samples with the same repeated-measures variable value are assigned
- * to the same plate.
+ * This function performs post-distribution validation to ensure that the fundamental
+ * repeated-measures constraint is satisfied: all samples with the same subject ID
+ * (repeated-measures variable value) must be assigned to the same plate. This is a
+ * critical validation step that catches any algorithmic errors in the distribution process.
  *
- * @param plateAssignments Map of plate index to samples assigned to that plate
- * @param repeatedMeasuresVariable Variable used for repeated-measures grouping
- * @throws Error if any repeated-measures group is split across multiple plates
+ * **Validation Logic:**
+ * 1. Iterate through all plates and their assigned samples
+ * 2. For each sample with a subject ID, track which plate it's assigned to
+ * 3. If a subject ID appears on multiple plates, record a violation
+ * 4. Skip samples without subject IDs (singletons can be on any plate)
+ * 5. Throw error if any violations are detected
+ *
+ * **What Constitutes a Violation:**
+ * - Same subject ID (non-empty, non-whitespace value) appears on 2+ different plates
+ * - Example: Patient_001 has samples on both Plate 1 and Plate 2
+ *
+ * **What is NOT a Violation:**
+ * - Samples without subject ID (empty or whitespace) on different plates (singletons are independent)
+ * - Same subject ID appearing multiple times on the SAME plate (expected behavior)
+ * - Different subject IDs on different plates (expected behavior)
+ *
+ * **Example Usage:**
+ * ```typescript
+ * // After distributing groups to plates
+ * const plateAssignments = new Map([
+ *   [0, [sample1, sample2, sample3]], // Patient_001, Patient_001, Patient_002
+ *   [1, [sample4, sample5, sample6]]  // Patient_003, Patient_003, Patient_004
+ * ]);
+ *
+ * // This will pass validation (no subject ID appears on multiple plates)
+ * validateRepeatedMeasuresConstraints(plateAssignments, 'PatientID');
+ *
+ * // This would fail validation:
+ * const badAssignments = new Map([
+ *   [0, [sample1, sample2]], // Patient_001, Patient_002
+ *   [1, [sample3, sample4]]  // Patient_001, Patient_003  <- Patient_001 on both plates!
+ * ]);
+ * validateRepeatedMeasuresConstraints(badAssignments, 'PatientID'); // Throws error
+ * ```
+ *
+ * **Validation Statistics Logged:**
+ * - Total samples checked across all plates
+ * - Number of unique subject IDs found
+ * - Number of singletons (samples without subject ID)
+ * - Number of violations detected
+ * - Per-plate breakdown of samples with/without subject IDs
+ *
+ * **Error Message Format:**
+ * If violations are detected, the error message includes:
+ * - List of all violations with specific subject IDs and plate numbers
+ * - Explanation of the constraint requirement
+ * - Guidance for troubleshooting
+ *
+ * **Edge Cases:**
+ * - All singletons: Validation passes (no subject IDs to track)
+ * - Single plate: Validation always passes (can't split across plates)
+ * - Empty plates: Skipped in validation
+ * - Duplicate subject IDs on same plate: Not a violation (expected)
+ * - Case-sensitive subject IDs: "Patient_001" and "patient_001" are different
+ *
+ * **Limitations:**
+ * - Does not validate that groups are complete (missing samples)
+ * - Does not check treatment composition within groups
+ * - Does not validate row-level distribution
+ * - Assumes subject IDs are strings (no type checking)
+ * - Case-sensitive comparison (no normalization)
+ *
+ * **When This Function Should Be Called:**
+ * - After plate distribution is complete
+ * - Before returning results to user
+ * - As a final sanity check on the algorithm
+ * - Should NEVER fail if distribution algorithm is correct
+ *
+ * **If Validation Fails:**
+ * This indicates a critical bug in the distribution algorithm. Possible causes:
+ * - Group was split during flattening step
+ * - Plate assignment logic has a bug
+ * - Concurrent modification of assignments
+ * - Data corruption during processing
+ *
+ * @param plateAssignments - Map of plate index (0-based) to array of samples assigned to that plate.
+ *                          Each sample must have metadata with the repeated-measures variable.
+ * @param repeatedMeasuresVariable - Name of the metadata field used for grouping (e.g., "PatientID", "SubjectID").
+ *                                  This field's value is used to identify which samples must stay together.
+ * @returns void - Function returns normally if validation passes
+ *
+ * @throws {Error} If any repeated-measures group is split across multiple plates. The error message includes:
+ *                - List of all violations with subject IDs and plate numbers
+ *                - Explanation of the constraint requirement
+ *                - Guidance that all samples with same subject ID must be on same plate
+ *
+ * @see {@link doRepeatedMeasuresAwareRandomization} for where this validation is called
+ * @see {@link distributeGroupsToPlates} for the distribution algorithm being validated
  */
 function validateRepeatedMeasuresConstraints(
   plateAssignments: Map<number, SearchData[]>,

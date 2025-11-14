@@ -2,18 +2,71 @@ import { SearchData, RepeatedMeasuresGroup } from '../utils/types';
 import { getCovariateKey } from '../utils/utils';
 
 /**
- * Creates repeated-measures groups from samples
+ * Creates repeated-measures groups from samples based on a shared identifier variable.
  *
- * OPTIMIZATIONS:
- * - Uses Map for O(1) subject ID lookups
- * - Pre-calculates treatment compositions during group creation
- * - Single pass through samples for grouping
- * - Efficient memory usage with direct array operations
+ * This function groups samples that share the same value for the repeated-measures variable
+ * (e.g., PatientID, SubjectID) into groups that must stay together on the same plate.
+ * Samples without a value for the repeated-measures variable are treated as independent
+ * singletons with unique identifiers.
  *
- * @param samples All samples to be randomized
- * @param repeatedMeasuresVariable Variable used for grouping (e.g., "PatientID")
- * @param treatmentVariables Variables used for treatment balancing
- * @returns Array of repeated-measures groups
+ * **Algorithm:**
+ * 1. Iterate through all samples once (single pass optimization)
+ * 2. Group samples by their repeated-measures variable value using a Map (O(1) lookups)
+ * 3. Create unique singleton IDs for samples without a repeated-measures value
+ * 4. Calculate treatment composition for each group during creation (pre-calculation optimization)
+ * 5. Convert Map entries to RepeatedMeasuresGroup objects with metadata
+ *
+ * **Performance Optimizations:**
+ * - Uses Map for O(1) subject ID lookups instead of array searches
+ * - Pre-calculates treatment compositions during group creation to avoid recalculation
+ * - Single pass through samples for grouping (O(n) time complexity)
+ * - Efficient memory usage with direct array operations and pre-allocated arrays
+ * - Avoids redundant iterations by calculating statistics during group creation
+ *
+ * **Example Usage:**
+ * ```typescript
+ * const samples = [
+ *   { name: 'S1', metadata: { PatientID: 'P001', Treatment: 'Drug' } },
+ *   { name: 'S2', metadata: { PatientID: 'P001', Treatment: 'Placebo' } },
+ *   { name: 'S3', metadata: { PatientID: 'P002', Treatment: 'Drug' } },
+ *   { name: 'S4', metadata: { Treatment: 'Drug' } } // No PatientID - becomes singleton
+ * ];
+ *
+ * const groups = createRepeatedMeasuresGroups(samples, 'PatientID', ['Treatment']);
+ * // Returns 3 groups:
+ * // - Group 'P001': 2 samples (Drug:1, Placebo:1)
+ * // - Group 'P002': 1 sample (Drug:1)
+ * // - Group '__singleton_0': 1 sample (Drug:1)
+ * ```
+ *
+ * **Edge Cases:**
+ * - Empty samples array: Returns empty array
+ * - All samples have same subject ID: Returns single group with all samples
+ * - No samples have subject ID: Returns array of singleton groups (one per sample)
+ * - Mixed groups and singletons: Handles both correctly
+ *
+ * **Limitations:**
+ * - Subject IDs are case-sensitive and must match exactly
+ * - Empty string values are treated as missing (become singletons)
+ * - Whitespace-only values are treated as missing (become singletons)
+ * - Treatment composition is calculated based on exact string matching of treatment keys
+ *
+ * @param samples - All samples to be randomized. Each sample must have a metadata object.
+ * @param repeatedMeasuresVariable - The metadata field name used for grouping (e.g., "PatientID", "SubjectID").
+ *                                   Samples with the same value will be grouped together.
+ * @param treatmentVariables - Array of metadata field names used for treatment balancing (e.g., ["Treatment", "Timepoint"]).
+ *                            Used to calculate treatment composition within each group.
+ * @returns Array of RepeatedMeasuresGroup objects, each containing:
+ *          - subjectId: The shared identifier or unique singleton ID
+ *          - samples: Array of samples in this group
+ *          - treatmentComposition: Map of treatment combination keys to sample counts
+ *          - size: Total number of samples in the group
+ *          - isSingleton: Boolean indicating if this is a singleton group
+ *
+ * @throws Does not throw errors, but logs warnings for unusual patterns
+ *
+ * @see {@link RepeatedMeasuresGroup} for the return type structure
+ * @see {@link validateRepeatedMeasuresGroups} for validation of created groups
  */
 export function createRepeatedMeasuresGroups(
   samples: SearchData[],
@@ -121,16 +174,85 @@ export function createRepeatedMeasuresGroups(
 }
 
 /**
- * Validates repeated-measures groups for common issues
+ * Validates repeated-measures groups for common issues that could prevent successful randomization.
  *
- * OPTIMIZATIONS:
- * - Single pass through groups for all checks
- * - Pre-calculate thresholds once
- * - Avoid redundant filtering operations
+ * This function performs comprehensive validation checks on repeated-measures groups to identify
+ * potential problems before attempting distribution. It checks for oversized groups that exceed
+ * plate capacity, large groups that may limit balancing flexibility, and high singleton ratios
+ * that may indicate incorrect variable selection.
  *
- * @param groups Groups to validate
- * @param plateCapacity Maximum samples per plate
- * @returns Validation result with errors and warnings
+ * **Validation Checks:**
+ * 1. **Oversized Groups (Error):** Groups larger than plate capacity cannot be assigned
+ * 2. **Large Groups (Warning):** Groups > 50% of plate capacity may limit balancing
+ * 3. **High Singleton Ratio (Warning):** > 80% singletons may indicate wrong variable selection
+ *
+ * **Algorithm:**
+ * 1. Pre-calculate validation thresholds once (optimization)
+ * 2. Single pass through all groups performing all checks simultaneously (O(n) time)
+ * 3. Collect errors and warnings during the pass
+ * 4. Generate detailed error/warning messages with actionable guidance
+ * 5. Log comprehensive validation summary
+ *
+ * **Performance Optimizations:**
+ * - Single pass through groups for all checks instead of multiple iterations
+ * - Pre-calculate thresholds once before the loop
+ * - Avoid redundant filtering operations by tracking counts during iteration
+ * - Use direct array access instead of filter/map chains
+ *
+ * **Example Usage:**
+ * ```typescript
+ * const groups = createRepeatedMeasuresGroups(samples, 'PatientID', ['Treatment']);
+ * const validation = validateRepeatedMeasuresGroups(groups, 96);
+ *
+ * if (!validation.isValid) {
+ *   console.error('Validation failed:', validation.errors);
+ *   // Handle errors - cannot proceed with randomization
+ * }
+ *
+ * if (validation.warnings.length > 0) {
+ *   console.warn('Validation warnings:', validation.warnings);
+ *   // Can proceed but user should be aware of potential issues
+ * }
+ * ```
+ *
+ * **Validation Rules:**
+ * - **Oversized Group:** group.size > plateCapacity
+ *   - Severity: ERROR (blocks randomization)
+ *   - Reason: Cannot physically fit group on a single plate
+ *   - Solution: Increase plate size or split the group
+ *
+ * - **Large Group:** group.size > plateCapacity * 0.5
+ *   - Severity: WARNING (allows randomization)
+ *   - Reason: Large groups consume significant plate space, limiting balancing options
+ *   - Impact: May result in less optimal treatment balance across plates
+ *
+ * - **High Singleton Ratio:** singletonCount / totalGroups > 0.8 AND totalGroups > 10
+ *   - Severity: WARNING (allows randomization)
+ *   - Reason: Most samples are ungrouped, defeating the purpose of repeated-measures
+ *   - Solution: Verify correct variable selection (e.g., not using a unique sample ID)
+ *
+ * **Edge Cases:**
+ * - Empty groups array: Returns valid with no errors/warnings
+ * - All singletons: Triggers high singleton ratio warning if > 10 groups
+ * - All groups same size: No warnings if within capacity
+ * - Single group: No singleton warning (< 10 groups threshold)
+ *
+ * **Limitations:**
+ * - Does not validate treatment composition within groups
+ * - Does not check for total capacity across all plates
+ * - Singleton ratio warning only triggers if > 10 total groups (avoids false positives for small datasets)
+ * - Thresholds (50% for large groups, 80% for singleton ratio) are fixed and not configurable
+ *
+ * @param groups - Array of repeated-measures groups to validate. Each group should have size and isSingleton properties.
+ * @param plateCapacity - Maximum number of samples that can fit on a single plate (e.g., 96 for 8x12 plate).
+ *                       Used to determine if groups are oversized or large.
+ * @returns Validation result object containing:
+ *          - isValid: Boolean indicating if validation passed (no errors). False if any errors exist.
+ *          - errors: Array of error messages. Non-empty array blocks randomization execution.
+ *          - warnings: Array of warning messages. Does not block execution but indicates potential issues.
+ *
+ * @see {@link createRepeatedMeasuresGroups} for group creation
+ * @see {@link RepeatedMeasuresGroup} for group structure
  */
 export function validateRepeatedMeasuresGroups(
   groups: RepeatedMeasuresGroup[],

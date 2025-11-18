@@ -1,0 +1,11 @@
+Sample Name,PatientID,Treatment,Timepoint,Sex,Age
+P001_T1_Drug,P001,Drug,Baseline,M,45
+P001_T2_Drug,P001,Drug,Week4,M,45
+P002_T1_Placebo,P002,Placebo,Baseline,F,52
+P002_T2_Placebo,P002,Placebo,Week4,F,52
+NoPatient_T1,n/a,Drug,Baseline,M,38
+NoPatient_T2,N/A,Placebo,Week4,F,44
+NoPatient_T3,,Drug,Baseline,M,29
+NoPatient_T4,   ,Placebo,Week4,F,56
+P003_T1_Drug,P003,Drug,Baseline,F,33
+P003_T2_Drug,P003,Drug,Week4,F,33

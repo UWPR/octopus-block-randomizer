@@ -1,155 +1,516 @@
-import React, { useState, useEffect, DragEvent, useCallback  } from 'react';
-import Papa from 'papaparse';
-import Plate from './components/Plate';
-import { SearchData } from './types';
-import { randomizeSearches, downloadCSV } from './utils';
+import React, { useState, useEffect } from 'react';
+import FileUploadSection from './components/FileUploadSection';
+import ConfigurationForm from './components/ConfigurationForm';
+import SummaryPanel from './components/SummaryPanel';
+import PlateDetailsModal from './components/PlateDetailsModal';
+import ExcelExportModal from './components/ExcelExportModal';
+import PlatesGrid from './components/PlatesGrid';
+import QualityMetricsPanel from './components/QualityMetricsPanel';
+import QualityLegend from './components/QualityLegend';
+import { SearchData, RandomizationAlgorithm } from './utils/types';
+import { downloadCSV, getCovariateKey, getQualityLevelColor, formatScore } from './utils/utils';
+import { exportToExcel } from './utils/excelExport';
+import { useFileUpload } from './hooks/useFileUpload';
+import { useModalDrag } from './hooks/useModalDrag';
+import { useRandomization } from './hooks/useRandomization';
+import { useCovariateColors } from './hooks/useCovariateColors';
+import { useDragAndDrop } from './hooks/useDragAndDrop';
+import { useQualityMetrics } from './hooks/useQualityMetrics';
+
+
 
 const App: React.FC = () => {
-  const [searches, setSearches] = useState<SearchData[]>([]);
+
+  const defaultAlgorithm = "balanced";
+
+  // File upload hook
+  const {
+    searches,
+    availableColumns,
+    selectedIdColumn,
+    selectedFileName,
+    handleFileUpload,
+    handleIdColumnChange,
+  } = useFileUpload();
+
+  // Modal drag hook
+  const {
+    modalPosition,
+    isDraggingModal,
+    handleModalMouseDown,
+    handleModalMouseMove,
+    handleModalMouseUp,
+    resetModalPosition,
+  } = useModalDrag();
+
+  // Randomization hook
+  const {
+    isProcessed,
+    randomizedPlates,
+    plateAssignments,
+    processRandomization,
+    reRandomize,
+    reRandomizeSinglePlate,
+    resetRandomization,
+    updatePlates,
+  } = useRandomization();
+
+  // Covariate colors hook
+  const {
+    covariateColors,
+    summaryData,
+    generateCovariateColors,
+    generateSummaryData,
+    resetColors,
+  } = useCovariateColors();
+
+  // Drag and drop hook
+  const {
+    draggedSearch,
+    handleDragStart,
+    handleDragOver,
+    handleDrop,
+  } = useDragAndDrop(randomizedPlates, updatePlates);
+
+  // Quality metrics hook
+  const {
+    metrics,
+    isCalculating,
+    showMetrics,
+    calculateMetrics,
+    resetMetrics,
+    toggleMetrics,
+    qualitySummary
+  } = useQualityMetrics();
+
+
+
+  // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
-  const [covariateColors, setCovariateColors] = useState<{ [key: string]: string }>({});
-  const [randomizedPlates, setRandomizedPlates] = useState<(SearchData | undefined)[][][]>([]);
-  const [draggedSearch, setDraggedSearch] = useState<string | null>(null);
+  const [controlLabels, setControlLabels] = useState<string>('');
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      Papa.parse(file, {
-        header: true,
-        complete: (results) => {
-          const parsedSearches: SearchData[] = results.data
-            .filter((row: any) => row['search name'])
-            .map((row: any) => ({
-              name: row['search name'],
-              metadata: Object.keys(row)
-                .filter((key) => key !== 'search name')
-                .reduce((acc, key) => ({ ...acc, [key.trim()]: row[key] }), {}),
-            }));
-          setSearches(parsedSearches);
-        },
-      });
+  // Algorithm selection
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>(defaultAlgorithm);
+  const [keepEmptyInLastPlate, setKeepEmptyInLastPlate] = useState<boolean>(true);
+
+  // Plate dimensions
+  const [plateRows, setPlateRows] = useState<number>(8);
+  const [plateColumns, setPlateColumns] = useState<number>(12);
+
+  // UI states
+  const [showSummary, setShowSummary] = useState<boolean>(false);
+  const [compactView, setCompactView] = useState<boolean>(true);
+  const [selectedCombination, setSelectedCombination] = useState<string | null>(null);
+  const [showPlateDetails, setShowPlateDetails] = useState<boolean>(false);
+  const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
+  const [showExcelExportModal, setShowExcelExportModal] = useState<boolean>(false);
+
+
+  // Calculate quality metrics when randomization completes or plates change
+  useEffect(() => {
+    if (isProcessed && randomizedPlates.length > 0 && plateAssignments && selectedCovariates.length > 0) {
+      calculateMetrics(
+        searches,
+        randomizedPlates,
+        plateAssignments,
+        selectedCovariates
+      );
     }
+  }, [isProcessed, randomizedPlates, plateAssignments, selectedCovariates, searches, calculateMetrics]);
+
+  // Reset all state when a new file is uploaded (but not on initial load)
+  useEffect(() => {
+    // Only reset if we have a filename and searches data (indicating a successful file upload)
+    if (selectedFileName && searches.length > 0) {
+      // Reset all application state except the file upload state
+      resetRandomization();
+      resetColors();
+      resetMetrics();
+      resetModalPosition();
+
+      // Reset configuration states
+      setSelectedCovariates([]);
+      setControlLabels('');
+
+      // Reset algorithm selection (keep defaults)
+      setSelectedAlgorithm(defaultAlgorithm);
+      setKeepEmptyInLastPlate(true);
+
+      // Reset plate dimensions (keep defaults)
+      setPlateRows(8);
+      setPlateColumns(12);
+
+      // Reset UI states
+      setShowSummary(false);
+      setCompactView(true);
+      setSelectedCombination(null);
+      setShowPlateDetails(false);
+      setSelectedPlateIndex(null);
+    }
+  }, [selectedFileName, searches.length]); // Trigger when filename changes or searches are loaded
+
+  const resetCovariateState = () => {
+    resetRandomization();
+    resetColors();
+    resetMetrics();
+    setShowSummary(false);
+    setSelectedCombination(null);
   };
 
-  const handleDownloadCSV = () => {
-    downloadCSV(searches, randomizedPlates);
+
+
+  // Algorithm selection handler
+  const handleAlgorithmChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newAlgorithm = event.target.value as RandomizationAlgorithm;
+    setSelectedAlgorithm(newAlgorithm);
+    resetCovariateState(); // Reset processing state when algorithm changes
   };
 
+  // Empty spots option handler
+  const handleKeepEmptyInLastPlateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setKeepEmptyInLastPlate(event.target.checked);
+    resetCovariateState(); // Reset processing state when option changes
+  };
+
+  // Covariate selection handler
   const handleCovariateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedOptions = Array.from(event.target.selectedOptions, (option) => option.value);
     setSelectedCovariates(selectedOptions);
+    resetCovariateState();
   };
 
-  useEffect(() => {
-    setRandomizedPlates(randomizeSearches(searches, selectedCovariates));
-  }, [selectedCovariates, searches]);
+  // Control labels change handler
+  const handleControlLabelsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setControlLabels(event.target.value);
+    resetCovariateState();
+  };
 
-  const generateCovariateColors = useCallback(() => {
-    if (selectedCovariates.length > 0 && searches.length > 0) {
-      const covariateValues = new Set(
-        selectedCovariates.flatMap((covariate) =>
-          searches.map((search) => search.metadata[covariate])
-        )
+
+
+  // Main processing handler
+  const handleProcessRandomization = () => {
+    if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Process randomization
+      const success = processRandomization(
+        searches,
+        selectedCovariates,
+        selectedAlgorithm,
+        keepEmptyInLastPlate,
+        plateRows,
+        plateColumns
       );
-      const colors = ['#FFE4E1', '#E0FFFF', '#F0FFF0', '#FFF0F5', '#F5F5DC', '#F0E68C', '#E6E6FA', '#FFE4B5'];
 
-      const covariateColorsMap: { [key: string]: string } = {};
-      let colorIndex = 0;
+      if (success) {
+        // Generate colors
+        const colors = generateCovariateColors(searches, selectedCovariates, controlLabels);
 
-      covariateValues.forEach((value) => {
-        covariateColorsMap[value] = colors[colorIndex % colors.length];
-        colorIndex += 1;
-      });
-
-      setCovariateColors(covariateColorsMap);
-    }
-  }, [selectedCovariates, searches]); // Dependencies for useCallback
-
-  useEffect(() => {
-    generateCovariateColors();
-  }, [generateCovariateColors]); // generateCovariateColors is now a dependency
-
-  const handleDragStart = (event: DragEvent<HTMLDivElement>, searchName: string) => {
-    setDraggedSearch(searchName);
-  };
-
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-  };
-
-  const handleDrop = (event: DragEvent<HTMLDivElement>, plateIndex: number, rowIndex: number, columnIndex: number) => {
-    event.preventDefault();
-    if (draggedSearch) {
-      const updatedRandomizedPlates = [...randomizedPlates];
-      const draggedSearchData = searches.find((search) => search.name === draggedSearch);
-      const targetSearchData = updatedRandomizedPlates[plateIndex][rowIndex][columnIndex];
-
-      if (draggedSearchData) {
-        // Find the current position of the dragged search
-        let draggedSearchPlateIndex = -1;
-        let draggedSearchRowIndex = -1;
-        let draggedSearchColumnIndex = -1;
-
-        updatedRandomizedPlates.forEach((plate, pIndex) => {
-          plate.forEach((row, rIndex) => {
-            const index = row.findIndex((s) => s?.name === draggedSearch);
-            if (index !== -1) {
-              draggedSearchPlateIndex = pIndex;
-              draggedSearchRowIndex = rIndex;
-              draggedSearchColumnIndex = index;
-            }
-          });
-        });
-
-        // Swap the positions of the dragged search and the target search
-        if (targetSearchData) {
-          updatedRandomizedPlates[draggedSearchPlateIndex][draggedSearchRowIndex][draggedSearchColumnIndex] = targetSearchData;
-        } else {
-          updatedRandomizedPlates[draggedSearchPlateIndex][draggedSearchRowIndex][draggedSearchColumnIndex] = undefined;
-        }
-
-        updatedRandomizedPlates[plateIndex][rowIndex][columnIndex] = draggedSearchData;
-        setRandomizedPlates(updatedRandomizedPlates);
+        // Generate summary data
+        generateSummaryData(colors, searches, selectedCovariates);
       }
     }
   };
 
+  // Download CSV handler
+  const handleDownloadCSV = () => {
+    if (selectedIdColumn) {
+      downloadCSV(searches, randomizedPlates, selectedIdColumn, selectedFileName);
+    }
+  };
+
+  // Download Excel handler - opens modal for covariate selection
+  const handleDownloadExcel = () => {
+    if (selectedCovariates.length > 0 && randomizedPlates.length > 0) {
+      setShowExcelExportModal(true);
+    }
+  };
+
+  // Actual export after covariate selection
+  const handleExcelExport = async (exportCovariates: string[]) => {
+    await exportToExcel({
+      searches,
+      randomizedPlates,
+      covariateColors,
+      treatmentCovariates: selectedCovariates, // Original treatment covariates for color lookup
+      exportCovariates: exportCovariates, // User-selected covariates to display
+      numRows: plateRows,
+      numColumns: plateColumns,
+      inputFileName: selectedFileName
+    });
+  };
+
+  // Re-randomization handler
+  const handleReRandomize = () => {
+    if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Re-randomize with existing colors
+      reRandomize(
+        searches,
+        selectedCovariates,
+        selectedAlgorithm,
+        keepEmptyInLastPlate,
+        plateRows,
+        plateColumns
+      );
+    }
+  };
+
+  // Single plate re-randomization handler
+  const handleReRandomizePlate = (plateIndex: number) => {
+    if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      reRandomizeSinglePlate(
+        plateIndex,
+        searches,
+        selectedCovariates,
+        selectedAlgorithm,
+        keepEmptyInLastPlate,
+        plateRows,
+        plateColumns
+      );
+      // Quality metrics will be recalculated automatically via useEffect
+    }
+  };
+
+  // Handle clicking on summary items for highlighting
+  const handleSummaryItemClick = (combination: string) => {
+    if (selectedCombination === combination) {
+      setSelectedCombination(null); // Deselect if already selected
+    } else {
+      setSelectedCombination(combination);
+    }
+  };
+
+  // Handle showing plate details
+  const handleShowPlateDetails = (plateIndex: number) => {
+    setSelectedPlateIndex(plateIndex);
+    setShowPlateDetails(true);
+  };
+
+  const handleClosePlateDetails = () => {
+    if (!isDraggingModal) {
+      setShowPlateDetails(false);
+      setSelectedPlateIndex(null);
+      resetModalPosition(); // Reset position when closing
+    }
+  };
+
+  // Add global mouse event listeners for modal dragging
+  useEffect(() => {
+    if (isDraggingModal) {
+      document.addEventListener('mousemove', handleModalMouseMove);
+      document.addEventListener('mouseup', handleModalMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleModalMouseMove);
+        document.removeEventListener('mouseup', handleModalMouseUp);
+      };
+    }
+  }, [isDraggingModal, handleModalMouseMove, handleModalMouseUp]);
+
+
+
+  // Check if a search matches the selected combination
+  const isSearchHighlighted = (search: SearchData): boolean => {
+    if (!selectedCombination) return false;
+
+    const searchCombination = getCovariateKey(search, selectedCovariates);
+
+    return searchCombination === selectedCombination;
+  };
+
+
+
+  const canProcess = selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0;
+
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        <h1 style={styles.heading}>Block Randomization</h1>
-        <input type="file" accept=".csv" onChange={handleFileUpload} style={styles.fileInput} />
-        <div style={styles.covariateSelection}>
-          <label htmlFor="covariates">Select Covariates:</label>
-          <select id="covariates" multiple value={selectedCovariates} onChange={handleCovariateChange}>
-            {searches.length > 0 &&
-              Object.keys(searches[0].metadata).map((covariate) => (
-                <option key={covariate} value={covariate}>
-                  {covariate}
-                </option>
-              ))}
-          </select>
-        </div>
-        <div style={styles.platesContainer}>
-          {randomizedPlates.map((plate, plateIndex) => (
-            <div key={plateIndex} style={styles.plateWrapper}>
-              <Plate
-                plateIndex={plateIndex}
-                rows={plate}
+        <h1 style={styles.heading}>Octopus Block Randomization</h1>
+        {/* File Upload */}
+        <FileUploadSection
+          selectedFileName={selectedFileName}
+          onFileUpload={handleFileUpload}
+        />
+
+        {/* Configuration Form */}
+        <ConfigurationForm
+          availableColumns={availableColumns}
+          selectedIdColumn={selectedIdColumn}
+          onIdColumnChange={handleIdColumnChange}
+          searches={searches}
+          selectedCovariates={selectedCovariates}
+          onCovariateChange={handleCovariateChange}
+          controlLabels={controlLabels}
+          onControlLabelsChange={handleControlLabelsChange}
+          selectedAlgorithm={selectedAlgorithm}
+          onAlgorithmChange={handleAlgorithmChange}
+          keepEmptyInLastPlate={keepEmptyInLastPlate}
+          onKeepEmptyInLastPlateChange={handleKeepEmptyInLastPlateChange}
+          plateRows={plateRows}
+          plateColumns={plateColumns}
+          onPlateRowsChange={setPlateRows}
+          onPlateColumnsChange={setPlateColumns}
+          onResetCovariateState={resetCovariateState}
+        />
+
+
+
+        <>
+          {/* Process Button */}
+          {searches.length > 0 && !isProcessed && (
+            <button
+              onClick={handleProcessRandomization}
+              disabled={!canProcess}
+              style={{
+                ...styles.processButton,
+                ...(canProcess ? {} : styles.processButtonDisabled)
+              }}
+            >
+              Generate Randomized Plates
+            </button>
+          )}
+
+          {/* Plates Visualization */}
+          {isProcessed && randomizedPlates.length > 0 && (
+            <>
+              <div style={styles.viewControls}>
+                {metrics && (
+                  <button
+                    onClick={toggleMetrics}
+                    style={styles.qualityButton}
+                  >
+                    <span style={styles.qualityButtonText}>Quality</span>
+                    <div style={styles.qualityButtonIndicators}>
+                      <span style={styles.qualityScore}>
+                        {formatScore(metrics.overallQuality.score)}
+                      </span>
+                      <span style={{
+                        ...styles.qualityBadge,
+                        backgroundColor:
+                          getQualityLevelColor(metrics.overallQuality.level)
+                      }}>
+                        {metrics.overallQuality.level.charAt(0).toUpperCase() + metrics.overallQuality.level.slice(1)}
+                      </span>
+                    </div>
+                  </button>
+                )}
+
+                {summaryData.length > 0 && (
+                  <button
+                    onClick={() => setShowSummary(!showSummary)}
+                    style={styles.summaryToggle}
+                  >
+                    {showSummary ? '▼ Hide' : '▶ Show'} Covariate Summary ({summaryData.length} combinations)
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setCompactView(!compactView)}
+                  style={styles.controlButton}
+                >
+                  {compactView ? 'Full Size View' : 'Compact View'}
+                </button>
+
+                <button
+                  onClick={handleReRandomize}
+                  style={styles.controlButton}
+                  title="Generate new randomization"
+                >
+                  Re-randomize
+                </button>
+
+                <button onClick={handleDownloadCSV} style={styles.downloadButton}>
+                  Download CSV
+                </button>
+
+                <button onClick={handleDownloadExcel} style={styles.downloadButton}>
+                  Download Excel
+                </button>
+              </div>
+
+              <SummaryPanel
+                summaryData={summaryData}
+                showSummary={showSummary}
+                onToggleSummary={() => setShowSummary(!showSummary)}
+                selectedCombination={selectedCombination}
+                onSummaryItemClick={handleSummaryItemClick}
+              />
+
+              <QualityLegend />
+
+              <PlatesGrid
+                randomizedPlates={randomizedPlates}
+                compactView={compactView}
                 covariateColors={covariateColors}
                 selectedCovariates={selectedCovariates}
+                plateColumns={plateColumns}
+                highlightFunction={isSearchHighlighted}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
-                onDrop={(event, rowIndex, columnIndex) => handleDrop(event, plateIndex, rowIndex, columnIndex)}
+                onDrop={handleDrop}
+                onShowDetails={handleShowPlateDetails}
+                onReRandomizePlate={handleReRandomizePlate}
+                qualityMetrics={metrics ?? undefined}
               />
-            </div>
-          ))}
-        </div>
-        {selectedCovariates.length > 0 && randomizedPlates.length > 0 && (
-          <button onClick={handleDownloadCSV} style={styles.downloadButton}>
-            Download CSV
-          </button>
-        )}
+            </>
+          )}
+        </>
+
+        {/* Plate Details Modal */}
+        <PlateDetailsModal
+          show={showPlateDetails}
+          plateIndex={selectedPlateIndex}
+          plateAssignments={plateAssignments}
+          searches={searches}
+          selectedCovariates={selectedCovariates}
+          covariateColors={covariateColors}
+          selectedCombination={selectedCombination}
+          plateRows={plateRows}
+          plateColumns={plateColumns}
+          modalPosition={modalPosition}
+          isDraggingModal={isDraggingModal}
+          onClose={handleClosePlateDetails}
+          onMouseDown={handleModalMouseDown}
+          plateQuality={selectedPlateIndex !== null ? metrics?.plateDiversity.plateScores.find(score => score.plateIndex === selectedPlateIndex) : undefined}
+          randomizedPlates={randomizedPlates}
+        />
+
+        {/* Quality Assessment Modal */}
+        <QualityMetricsPanel
+          metrics={metrics}
+          show={showMetrics}
+          onClose={toggleMetrics}
+        />
+
+        {/* Excel Export Modal */}
+        <ExcelExportModal
+          isOpen={showExcelExportModal}
+          onClose={() => setShowExcelExportModal(false)}
+          onExport={handleExcelExport}
+          availableCovariates={availableColumns}
+          treatmentCovariates={selectedCovariates}
+          searches={searches}
+          sampleIdColumn={selectedIdColumn}
+        />
+
+        {/* Help Section */}
+        {/* <div style={styles.helpSection}>
+          <div style={styles.helpLinks}>
+            <a
+              href="https://github.com/uwpr/octopus-block-randomizer/blob/main/docs/block_randomization_updates.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={styles.helpLink}
+            >
+              <i className="fa-regular fa-circle-question" style={{marginRight: '4px'}}></i> Documentation
+            </a>
+            <a
+              href="/test-data/simple-metadata.csv"
+              download="example-metadata.csv"
+              style={styles.helpLink}
+            >
+              <i className="fa-regular fa-circle-down" style={{marginRight: '4px'}}></i>Example Input File
+            </a>
+          </div>
+        </div> */}
+
       </div>
     </div>
   );
@@ -161,7 +522,7 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
     padding: '20px',
     boxSizing: 'border-box' as const,
   },
@@ -170,44 +531,152 @@ const styles = {
     maxWidth: '1600px',
     backgroundColor: '#fff',
     borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    padding: '20px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    padding: '30px',
     boxSizing: 'border-box' as const,
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
   },
   heading: {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 'bold',
-    marginBottom: '20px',
+    marginBottom: '10px',
+    color: '#333',
+    textAlign: 'center' as const,
   },
-  fileInput: {
-    marginBottom: '20px',
-  },
-  covariateSelection: {
-    marginBottom: '20px',
-  },
-  platesContainer: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    justifyContent: 'center',
-    gap: '20px',
-    width: '100%',
-  },
-  plateWrapper: {
-    margin: '10px',
-  },
-  downloadButton: {
-    marginTop: '20px',
-    padding: '10px 20px',
+  subtitle: {
     fontSize: '16px',
-    backgroundColor: '#4caf50',
+    color: '#666',
+    textAlign: 'center' as const,
+    marginBottom: '30px',
+    lineHeight: '1.5',
+  },
+  processButton: {
+    padding: '12px 24px',
+    backgroundColor: '#2196f3',
     color: '#fff',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    marginBottom: '25px',
+    transition: 'background-color 0.3s ease',
   },
+  processButtonDisabled: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+  },
+  viewControls: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '15px',
+    marginBottom: '25px',
+    flexWrap: 'wrap' as const,
+  },
+  controlButton: {
+    padding: '8px 16px',
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #dee2e6',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#495057',
+    transition: 'all 0.2s ease',
+  },
+  downloadButton: {
+    padding: '8px 16px',
+    backgroundColor: '#28a745',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.3s ease',
+  },
+  qualityButton: {
+    padding: '8px 12px',
+    backgroundColor: '#e3f2fd',
+    border: '1px solid #bbdefb',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#1565c0',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  qualityButtonText: {
+    fontSize: '14px',
+    fontWeight: '500',
+  },
+  qualityButtonIndicators: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  summaryToggle: {
+    padding: '10px 16px',
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #dee2e6',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#495057',
+    transition: 'all 0.2s ease',
+  },
+  qualityIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 12px',
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #dee2e6',
+    borderRadius: '6px',
+    fontSize: '12px',
+  },
+  qualityScore: {
+    fontWeight: '600',
+    color: '#495057',
+  },
+  qualityBadge: {
+    padding: '2px 6px',
+    borderRadius: '3px',
+    color: '#fff',
+    fontSize: '10px',
+    fontWeight: '600',
+    textTransform: 'uppercase' as const,
+  },
+  helpSection: {
+    width: '100%',
+    padding: '15px',
+    backgroundColor: '#ffffffff',
+  },
+  helpLinks: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '20px',
+    flexWrap: 'wrap' as const,
+  },
+  helpLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '8px 16px',
+    backgroundColor: '#ffffff',
+    color: '#0066cc',
+    textDecoration: 'none',
+    fontSize: '12px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+  } as React.CSSProperties,
 };
 
 export default App;

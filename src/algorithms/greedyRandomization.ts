@@ -1,0 +1,143 @@
+import { SearchData } from '../utils/types';
+import { shuffleArray } from '../utils/utils';
+
+// Original greedy algorithm (refactored)
+export function greedyRandomization(
+    searches: SearchData[], 
+    selectedCovariates: string[]): {
+    plates: (SearchData | undefined)[][][];
+    plateAssignments?: Map<number, SearchData[]>;
+} {
+    const platesNeeded = Math.ceil(searches.length / 96);
+    let plates = Array.from({ length: platesNeeded }, () =>
+        Array.from({ length: 8 }, () => new Array(12).fill(undefined))
+    );
+
+    let shuffledSearches = shuffleArray([...searches]);
+
+    function searchCanBePlaced(search: SearchData, row: (SearchData | undefined)[], tolerance: number): boolean {
+        const searchCovariates = selectedCovariates.map(cov => search.metadata[cov]);
+        let duplicateCount = 0;
+
+        for (const existingSearch of row) {
+            if (existingSearch === undefined) continue;
+            const existingSearchCovariates = selectedCovariates.map(cov => existingSearch.metadata[cov]);
+            if (JSON.stringify(searchCovariates) === JSON.stringify(existingSearchCovariates)) {
+                duplicateCount++;
+            }
+        }
+
+        return duplicateCount <= tolerance;
+    }
+
+    // Place searches with increasing tolerance
+    for (const search of shuffledSearches) {
+        let placed = false;
+        let tolerance = 0;
+
+        while (!placed) {
+            for (let p = 0; p < plates.length && !placed; p++) {
+                for (let r = 0; r < plates[p].length && !placed; r++) {
+                    if (searchCanBePlaced(search, plates[p][r], tolerance) && plates[p][r].includes(undefined)) {
+                        const indexToPlace = plates[p][r].indexOf(undefined);
+                        plates[p][r][indexToPlace] = search;
+                        placed = true;
+                    }
+                }
+            }
+
+            if (!placed) tolerance++;
+        }
+    }
+
+    //maximizeDissimilarity(plates, selectedCovariates);
+
+    // Shuffle the order of searches within each row after all searches have been assigned
+    for (let p = 0; p < plates.length; p++) {
+        for (let r = 0; r < plates[p].length; r++) {
+            plates[p][r] = shuffleArray(plates[p][r]);
+        }
+    }
+
+    // Calculate plateAssignments by extracting samples from the 3D plates array
+    const plateAssignments = new Map<number, SearchData[]>();
+    plates.forEach((plate, plateIndex) => {
+        const plateSamples: SearchData[] = [];
+        plate.forEach(row => {
+            row.forEach(cell => {
+                if (cell !== undefined) {
+                    plateSamples.push(cell);
+                }
+            });
+        });
+        plateAssignments.set(plateIndex, plateSamples);
+    });
+
+    return {
+        plates,
+        plateAssignments
+    };
+}
+
+// Legacy functions for backward compatibility
+function generatePermutations(array: SearchData[]): (SearchData | undefined)[][] {
+    if (array.length <= 1) return [array];
+    const perms: (SearchData | undefined)[][] = [];
+    const [first, ...rest] = array;
+    for (const perm of generatePermutations(rest)) {
+        for (let i = 0; i <= perm.length; i++) {
+            const start = perm.slice(0, i);
+            const end = perm.slice(i);
+            perms.push([...start, first, ...end]);
+        }
+    }
+    return perms;
+}
+
+function calculateDissimilarityScore(row: (SearchData | undefined)[], orderedRows: (SearchData | undefined)[][], selectedCovariates: string[]): number {
+    let score = 0;
+    for (let i = 0; i < row.length; i++) {
+        orderedRows.forEach((orderedRow: (SearchData | undefined)[]) => {
+            if (i < orderedRow.length && row[i] && orderedRow[i]) {
+                const dissimilarity = selectedCovariates.some(covariate =>
+                    row[i]!.metadata[covariate] !== orderedRow[i]!.metadata[covariate]);
+                if (dissimilarity) score++;
+            }
+        });
+    }
+    return score;
+}
+
+function maximizeDissimilarity(plates: (SearchData | undefined)[][][], selectedCovariates: string[]): void {
+    plates.forEach((plate: (SearchData | undefined)[][]) => {
+        let orderedRows: (SearchData | undefined)[][] = [];
+
+        const startIndex = Math.floor(Math.random() * plate.length);
+        orderedRows.push(...plate.splice(startIndex, 1));
+
+        while (plate.length > 0) {
+            let bestScore = -Infinity;
+            let bestRow: (SearchData | undefined)[] | null = null;
+            let bestRowIndex = -1;
+
+            plate.forEach((row: (SearchData | undefined)[], rowIndex: number) => {
+                const permutations = generatePermutations(row.filter(item => item !== undefined) as SearchData[]);
+                permutations.forEach(permutation => {
+                    const score = calculateDissimilarityScore(permutation, orderedRows, selectedCovariates);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestRow = permutation;
+                        bestRowIndex = rowIndex;
+                    }
+                });
+            });
+
+            if (bestRow !== null) {
+                orderedRows.push(bestRow);
+                plate.splice(bestRowIndex, 1);
+            }
+        }
+
+        plate.push(...orderedRows.map(row => [...row, ...Array(12 - row.length).fill(undefined)]));
+    });
+}

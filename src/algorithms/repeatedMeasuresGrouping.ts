@@ -7,7 +7,8 @@ import { getCovariateKey } from '../utils/utils';
  * This function groups samples that share the same value for the repeated-measures variable
  * (e.g., PatientID, SubjectID) into groups that must stay together on the same plate.
  * Samples without a value for the repeated-measures variable are treated as independent
- * singletons with unique identifiers.
+ * singletons with unique identifiers. Missing values include: undefined, null, empty strings,
+ * whitespace-only strings, and "n/a" (case-insensitive).
  *
  * **Algorithm:**
  * 1. Iterate through all samples once (single pass optimization)
@@ -49,6 +50,7 @@ import { getCovariateKey } from '../utils/utils';
  * - Subject IDs are case-sensitive and must match exactly
  * - Empty string values are treated as missing (become singletons)
  * - Whitespace-only values are treated as missing (become singletons)
+ * - "n/a" values (case-insensitive) are treated as missing (become singletons)
  * - Treatment composition is calculated based on exact string matching of treatment keys
  *
  * @param samples - All samples to be randomized. Each sample must have a metadata object.
@@ -85,8 +87,14 @@ export function createRepeatedMeasuresGroups(
   // OPTIMIZATION: Single pass through samples
   samples.forEach(sample => {
     const subjectId = sample.metadata[repeatedMeasuresVariable];
+    const trimmedId = subjectId?.trim() || '';
 
-    if (!subjectId || subjectId.trim() === '') {
+    // Treat missing, empty, whitespace-only, or "n/a" (case-insensitive) as no subject ID
+    const hasNoSubjectId = !subjectId ||
+      trimmedId === '' ||
+      trimmedId.toLowerCase() === 'n/a';
+
+    if (hasNoSubjectId) {
       // Create unique singleton ID for samples without subject ID
       const singletonId = `__singleton_${singletonCounter++}`;
       subjectMap.set(singletonId, [sample]);

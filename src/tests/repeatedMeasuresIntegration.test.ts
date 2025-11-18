@@ -675,4 +675,328 @@ describe('Repeated-Measures Integration Tests', () => {
 
   });
 
+  describe('Missing and N/A subject ID handling', () => {
+
+    test('Should treat missing subject IDs as singletons', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { Treatment: 'Drug' }), // Missing PatientID
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 3 groups: P001 (2 samples), P002 (1 sample), and 1 singleton
+      expect(result.repeatedMeasuresGroups?.length).toBe(3);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(1);
+      expect(singletons?.[0].size).toBe(1);
+    });
+
+    test('Should treat "n/a" (lowercase) as missing subject ID', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: 'n/a', Treatment: 'Drug' }), // n/a should be singleton
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 3 groups: P001 (2 samples), P002 (1 sample), and 1 singleton
+      expect(result.repeatedMeasuresGroups?.length).toBe(3);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(1);
+      expect(singletons?.[0].size).toBe(1);
+    });
+
+    test('Should treat "N/A" (uppercase) as missing subject ID', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: 'N/A', Treatment: 'Drug' }), // N/A should be singleton
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 3 groups: P001 (2 samples), P002 (1 sample), and 1 singleton
+      expect(result.repeatedMeasuresGroups?.length).toBe(3);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(1);
+      expect(singletons?.[0].size).toBe(1);
+    });
+
+    test('Should treat "N/a" (mixed case) as missing subject ID', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: 'N/a', Treatment: 'Drug' }), // N/a should be singleton
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 3 groups: P001 (2 samples), P002 (1 sample), and 1 singleton
+      expect(result.repeatedMeasuresGroups?.length).toBe(3);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(1);
+      expect(singletons?.[0].size).toBe(1);
+    });
+
+    test('Should treat empty string as missing subject ID', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: '', Treatment: 'Drug' }), // Empty string should be singleton
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 3 groups: P001 (2 samples), P002 (1 sample), and 1 singleton
+      expect(result.repeatedMeasuresGroups?.length).toBe(3);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(1);
+      expect(singletons?.[0].size).toBe(1);
+    });
+
+    test('Should treat whitespace-only string as missing subject ID', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: '   ', Treatment: 'Drug' }), // Whitespace should be singleton
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 3 groups: P001 (2 samples), P002 (1 sample), and 1 singleton
+      expect(result.repeatedMeasuresGroups?.length).toBe(3);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(1);
+      expect(singletons?.[0].size).toBe(1);
+    });
+
+    test('Should handle multiple missing/n/a values as separate singletons', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: 'n/a', Treatment: 'Drug' }), // Singleton 1
+        createSample('S4', { PatientID: 'N/A', Treatment: 'Placebo' }), // Singleton 2
+        createSample('S5', { Treatment: 'Drug' }), // Singleton 3 (missing)
+        createSample('S6', { PatientID: '', Treatment: 'Placebo' }), // Singleton 4 (empty)
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 5 groups: P001 (2 samples) and 4 singletons
+      expect(result.repeatedMeasuresGroups?.length).toBe(5);
+
+      const singletons = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+      expect(singletons?.length).toBe(4);
+
+      // Each singleton should have exactly 1 sample
+      singletons?.forEach(singleton => {
+        expect(singleton.size).toBe(1);
+      });
+    });
+
+    test('Should NOT treat "na" (without slash) as missing - it is a valid ID', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: 'na', Treatment: 'Drug' }), // "na" is a valid ID
+        createSample('S4', { PatientID: 'na', Treatment: 'Placebo' }), // Should group with S3
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 2 groups: P001 (2 samples) and "na" (2 samples)
+      expect(result.repeatedMeasuresGroups?.length).toBe(2);
+
+      const naGroup = result.repeatedMeasuresGroups?.find(g => g.subjectId === 'na');
+      expect(naGroup).toBeDefined();
+      expect(naGroup?.size).toBe(2);
+      expect(naGroup?.isSingleton).toBe(false);
+    });
+  });
+
+  describe('Singleton distribution behavior', () => {
+
+    test('Should exclude singletons from repeated-measures distribution', () => {
+      const samples: SearchData[] = [
+        createSample('S1', { PatientID: 'P001', Treatment: 'Drug' }),
+        createSample('S2', { PatientID: 'P001', Treatment: 'Placebo' }),
+        createSample('S3', { PatientID: 'P002', Treatment: 'Drug' }),
+        createSample('S4', { PatientID: 'P002', Treatment: 'Placebo' }),
+        createSample('S5', { PatientID: 'n/a', Treatment: 'Drug' }), // Singleton 1
+        createSample('S6', { PatientID: 'N/A', Treatment: 'Placebo' }), // Singleton 2
+        createSample('S7', { Treatment: 'Drug' }), // Singleton 3 (missing)
+        createSample('S8', { PatientID: '', Treatment: 'Placebo' }), // Singleton 4 (empty)
+      ];
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 8,
+        numColumns: 12
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 6 groups total: 2 multi-sample + 4 singletons
+      expect(result.repeatedMeasuresGroups?.length).toBe(6);
+
+      const multiSampleGroups = result.repeatedMeasuresGroups?.filter(g => !g.isSingleton);
+      const singletonGroups = result.repeatedMeasuresGroups?.filter(g => g.isSingleton);
+
+      expect(multiSampleGroups?.length).toBe(2);
+      expect(singletonGroups?.length).toBe(4);
+
+      // Multi-sample groups should have plate assignments
+      multiSampleGroups?.forEach(group => {
+        expect(group.assignedPlate).toBeDefined();
+        expect(group.assignedPlate).toBeGreaterThanOrEqual(0);
+      });
+
+      // Singletons should NOT have plate assignments (distributed independently)
+      singletonGroups?.forEach(group => {
+        expect(group.assignedPlate).toBeUndefined();
+      });
+
+      // All samples should be placed
+      let totalPlacedSamples = 0;
+      result.plates.forEach(plate => {
+        plate.forEach(row => {
+          row.forEach(cell => {
+            if (cell !== undefined) {
+              totalPlacedSamples++;
+            }
+          });
+        });
+      });
+      expect(totalPlacedSamples).toBe(8);
+    });
+
+    test('Should distribute singletons independently across plates', () => {
+      // Create a dataset that requires multiple plates
+      const samples: SearchData[] = [];
+
+      // Add 3 multi-sample groups (2 samples each = 6 samples)
+      for (let i = 1; i <= 3; i++) {
+        samples.push(createSample(`P00${i}_S1`, { PatientID: `P00${i}`, Treatment: 'Drug' }));
+        samples.push(createSample(`P00${i}_S2`, { PatientID: `P00${i}`, Treatment: 'Placebo' }));
+      }
+
+      // Add 10 singletons
+      for (let i = 1; i <= 10; i++) {
+        samples.push(createSample(`Singleton_${i}`, { PatientID: 'n/a', Treatment: i % 2 === 0 ? 'Drug' : 'Placebo' }));
+      }
+
+      const config: RandomizationConfig = {
+        treatmentVariables: ['Treatment'],
+        repeatedMeasuresVariable: 'PatientID',
+        keepEmptyInLastPlate: true,
+        numRows: 2,
+        numColumns: 4 // 8 samples per plate
+      };
+
+      const result = balancedBlockRandomization(samples, config) as RandomizationResult;
+
+      // Should have 13 groups: 3 multi-sample + 10 singletons
+      expect(result.repeatedMeasuresGroups?.length).toBe(13);
+
+      // Verify singletons are distributed across multiple plates
+      const plateSampleCounts = result.plates.map(plate => {
+        let count = 0;
+        plate.forEach(row => {
+          row.forEach(cell => {
+            if (cell !== undefined) count++;
+          });
+        });
+        return count;
+      });
+
+      // Should use multiple plates (16 samples total, 8 per plate = 2 plates minimum)
+      const platesUsed = plateSampleCounts.filter(count => count > 0).length;
+      expect(platesUsed).toBeGreaterThanOrEqual(2);
+
+      // All samples should be placed
+      const totalPlaced = plateSampleCounts.reduce((sum, count) => sum + count, 0);
+      expect(totalPlaced).toBe(16);
+    });
+  });
 });

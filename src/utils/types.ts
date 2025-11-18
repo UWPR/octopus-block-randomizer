@@ -243,6 +243,15 @@ export interface RepeatedMeasuresGroup {
    * High singleton ratios (>80%) may indicate incorrect variable selection.
    */
   isSingleton: boolean;
+
+  /**
+   * The plate index (0-based) to which this group was assigned.
+   *
+   * - Set during distribution phase
+   * - `undefined` before distribution or for singletons (which are distributed independently)
+   * - Used for reporting and validation
+   */
+  assignedPlate?: number;
 }
 
 /**

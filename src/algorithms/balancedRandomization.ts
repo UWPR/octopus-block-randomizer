@@ -915,13 +915,28 @@ function doRepeatedMeasuresAwareRandomization(
   console.log(`Plates needed: ${actualPlatesNeeded}`);
   console.log(`Plate capacities: ${plateCapacities.join(', ')}`);
 
-  // Step 4: Distribute groups to plates
+  // Step 4: Distribute groups to plates (excluding singletons)
   console.log(`\n--- Step 4: Distributing groups to plates ---`);
+
+  // Separate multi-sample groups from singletons
+  const multiSampleGroups = groups.filter(g => !g.isSingleton);
+  const singletonGroups = groups.filter(g => g.isSingleton);
+
+  console.log(`  - Multi-sample groups to distribute: ${multiSampleGroups.length}`);
+  console.log(`  - Singleton groups (will be distributed independently): ${singletonGroups.length}`);
+
   const plateGroupAssignments = distributeGroupsToPlates(
-    groups,
+    multiSampleGroups,
     plateCapacities,
     treatmentVariables
   );
+
+  // Assign plate numbers to groups for tracking
+  plateGroupAssignments.forEach((assignedGroups, plateIdx) => {
+    assignedGroups.forEach(group => {
+      group.assignedPlate = plateIdx;
+    });
+  });
 
   // Step 5: Flatten groups back to samples
   console.log(`\n--- Step 5: Flattening groups to samples ---`);
@@ -940,6 +955,44 @@ function doRepeatedMeasuresAwareRandomization(
       `Plate ${plateIdx + 1}: ${assignedGroups.length} groups → ${plateSamples.length} samples`
     );
   });
+
+  // Distribute singletons across plates based on available capacity
+  if (singletonGroups.length > 0) {
+    console.log(`\n  - Distributing ${singletonGroups.length} singleton samples across plates`);
+
+    // Calculate remaining capacity per plate
+    const remainingCapacity = plateCapacities.map((capacity, idx) => {
+      const currentSamples = plateAssignments.get(idx)?.length || 0;
+      return capacity - currentSamples;
+    });
+
+    console.log(`  - Remaining capacity per plate: ${remainingCapacity.join(', ')}`);
+
+    // Distribute singletons round-robin to plates with available capacity
+    let plateIdx = 0;
+    singletonGroups.forEach(group => {
+      // Find next plate with capacity
+      let attempts = 0;
+      while (remainingCapacity[plateIdx] <= 0 && attempts < plateCapacities.length) {
+        plateIdx = (plateIdx + 1) % plateCapacities.length;
+        attempts++;
+      }
+
+      if (remainingCapacity[plateIdx] > 0) {
+        const plateSamples = plateAssignments.get(plateIdx) || [];
+        plateSamples.push(...group.samples);
+        plateAssignments.set(plateIdx, plateSamples);
+        remainingCapacity[plateIdx] -= group.samples.length;
+
+        // Move to next plate for better distribution
+        plateIdx = (plateIdx + 1) % plateCapacities.length;
+      } else {
+        console.warn(`  ⚠ No capacity available for singleton group ${group.subjectId}`);
+      }
+    });
+
+    console.log(`  - Singletons distributed across plates`);
+  }
 
   // Step 6: Apply existing row distribution to each plate
   console.log(`\n--- Step 6: Applying row distribution within each plate ---`);
@@ -1166,9 +1219,15 @@ function validateRepeatedMeasuresConstraints(
     samples.forEach(sample => {
       totalSamplesChecked++;
       const subjectId = sample.metadata[repeatedMeasuresVariable];
+      const trimmedId = subjectId?.trim() || '';
 
       // Skip samples without a subject ID (singletons are allowed anywhere)
-      if (!subjectId || subjectId === '') {
+      // This includes: undefined, null, empty, whitespace-only, and "n/a" (case-insensitive)
+      const isSingleton = !subjectId ||
+                          trimmedId === '' ||
+                          trimmedId.toLowerCase() === 'n/a';
+
+      if (isSingleton) {
         singletonsFound++;
         plateSingletons++;
         return;

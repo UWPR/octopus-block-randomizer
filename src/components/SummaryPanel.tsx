@@ -96,17 +96,40 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
               </div>
             </div>
 
-            {/* Per-plate group counts */}
-            {repeatedMeasuresQualityMetrics.plateGroupCounts.length > 0 && (
-              <div style={styles.plateGroupCounts}>
-                <span style={styles.metricLabel}>Groups per plate:</span>
-                <div style={styles.plateCountsList}>
-                  {repeatedMeasuresQualityMetrics.plateGroupCounts.map((count, idx) => (
-                    <span key={idx} style={styles.plateCountItem}>
-                      Plate {idx + 1}: {count}
-                    </span>
-                  ))}
+            {/* Detailed group assignments table */}
+            {repeatedMeasuresGroups && repeatedMeasuresGroups.length > 0 && (
+              <div style={styles.groupsTable}>
+                <div style={styles.tableTitle}>Group Assignments:</div>
+                <div style={styles.tableHeader}>
+                  <div style={styles.tableHeaderCell}>Group ID</div>
+                  <div style={styles.tableHeaderCell}>Samples</div>
+                  <div style={styles.tableHeaderCell}>Plate</div>
                 </div>
+                <div style={styles.tableBody}>
+                  {repeatedMeasuresGroups
+                    .filter(g => !g.isSingleton) // Only show multi-sample groups
+                    .sort((a, b) => {
+                      // Sort by plate first, then by group ID
+                      const plateA = a.assignedPlate ?? 999;
+                      const plateB = b.assignedPlate ?? 999;
+                      if (plateA !== plateB) return plateA - plateB;
+                      return a.subjectId.localeCompare(b.subjectId);
+                    })
+                    .map((group, idx) => (
+                      <div key={idx} style={styles.tableRow}>
+                        <div style={styles.tableCell}>{group.subjectId}</div>
+                        <div style={styles.tableCellCenter}>{group.size}</div>
+                        <div style={styles.tableCellCenter}>
+                          {group.assignedPlate !== undefined ? group.assignedPlate + 1 : '-'}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                {singletonGroups > 0 && (
+                  <div style={styles.tableFooter}>
+                    Note: {singletonGroups} singleton sample{singletonGroups !== 1 ? 's' : ''} (blank/n/a IDs) distributed independently
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -220,6 +243,69 @@ const styles = {
     padding: '2px 8px',
     borderRadius: '3px',
     border: '1px solid #e9ecef',
+  },
+  groupsTable: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #e9ecef',
+  },
+  tableTitle: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: '8px',
+  },
+  tableHeader: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr 1fr',
+    gap: '8px',
+    padding: '8px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px 4px 0 0',
+    border: '1px solid #dee2e6',
+    borderBottom: 'none',
+  },
+  tableHeaderCell: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#495057',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  tableBody: {
+    maxHeight: '200px',
+    overflowY: 'auto' as const,
+    border: '1px solid #dee2e6',
+    borderRadius: '0 0 4px 4px',
+  },
+  tableRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr 1fr',
+    gap: '8px',
+    padding: '6px 8px',
+    borderBottom: '1px solid #f1f3f5',
+    backgroundColor: '#fff',
+  },
+  tableCell: {
+    fontSize: '12px',
+    color: '#333',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  tableCellCenter: {
+    fontSize: '12px',
+    color: '#333',
+    textAlign: 'center' as const,
+  },
+  tableFooter: {
+    fontSize: '11px',
+    color: '#6c757d',
+    fontStyle: 'italic' as const,
+    marginTop: '6px',
+    padding: '4px 8px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px',
   },
   summaryGrid: {
     display: 'flex',

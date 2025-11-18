@@ -1,4 +1,24 @@
-# Getting Started with Create React App
+# Octopus Block Randomizer
+
+A web application for optimizing the distribution of experimental samples across multiple plates with balanced randomization and support for repeated-measures variables.
+
+## Features
+
+- **Balanced Distribution**: Ensures each plate contains a representative mix of sample types based on selected covariates
+- **Repeated-measures Support**: Groups samples from the same subject that must stay together on the same plate
+- **Spatial Randomization**: Minimizes clustering of similar samples to reduce position-based biases
+- **Quality Assessment**: Built-in metrics to evaluate balance and randomization quality
+- **Multiple Algorithms**: Choose from Balanced Spatial, Balanced Block, or Greedy randomization
+- **Interactive Visualization**: Compact and full-size views with quality metrics and covariate highlighting
+
+## Documentation
+
+- [User Guide](docs/octopus_doc.md) - Complete guide to using the application
+- [Repeated-measures Variables](docs/octopus_doc.md#working-with-repeated-measures-variables) - Guide to grouping related samples
+- [Quality Scoring](docs/quality-scoring-documentation.md) - Details on quality metrics
+- [Algorithm Documentation](docs/balanced-randomization-algorithm.md) - Technical details on randomization algorithms
+
+## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
@@ -18,6 +38,13 @@ You will also see any lint errors in the console.
 
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+**For CI/automated testing (non-interactive):**
+```bash
+npm test -- --watchAll=false
+```
+
+This runs all tests once and exits, which is useful for continuous integration or when you want to verify all tests pass without entering watch mode.
 
 ### `npm run build`
 

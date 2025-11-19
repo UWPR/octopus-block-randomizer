@@ -1,7 +1,7 @@
 import { SearchData } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
-import { greedyPlaceInRow, analyzeSpatialQuality } from './greedySpatialPlacement';
+import { greedyPlaceInRow, analyzePlateSpatialQuality } from './greedySpatialPlacement';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -579,25 +579,18 @@ function doBalancedRandomization(
         // Use greedy placement instead of simple shuffling
         greedyPlaceInRow(
           rowSamples,
-          plateIdx,
+          plates[plateIdx],
           rowIdx,
-          plates,
           selectedCovariates,
-          numColumns,
-          numRows
+          numColumns
         );
       }
     });
 
+    const spatialQuality = analyzePlateSpatialQuality(plates[plateIdx], selectedCovariates, numRows, numColumns);
+    console.log(`Spatial Quality Analysis: Plate ${plateIdx}: H=${spatialQuality.horizontalClusters}, V=${spatialQuality.verticalClusters}, CR=${spatialQuality.crossRowClusters}, Total=${spatialQuality.totalClusters}`);
   });
 
-  // STEP 6: Analyze spatial quality
-  const spatialQuality = analyzeSpatialQuality(plates, selectedCovariates, numRows, numColumns);
-  console.log('Spatial Quality Analysis:', spatialQuality);
-  console.log(`  - Horizontal clusters: ${spatialQuality.horizontalClusters}`);
-  console.log(`  - Vertical clusters: ${spatialQuality.verticalClusters}`);
-  console.log(`  - Cross-row clusters: ${spatialQuality.crossRowClusters}`);
-  console.log(`  - Total clusters: ${spatialQuality.totalClusters}`);
 
   return {
     plates,

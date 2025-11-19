@@ -5,24 +5,20 @@ import { shuffleArray, getCovariateKey } from '../utils/utils';
  * Calculate a clustering score for placing a sample at a specific position.
  * Lower scores indicate better positions (less clustering).
  *
- * @param plateIdx - Index of the plate
+ * @param plate - The 2D grid of the current plate
  * @param rowIdx - Row index within the plate
  * @param colIdx - Column index within the row
  * @param treatmentKey - The covariate group key of the sample being placed
- * @param plates - The 3D grid of plates
  * @param selectedCovariates - List of selected covariate names
- * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @returns Clustering score (lower is better)
  */
 export function calculateClusterScore(
-  plateIdx: number,
+  plate: (SearchData | undefined)[][],
   rowIdx: number,
   colIdx: number,
   treatmentKey: string,
-  plates: (SearchData | undefined)[][][],
   selectedCovariates: string[],
-  numRows: number,
   numColumns: number
 ): number {
   let score = 0;
@@ -35,7 +31,7 @@ export function calculateClusterScore(
 
   // Check left neighbor (horizontal)
   if (colIdx > 0) {
-    const leftSample = plates[plateIdx][rowIdx][colIdx - 1];
+    const leftSample = plate[rowIdx][colIdx - 1];
     if (getTreatmentKey(leftSample) === treatmentKey) {
       score += 10; // Heavy penalty for horizontal adjacency
     }
@@ -43,7 +39,7 @@ export function calculateClusterScore(
 
   // Check right neighbor (horizontal) - may already be placed since we fill greedily
   if (colIdx < numColumns - 1) {
-    const rightSample = plates[plateIdx][rowIdx][colIdx + 1];
+    const rightSample = plate[rowIdx][colIdx + 1];
     if (getTreatmentKey(rightSample) === treatmentKey) {
       score += 10; // Heavy penalty for horizontal adjacency
     }
@@ -52,17 +48,17 @@ export function calculateClusterScore(
   // Check above neighbor (vertical)
   // Only check above since rows are filled sequentially (below is always empty)
   if (rowIdx > 0) {
-    const aboveSample = plates[plateIdx][rowIdx - 1][colIdx];
+    const aboveSample = plate[rowIdx - 1][colIdx];
     if (getTreatmentKey(aboveSample) === treatmentKey) {
-      score += 8; // Medium-high penalty for vertical adjacency
+      score += 10; // Heavy penalty for vertical adjacency
     }
   }
 
-  // Cross-row constraint: check if this is the first column and previous row's last column
+  // Cross-row constraint: check if this is the first column and matches the previous row's last column
   if (colIdx === 0 && rowIdx > 0) {
-    const prevRowLastSample = plates[plateIdx][rowIdx - 1][numColumns - 1];
+    const prevRowLastSample = plate[rowIdx - 1][numColumns - 1];
     if (getTreatmentKey(prevRowLastSample) === treatmentKey) {
-      score += 15; // Very heavy penalty for cross-row adjacency
+      score += 8; // Medium-high penalty for cross-row adjacency
     }
   }
 
@@ -72,31 +68,27 @@ export function calculateClusterScore(
 /**
  * Place samples in a row using greedy spatial placement to minimize clustering.
  *
- * @param samples - Array of samples to place in this row
- * @param plateIdx - Index of the plate
+ * @param rowSamples - Array of samples to place in this row
+ * @param plate - The 2D grid of the current plate (will be modified)
  * @param rowIdx - Row index within the plate
- * @param plates - The 3D grid of plates (will be modified)
  * @param selectedCovariates - List of selected covariate names
  * @param numColumns - Total number of columns per row
- * @param numRows - Total number of rows per plate
  */
 export function greedyPlaceInRow(
-  samples: SearchData[],
-  plateIdx: number,
+  rowSamples: SearchData[],
+  plate: (SearchData | undefined)[][],
   rowIdx: number,
-  plates: (SearchData | undefined)[][][],
   selectedCovariates: string[],
-  numColumns: number,
-  numRows: number
+  numColumns: number
 ): void {
-  if (samples.length === 0) return;
+  if (rowSamples.length === 0) return;
 
   // Shuffle samples first to add randomness when multiple positions have equal scores
-  const shuffledSamples = shuffleArray([...samples]);
+  const shuffledSamples = shuffleArray([...rowSamples]);
 
   // Track available positions in this row
   const availablePositions: number[] = [];
-  for (let col = 0; col < Math.min(numColumns, samples.length); col++) {
+  for (let col = 0; col < Math.min(numColumns, rowSamples.length); col++) {
     availablePositions.push(col);
   }
 
@@ -110,13 +102,11 @@ export function greedyPlaceInRow(
     const positionScores = availablePositions.map(col => ({
       col,
       score: calculateClusterScore(
-        plateIdx,
+        plate,
         rowIdx,
         col,
         treatmentKey,
-        plates,
         selectedCovariates,
-        numRows,
         numColumns
       )
     }));
@@ -133,7 +123,7 @@ export function greedyPlaceInRow(
     const chosenCol = bestPositions[Math.floor(Math.random() * bestPositions.length)];
 
     // Place the sample
-    plates[plateIdx][rowIdx][chosenCol] = sample;
+    plate[rowIdx][chosenCol] = sample;
 
     // Remove chosen position from available positions
     const posIndex = availablePositions.indexOf(chosenCol);
@@ -142,32 +132,43 @@ export function greedyPlaceInRow(
     }
 
     console.log(
-      `Placed sample with treatment ${treatmentKey} at plate ${plateIdx}, row ${rowIdx}, col ${chosenCol} (score: ${minScore})`
+      `Placed sample with treatment ${treatmentKey} at row ${rowIdx}, col ${chosenCol} (score: ${minScore})`
     );
   }
 }
 
-/**
- * Analyze the quality of spatial distribution in a plate.
- * Returns metrics about clustering.
- *
- * @param plates - The 3D grid of plates
- * @param selectedCovariates - List of selected covariate names
- * @param numRows - Total number of rows per plate
- * @param numColumns - Total number of columns per row
- * @returns Object with clustering metrics
- */
-export function analyzeSpatialQuality(
-  plates: (SearchData | undefined)[][][],
-  selectedCovariates: string[],
-  numRows: number,
-  numColumns: number
-): {
+export interface PlateSpatialQuality {
+  plateIndex: number;
   horizontalClusters: number;
   verticalClusters: number;
   crossRowClusters: number;
   totalClusters: number;
-} {
+}
+
+export interface OverallSpatialQuality {
+  plateQualities: PlateSpatialQuality[];
+  totalHorizontalClusters: number;
+  totalVerticalClusters: number;
+  totalCrossRowClusters: number;
+  totalClusters: number;
+}
+
+/**
+ * Analyze the quality of spatial distribution in a single plate.
+ * Returns metrics about clustering.
+ *
+ * @param plate - The 2D grid of a single plate
+ * @param selectedCovariates - List of selected covariate names
+ * @param numRows - Total number of rows per plate
+ * @param numColumns - Total number of columns per row
+ * @returns Object with clustering metrics for the plate
+ */
+export function analyzePlateSpatialQuality(
+  plate: (SearchData | undefined)[][],
+  selectedCovariates: string[],
+  numRows: number,
+  numColumns: number
+): Omit<PlateSpatialQuality, 'plateIndex'> {
   let horizontalClusters = 0;
   let verticalClusters = 0;
   let crossRowClusters = 0;
@@ -177,45 +178,86 @@ export function analyzeSpatialQuality(
     return getCovariateKey(sample, selectedCovariates);
   };
 
-  plates.forEach((plate, plateIdx) => {
-    for (let row = 0; row < numRows; row++) {
-      for (let col = 0; col < numColumns; col++) {
-        const currentSample = plate[row][col];
-        if (!currentSample) continue;
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numColumns; col++) {
+      const currentSample = plate[row][col];
+      if (!currentSample) continue;
 
-        const currentKey = getTreatmentKey(currentSample);
+      const currentKey = getTreatmentKey(currentSample);
 
-        // Check horizontal adjacency (right neighbor)
-        if (col < numColumns - 1) {
-          const rightSample = plate[row][col + 1];
-          if (getTreatmentKey(rightSample) === currentKey) {
-            horizontalClusters++;
-          }
+      // Check horizontal adjacency (right neighbor)
+      if (col < numColumns - 1) {
+        const rightSample = plate[row][col + 1];
+        if (getTreatmentKey(rightSample) === currentKey) {
+          horizontalClusters++;
         }
+      }
 
-        // Check vertical adjacency (below neighbor)
-        if (row < numRows - 1) {
-          const belowSample = plate[row + 1][col];
-          if (getTreatmentKey(belowSample) === currentKey) {
-            verticalClusters++;
-          }
+      // Check vertical adjacency (below neighbor)
+      if (row < numRows - 1) {
+        const belowSample = plate[row + 1][col];
+        if (getTreatmentKey(belowSample) === currentKey) {
+          verticalClusters++;
         }
+      }
 
-        // Check cross-row adjacency (last column to first column of next row)
-        if (col === numColumns - 1 && row < numRows - 1) {
-          const nextRowFirstSample = plate[row + 1][0];
-          if (getTreatmentKey(nextRowFirstSample) === currentKey) {
-            crossRowClusters++;
-          }
+      // Check cross-row adjacency (last column to first column of next row)
+      if (col === numColumns - 1 && row < numRows - 1) {
+        const nextRowFirstSample = plate[row + 1][0];
+        if (getTreatmentKey(nextRowFirstSample) === currentKey) {
+          crossRowClusters++;
         }
       }
     }
-  });
+  }
 
   return {
     horizontalClusters,
     verticalClusters,
     crossRowClusters,
     totalClusters: horizontalClusters + verticalClusters + crossRowClusters
+  };
+}
+
+/**
+ * Analyze the quality of spatial distribution across all plates.
+ * Returns per-plate metrics and overall totals.
+ *
+ * @param plates - The 3D grid of plates
+ * @param selectedCovariates - List of selected covariate names
+ * @param numRows - Total number of rows per plate
+ * @param numColumns - Total number of columns per row
+ * @returns Object with per-plate and overall clustering metrics
+ */
+export function analyzeOverallSpatialQuality(
+  plates: (SearchData | undefined)[][][],
+  selectedCovariates: string[],
+  numRows: number,
+  numColumns: number
+): OverallSpatialQuality {
+  const plateQualities: PlateSpatialQuality[] = [];
+  let totalHorizontalClusters = 0;
+  let totalVerticalClusters = 0;
+  let totalCrossRowClusters = 0;
+
+  plates.forEach((plate, plateIndex) => {
+    const quality = analyzePlateSpatialQuality(plate, selectedCovariates, numRows, numColumns);
+
+    plateQualities.push({
+      plateIndex,
+      ...quality
+    });
+
+    totalHorizontalClusters += quality.horizontalClusters;
+    totalVerticalClusters += quality.verticalClusters;
+    totalCrossRowClusters += quality.crossRowClusters;
+  });
+
+  return {
+    plateQualities,
+    totalHorizontalClusters,
+    totalVerticalClusters,
+    totalCrossRowClusters,
+    totalClusters: totalHorizontalClusters + totalVerticalClusters + totalCrossRowClusters
   };
 }

@@ -1,6 +1,7 @@
 import { SearchData } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
+import { greedyPlaceInRow, analyzeSpatialQuality } from './greedySpatialPlacement';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -76,7 +77,7 @@ function getAvailableBlocks(
 
 // Helper function to calculate expected minimum samples per block (plates or rows) for each covariate group
 // Throws an error if the total samples exceed available capacity or if any block's expected minimums exceed its capacity
-// 
+//
 // Exported for testing purposes
 export function calculateExpectedMinimums(
   blockCapacities: number[],
@@ -109,13 +110,13 @@ export function calculateExpectedMinimums(
   blockCapacities.forEach((capacity, blockIdx) => {
     expectedMinimums[blockIdx] = {};
     let blockTotalExpected = 0;
-    
+
     covariateGroups.forEach((samples, groupKey) => {
       // Calculate expected minimum for this covariate group on this specific block
       // Based on the block's capacity relative to a full block
-      const capacityRatio = totalBlocksNeeded == 1 ? 1 : capacity / fullBlockCapacity;
+      const capacityRatio = totalBlocksNeeded === 1 ? 1 : capacity / fullBlockCapacity;
       const globalExpected = Math.floor(samples.length / totalBlocksNeeded);
-      
+
       expectedMinimums[blockIdx][groupKey] = Math.round(globalExpected * capacityRatio);
       blockTotalExpected += expectedMinimums[blockIdx][groupKey];
 
@@ -153,7 +154,7 @@ export function assignBlockCapacities(
     console.error(`Total samples (${totalSamples}) exceed total block capacity (${actualBlocksNeeded * blockSize}).`);
     return [0];
   }
-  
+
   let blockCapacities: number[];
 
   if (keepEmptyInLastBlock) {
@@ -572,20 +573,31 @@ function doBalancedRandomization(
       console.error(`Row-level distribution validation failed for plate ${plateIdx}`);
     }
 
-    // Fill positions and shuffle within rows
+    // Fill positions using greedy spatial placement to minimize clustering
     rowAssignments.forEach((rowSamples, rowIdx) => {
       if (rowIdx < numRows) {
-        // Shuffle samples within this row for final randomization
-        const shuffledRowSamples = shuffleArray([...rowSamples]);
-
-        // Place samples in the row
-        for (let colIdx = 0; colIdx < Math.min(numColumns, shuffledRowSamples.length); colIdx++) {
-          plates[plateIdx][rowIdx][colIdx] = shuffledRowSamples[colIdx];
-        }
+        // Use greedy placement instead of simple shuffling
+        greedyPlaceInRow(
+          rowSamples,
+          plateIdx,
+          rowIdx,
+          plates,
+          selectedCovariates,
+          numColumns,
+          numRows
+        );
       }
     });
 
   });
+
+  // STEP 6: Analyze spatial quality
+  const spatialQuality = analyzeSpatialQuality(plates, selectedCovariates, numRows, numColumns);
+  console.log('Spatial Quality Analysis:', spatialQuality);
+  console.log(`  - Horizontal clusters: ${spatialQuality.horizontalClusters}`);
+  console.log(`  - Vertical clusters: ${spatialQuality.verticalClusters}`);
+  console.log(`  - Cross-row clusters: ${spatialQuality.crossRowClusters}`);
+  console.log(`  - Total clusters: ${spatialQuality.totalClusters}`);
 
   return {
     plates,

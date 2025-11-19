@@ -122,6 +122,7 @@ export const getUrlParams = (): URLSearchParams => {
 // Check if developer mode is enabled via URL parameter
 // Usage: Add ?dev=true to the URL to enable developer features
 export const isDeveloperMode = (): boolean => {
+  // debugger;
   const params = getUrlParams();
   return params.get('dev') === 'true' || params.get('developer') === 'true';
 };

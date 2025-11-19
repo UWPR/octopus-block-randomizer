@@ -16,6 +16,7 @@ import { useRandomization } from './hooks/useRandomization';
 import { useCovariateColors } from './hooks/useCovariateColors';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import { useQualityMetrics } from './hooks/useQualityMetrics';
+import { isDeveloperMode } from './utils/configs';
 
 
 
@@ -322,7 +323,12 @@ const App: React.FC = () => {
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        <h1 style={styles.heading}>Octopus Block Randomization</h1>
+        <h1 style={styles.heading}>
+          Octopus Block Randomization
+          {isDeveloperMode() && (
+            <span style={styles.devIndicator}> Dev</span>
+          )}
+        </h1>
         {/* File Upload */}
         <FileUploadSection
           selectedFileName={selectedFileName}
@@ -544,6 +550,12 @@ const styles = {
     marginBottom: '10px',
     color: '#333',
     textAlign: 'center' as const,
+  },
+  devIndicator: {
+    fontSize: '12px',
+    color: '#fd4400ff',
+    fontWeight: 'bold',
+    marginLeft: '0px',
   },
   subtitle: {
     fontSize: '16px',

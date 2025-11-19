@@ -1,4 +1,4 @@
-import { ALGORITHM_CONFIG, QUALITY_LEVEL_CONFIG, QualityLevel } from './configs';
+import { ALGORITHM_CONFIG, QUALITY_LEVEL_CONFIG, QualityLevel, isDeveloperMode } from './configs';
 
 // Block types for distribution algorithms
 export enum BlockType {
@@ -24,8 +24,16 @@ export const getAllAlgorithms = (): RandomizationAlgorithm[] =>
   Object.keys(ALGORITHM_CONFIG) as RandomizationAlgorithm[];
 
 // Get algorithms in UI display order
-export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] =>
-  ['balanced', 'greedy'] as RandomizationAlgorithm[];
+export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] => {
+  const algorithms: RandomizationAlgorithm[] = ['balanced'];
+  
+  // Show all algorithms in developer mode, otherwise show only the base algorithm
+  if (isDeveloperMode()) {
+    return ['balanced', 'greedy'] as RandomizationAlgorithm[];
+  }
+  
+  return algorithms;
+};
 
 export interface RandomizationOptions {
   algorithm: RandomizationAlgorithm;

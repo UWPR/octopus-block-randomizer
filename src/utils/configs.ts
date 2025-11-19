@@ -113,3 +113,15 @@ export const DEFAULT_QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
 export const QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
   showRowScore: true  // Set to false to hide row scores
 };
+
+// Developer mode configuration
+export const getUrlParams = (): URLSearchParams => {
+  return new URLSearchParams(window.location.search);
+};
+
+// Check if developer mode is enabled via URL parameter
+// Usage: Add ?dev=true to the URL to enable developer features
+export const isDeveloperMode = (): boolean => {
+  const params = getUrlParams();
+  return params.get('dev') === 'true' || params.get('developer') === 'true';
+};

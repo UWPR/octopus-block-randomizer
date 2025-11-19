@@ -205,7 +205,7 @@ const App: React.FC = () => {
         const colors = generateCovariateColors(searches, selectedCovariates, controlLabels);
 
         // Generate summary data
-        generateSummaryData(colors, searches, selectedCovariates);
+        generateSummaryData(colors, searches, selectedCovariates, controlLabels);
       }
     }
   };

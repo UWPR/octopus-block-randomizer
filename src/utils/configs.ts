@@ -7,7 +7,7 @@ export const BRIGHT_COLOR_PALETTE = [
   '#FF8000', // Pure Orange
   '#FFFF00', // Pure Yellow
   '#FF00FF', // Magenta
-  
+
   // Subgroup 2
   '#87CEEB', // Sky Blue
   '#800080', // Purple
@@ -15,8 +15,8 @@ export const BRIGHT_COLOR_PALETTE = [
   '#006400', // Dark Forest Green
   '#4169E1', // Royal Blue
   '#20B2AA', // Light Sea Green
-  
-  
+
+
   // Subgroup 3
   '#F08080', // Light Coral
   '#40E0D0', // Turquoise
@@ -24,8 +24,8 @@ export const BRIGHT_COLOR_PALETTE = [
   '#9370DB', // Medium Purple
   '#98FB98', // Pale Green
   '#C0C0C0', // Silver
-  
-  
+
+
   // Subgroup 4
   '#FF4500', // Orange Red
   '#8000FF', // Pure Purple
@@ -34,7 +34,15 @@ export const BRIGHT_COLOR_PALETTE = [
   '#008B8B', // Dark Cyan
   '#FF69B4', // Hot Pink
 ];
-  
+
+// Bright color palette with 24 distinct colors in 4 randomized subgroups
+export const QC_COLOR_PALETTE = [
+  '#000000', // Black
+  '#800080', // Purple
+  '#000080', // Navy
+  '#8B0000', // Dark Red
+];
+
 
 // Algorithm configuration with descriptions
 export const ALGORITHM_CONFIG = {

@@ -3,18 +3,11 @@ import { shuffleArray } from '../utils/utils';
 
 // Original greedy algorithm (refactored)
 export function greedyRandomization(
-    searchesBase: SearchData[], 
+    searches: SearchData[], 
     selectedCovariates: string[]): {
     plates: (SearchData | undefined)[][][];
     plateAssignments?: Map<number, SearchData[]>;
 } {
-    // Convert SearchDataBase to SearchData by adding treatmentKey
-    const searches: SearchData[] = searchesBase.map(search => ({
-        ...search,
-        treatmentKey: selectedCovariates
-            .map(cov => search.metadata[cov] || 'N/A')
-            .join('|')
-    }));
 
     const platesNeeded = Math.ceil(searches.length / 96);
     let plates = Array.from({ length: platesNeeded }, () =>

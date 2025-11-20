@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SearchData, RandomizationAlgorithm } from '../utils/types';
+import { SearchDataBase, RandomizationAlgorithm } from '../utils/types';
 import { randomizeSearches } from '../utils/utils';
 
 export function useRandomization() {
@@ -8,7 +8,7 @@ export function useRandomization() {
   const [plateAssignments, setPlateAssignments] = useState<Map<number, SearchData[]> | undefined>(undefined);
 
   const processRandomization = (
-    searches: SearchData[],
+    searches: SearchDataBase[],
     selectedCovariates: string[],
     selectedAlgorithm: RandomizationAlgorithm,
     keepEmptyInLastPlate: boolean,

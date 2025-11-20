@@ -1,4 +1,4 @@
-import { SearchData, RandomizationAlgorithm } from './types';
+import { SearchDataBase, SearchData, RandomizationAlgorithm } from './types';
 import { QualityLevel, QUALITY_LEVEL_CONFIG } from './configs';
 import Papa from 'papaparse';
 import { balancedBlockRandomization } from '../algorithms/balancedRandomization';
@@ -14,7 +14,7 @@ export function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-export function getCovariateKey(search: SearchData, selectedCovariates: string[]): string {
+export function getCovariateKey(search: SearchDataBase, selectedCovariates: string[]): string {
   return selectedCovariates
     .map(cov => search.metadata[cov] || 'N/A')
     .join('|');
@@ -57,7 +57,7 @@ export function groupByCovariates(searches: SearchData[], selectedCovariates: st
 
 // Main randomization function with algorithm selection
 export function randomizeSearches(
-  searches: SearchData[],
+  searchesBase: SearchDataBase[],
   selectedCovariates: string[],
   algorithm: RandomizationAlgorithm = 'balanced',
   keepEmptyInLastPlate: boolean = true,
@@ -67,6 +67,12 @@ export function randomizeSearches(
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
+  // Convert SearchDataBase to SearchData by adding treatmentKey
+  const searches: SearchData[] = searchesBase.map(search => ({
+    ...search,
+    treatmentKey: getCovariateKey(search, selectedCovariates)
+  }));
+
   switch (algorithm) {
     case 'balanced':
       return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);

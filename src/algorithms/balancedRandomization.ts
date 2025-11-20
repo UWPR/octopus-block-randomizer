@@ -483,7 +483,7 @@ export function balancedBlockRandomization(
 
 // Core balanced randomization implementation
 function doBalancedRandomization(
-  searchesBase: SearchData[],
+  searches: SearchData[],
   selectedCovariates: string[],
   keepEmptyInLastPlate: boolean = true,
   numRows: number = 8,
@@ -492,15 +492,9 @@ function doBalancedRandomization(
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
-  const totalSamples = searchesBase.length;
+  const totalSamples = searches.length;
   const plateSize = numRows * numColumns;
   console.log(`Starting balanced randomization for ${totalSamples} samples with plate size ${plateSize} (${numRows} rows x ${numColumns} columns)`);
-
-  // Convert SearchDataBase to SearchData by adding treatmentKey
-  const searches: SearchData[] = searchesBase.map(search => ({
-    ...search,
-    treatmentKey: getCovariateKey(search, selectedCovariates)
-  }));
 
   // Calculate number of plates needed (same regardless of keepEmptyInLastPlate)
   const actualPlatesNeeded = Math.ceil(totalSamples / plateSize);

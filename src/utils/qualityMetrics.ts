@@ -1,6 +1,6 @@
 import { SearchData, QualityMetrics, PlateDiversityMetrics, PlateQualityScore, OverallQualityAssessment } from '../utils/types';
    import { DEFAULT_QUALITY_DISPLAY_CONFIG, QualityDisplayConfig } from '../utils/configs';
-import { getCovariateKey, groupByCovariates, getQualityLevel } from '../utils/utils';
+import { groupByCovariates, getQualityLevel } from '../utils/utils';
 
 /**
  * Quality Metrics Calculator
@@ -133,7 +133,7 @@ const calculateRowClusteringScore = (
       continue;
     }
 
-    const rowKeys = rowSamples.map(sample => getCovariateKey(sample, selectedCovariates));
+    const rowKeys = rowSamples.map(sample => sample.treatmentKey);
 
     // Calculate clustering score
     const rowScore = calculateRowScore(rowKeys);

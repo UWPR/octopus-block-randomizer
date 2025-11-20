@@ -1,7 +1,7 @@
 import { SearchData } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
-import { greedyPlaceInRow, analyzePlateSpatialQuality } from './greedySpatialPlacement';
+import { greedyPlaceInRow, analyzePlateSpatialQuality, optimizeAllPlates } from './greedySpatialPlacement';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -588,9 +588,20 @@ function doBalancedRandomization(
     });
 
     const spatialQuality = analyzePlateSpatialQuality(plates[plateIdx], selectedCovariates, numRows, numColumns);
-    console.log(`Spatial Quality Analysis: Plate ${plateIdx}: H=${spatialQuality.horizontalClusters}, V=${spatialQuality.verticalClusters}, CR=${spatialQuality.crossRowClusters}, Total=${spatialQuality.totalClusters}`);
+    console.log(`Spatial Quality Analysis: Plate ${plateIdx + 1}: H=${spatialQuality.horizontalClusters}, V=${spatialQuality.verticalClusters}, CR=${spatialQuality.crossRowClusters}, Total=${spatialQuality.totalClusters}`);
   });
 
+  // STEP 6: Global optimization pass - swap positions to further reduce clustering
+  console.log('\n=== Starting Global Optimization ===');
+  const totalImprovements = optimizeAllPlates(plates, selectedCovariates, numRows, numColumns, 100);
+  console.log(`=== Optimization Complete: ${totalImprovements} total improvements ===\n`);
+
+  // STEP 7: Analyze spatial quality after optimization
+  console.log('Final Spatial Quality Analysis:');
+  plateAssignments.forEach((_, plateIdx) => {
+    const finalQuality = analyzePlateSpatialQuality(plates[plateIdx], selectedCovariates, numRows, numColumns);
+    console.log(`  Plate ${plateIdx + 1}: H=${finalQuality.horizontalClusters}, V=${finalQuality.verticalClusters}, CR=${finalQuality.crossRowClusters}, Total=${finalQuality.totalClusters}`);
+  });
 
   return {
     plates,

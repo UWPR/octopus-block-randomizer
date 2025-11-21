@@ -3,11 +3,13 @@ import React from 'react';
 interface FileUploadSectionProps {
   selectedFileName: string;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  sampleCount: number;
 }
 
 const FileUploadSection: React.FC<FileUploadSectionProps> = ({
   selectedFileName,
-  onFileUpload
+  onFileUpload,
+  sampleCount
 }) => {
   return (
     <div style={styles.fileUploadContainer}>
@@ -22,7 +24,12 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
         Choose File
       </label>
       {selectedFileName && (
-        <span style={styles.fileName}>{selectedFileName}</span>
+        <span style={styles.fileName}>
+          {selectedFileName}
+          {sampleCount > 0 && (
+            <span style={styles.sampleCount}> ({sampleCount} samples)</span>
+          )}
+        </span>
       )}
     </div>
   );
@@ -57,6 +64,10 @@ const styles = {
     color: '#333',
     fontWeight: 'normal',
     wordBreak: 'break-all' as const,
+  },
+  sampleCount: {
+    color: '#666',
+    fontStyle: 'italic',
   },
 };
 

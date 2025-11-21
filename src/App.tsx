@@ -333,6 +333,7 @@ const App: React.FC = () => {
         <FileUploadSection
           selectedFileName={selectedFileName}
           onFileUpload={handleFileUpload}
+          sampleCount={searches.length}
         />
 
         {/* Configuration Form */}

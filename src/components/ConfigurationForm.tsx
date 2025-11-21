@@ -108,11 +108,33 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
               onChange={onCovariateChange}
               style={styles.compactMultiSelect}
             >
-              {Object.keys(searches[0].metadata).map((covariate) => (
-                <option key={covariate} value={covariate}>
-                  {covariate}
-                </option>
-              ))}
+              {Object.keys(searches[0].metadata).map((covariate) => {
+                // Get unique values for this covariate
+                const values = new Set<string>();
+                searches.forEach(search => {
+                  const value = search.metadata[covariate];
+                  if (value) {
+                    values.add(value);
+                  }
+                });
+                const uniqueValues = Array.from(values).sort();
+                
+                // Format display: show values if 5 or less, otherwise show count
+                let displayText = covariate;
+                if (uniqueValues.length > 0) {
+                  if (uniqueValues.length <= 8) {
+                    displayText += ` (${uniqueValues.join(', ')})`;
+                  } else {
+                    displayText += ` (${uniqueValues.length} values)`;
+                  }
+                }
+                
+                return (
+                  <option key={covariate} value={covariate}>
+                    {displayText}
+                  </option>
+                );
+              })}
             </select>
             <small style={styles.compactHint}>Hold Ctrl/Cmd to select multiple options</small>
             {selectedCovariates.length > 0 && (

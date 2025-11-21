@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SearchData, RandomizationAlgorithm } from '../utils/types';
 import { randomizeSearches } from '../utils/utils';
+import { greedyPlaceInRow } from '../algorithms/greedySpatialPlacement';
 
 export function useRandomization() {
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
@@ -134,28 +135,23 @@ export function useRandomization() {
     if (plateSamples.length === 0) return false;
 
     if (selectedAlgorithm === 'balanced') {
-      // For balanced randomization: shuffle samples within each row only
-      const newPlate = currentPlate.map(row => {
+      // For balanced randomization: use row-level greedy spatial placement
+      console.log(`Re-randomizing plate ${plateIndex + 1} using greedy spatial placement`);
+
+      // Create a new empty plate
+      const newPlate: (SearchData | undefined)[][] = Array(plateRows)
+        .fill(null)
+        .map(() => Array(plateColumns).fill(undefined));
+
+      // Process each row using greedy placement
+      currentPlate.forEach((row, rowIdx) => {
         // Get all non-undefined samples in this row
         const rowSamples = row.filter(sample => sample !== undefined) as SearchData[];
 
-        if (rowSamples.length === 0) return row;
-
-        // Shuffle the samples in this row
-        const shuffledRowSamples = [...rowSamples].sort(() => Math.random() - 0.5);
-
-        // Create new row with shuffled samples in the same positions
-        const newRow = [...row];
-        let shuffleIndex = 0;
-
-        for (let col = 0; col < newRow.length; col++) {
-          if (newRow[col] !== undefined && shuffleIndex < shuffledRowSamples.length) {
-            newRow[col] = shuffledRowSamples[shuffleIndex];
-            shuffleIndex++;
-          }
+        if (rowSamples.length > 0) {
+          // Use greedy spatial placement for this row
+          greedyPlaceInRow(rowSamples, newPlate, rowIdx, plateColumns);
         }
-
-        return newRow;
       });
 
       updatedRandomizedPlates[plateIndex] = newPlate;

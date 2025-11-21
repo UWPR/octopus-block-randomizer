@@ -1,7 +1,7 @@
 import { SearchData } from '../utils/types';
 import { BlockType } from '../utils/types';
 import { shuffleArray, groupByCovariates } from '../utils/utils';
-import { greedyPlaceInRow, analyzePlateSpatialQuality, optimizeAllPlates } from './greedySpatialPlacement';
+import { greedyPlaceInRow, analyzePlateSpatialQuality } from './greedySpatialPlacement';
 
 enum OverflowPrioritization {
   BY_CAPACITY = 'by_capacity',      // Prioritize higher capacity blocks (for plates)
@@ -590,17 +590,11 @@ function doBalancedRandomization(
     console.log(`Spatial Quality Analysis: Plate ${plateIdx + 1}: H=${spatialQuality.horizontalClusters}, V=${spatialQuality.verticalClusters}, CR=${spatialQuality.crossRowClusters}, Total=${spatialQuality.totalClusters}`);
   });
 
-  // STEP 6: Global optimization pass - swap positions to further reduce clustering
-  console.log('\n=== Starting Global Optimization ===');
-  const totalImprovements = optimizeAllPlates(plates, numRows, numColumns, 100);
-  console.log(`=== Optimization Complete: ${totalImprovements} total improvements ===\n`);
-
-  // STEP 7: Analyze spatial quality after optimization
-  console.log('Final Spatial Quality Analysis:');
-  plateAssignments.forEach((_, plateIdx) => {
-    const finalQuality = analyzePlateSpatialQuality(plates[plateIdx], numRows, numColumns);
-    console.log(`  Plate ${plateIdx + 1}: H=${finalQuality.horizontalClusters}, V=${finalQuality.verticalClusters}, CR=${finalQuality.crossRowClusters}, Total=${finalQuality.totalClusters}`);
-  });
+  // STEP 6: Global optimization pass - DISABLED to preserve row-level distribution
+  // The optimization was breaking the proportional distribution by moving samples between rows
+  // console.log('\n=== Starting Global Optimization ===');
+  // const totalImprovements = optimizeAllPlates(plates, numRows, numColumns, 100);
+  // console.log(`=== Optimization Complete: ${totalImprovements} total improvements ===\n`);
 
   return {
     plates,

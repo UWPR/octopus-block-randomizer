@@ -76,8 +76,9 @@ export const getAllQualityLevelKeys = (): QualityLevel[] =>
 export interface PlateQualityScore {
   plateIndex: number;
   balanceScore: number; // 0-100 (Proportional Accuracy)
+  clusteringScore: number; // 0 - 100 (clustering: row, column and cross-row)
   rowClusteringScore: number; // 0-100 (Row Clustering)
-  overallScore: number; // 0-100 (Average of both)
+  overallScore: number; // 0-100 (Average of scores)
   rowScores?: number[]; // Individual row scores (0-100)
   covariateGroupBalance: {
     [combination: string]: {
@@ -94,6 +95,7 @@ export interface PlateQualityScore {
 
 export interface PlateDiversityMetrics {
   averageBalanceScore: number; // 0-100
+  averageClusteringScore: number; // 0 - 100
   averageRowClusteringScore: number; // 0-100
   plateScores: PlateQualityScore[];
 }

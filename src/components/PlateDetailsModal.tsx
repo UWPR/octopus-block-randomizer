@@ -103,7 +103,22 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                         {getCompactQualityLevel(plateQuality.balanceScore)}
                       </span>
                     </span>
-                    {QUALITY_DISPLAY_CONFIG.showRowScore && (
+                    {QUALITY_DISPLAY_CONFIG.showClusteringScore && (
+                      <span>
+                        <strong>Clustering:</strong>{' '}
+                        <span style={{ color: getQualityColor(plateQuality.clusteringScore) }}>
+                          {formatScore(plateQuality.clusteringScore)}
+                        </span>
+                        {' '}
+                        <span style={{
+                          ...styles.qualityBadge,
+                          backgroundColor: getQualityColor(plateQuality.clusteringScore)
+                        }}>
+                          {getCompactQualityLevel(plateQuality.clusteringScore)}
+                        </span>
+                      </span>
+                    )}
+                     {QUALITY_DISPLAY_CONFIG.showRowScore && (
                       <span>
                         <strong>Row Score:</strong>{' '}
                         <span style={{ color: getQualityColor(plateQuality.rowClusteringScore) }}>

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { SearchDataBase } from '../utils/types';
+import { SearchData } from '../utils/types';
 
 export function useFileUpload() {
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [selectedIdColumn, setSelectedIdColumn] = useState<string>('');
   const [selectedFileName, setSelectedFileName] = useState<string>('');
-  const [searches, setSearches] = useState<SearchDataBase[]>([]);
+  const [searches, setSearches] = useState<SearchData[]>([]);
 
-  const processSearchData = (data: any[], idColumn: string): SearchDataBase[] => {
+  const processSearchData = (data: any[], idColumn: string): SearchData[] => {
     return data
       .filter((row: any) => row[idColumn])
       .map((row: any) => ({

@@ -133,7 +133,7 @@ const calculateRowClusteringScore = (
       continue;
     }
 
-    const rowKeys = rowSamples.map(sample => sample.treatmentKey);
+    const rowKeys = rowSamples.map(sample => sample.treatmentKey || '');
 
     // Calculate clustering score
     const rowScore = calculateRowScore(rowKeys);

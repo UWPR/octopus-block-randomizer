@@ -242,7 +242,7 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Re-randomize with existing colors
+      // Re-randomize - colors are already generated, so we don't need to regenerate them
       reRandomize(
         searches,
         selectedCovariates,

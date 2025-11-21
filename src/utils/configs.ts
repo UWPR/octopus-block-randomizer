@@ -10,7 +10,7 @@ export const BRIGHT_COLOR_PALETTE = [
 
   // Subgroup 2
   '#87CEEB', // Sky Blue
-  '#800080', // Purple
+  '#8000FF', // Pure Purple
   '#FF1493', // Deep Pink
   '#006400', // Dark Forest Green
   '#4169E1', // Royal Blue
@@ -28,7 +28,7 @@ export const BRIGHT_COLOR_PALETTE = [
 
   // Subgroup 4
   '#FF4500', // Orange Red
-  '#8000FF', // Pure Purple
+  '#483D8B', // Dark blue slate
   '#BA55D3', // Medium Orchid
   '#B8860B', // Dark Gold
   '#008B8B', // Dark Cyan

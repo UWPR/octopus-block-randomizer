@@ -7,14 +7,10 @@ export enum BlockType {
 }
 
 // Base search data from CSV (before covariate selection)
-export interface SearchDataBase {
+export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
-}
-
-// Search data with computed treatment key (after covariate selection)
-export interface SearchData extends SearchDataBase {
-  treatmentKey: string; // Covariate combination key, calculated based on selected covariates
+  treatmentKey?: string;  // Covariate combination key, calculated based on selected covariates
 }
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;

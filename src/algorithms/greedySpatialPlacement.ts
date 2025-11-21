@@ -23,7 +23,7 @@ export function calculateClusterScore(
   plate: (SearchData | undefined)[][],
   rowIdx: number,
   colIdx: number,
-  treatmentKey: string,
+  treatmentKey: string | undefined,
   numColumns: number
 ): number {
   let score = 0;
@@ -315,7 +315,7 @@ function isClustered(
   col: number,
   row: number,
   plate: (SearchData | undefined)[][],
-  currentKey: string | null,
+  currentKey: string | undefined,
   numColumns: number,
   numRows: number): boolean {
 

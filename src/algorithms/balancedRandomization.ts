@@ -1,6 +1,6 @@
 import { SearchData } from '../utils/types';
 import { BlockType } from '../utils/types';
-import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
+import { shuffleArray, groupByCovariates } from '../utils/utils';
 import { greedyPlaceInRow, analyzePlateSpatialQuality, optimizeAllPlates } from './greedySpatialPlacement';
 
 enum OverflowPrioritization {
@@ -447,7 +447,7 @@ function validatePerBlockDistribution(
 
     // Count samples by group in this block
     samples.forEach(sample => {
-      const groupKey = sample.treatmentKey;
+      const groupKey = sample.treatmentKey || '';
       groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
     });
 

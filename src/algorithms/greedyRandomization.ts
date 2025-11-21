@@ -8,7 +8,6 @@ export function greedyRandomization(
     plates: (SearchData | undefined)[][][];
     plateAssignments?: Map<number, SearchData[]>;
 } {
-
     const platesNeeded = Math.ceil(searches.length / 96);
     let plates = Array.from({ length: platesNeeded }, () =>
         Array.from({ length: 8 }, () => new Array(12).fill(undefined))

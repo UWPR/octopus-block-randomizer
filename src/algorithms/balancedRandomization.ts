@@ -1,6 +1,6 @@
 import { SearchData } from '../utils/types';
 import { BlockType } from '../utils/types';
-import { shuffleArray, getCovariateKey, groupByCovariates } from '../utils/utils';
+import { shuffleArray, groupByCovariates } from '../utils/utils';
 import { greedyPlaceInRow, analyzePlateSpatialQuality, optimizeAllPlates } from './greedySpatialPlacement';
 
 enum OverflowPrioritization {
@@ -402,7 +402,7 @@ function processOverflowGroups(
       const blockGroupCounts = availableBlocks.map(blockIdx => {
         const blockSamples = blockAssignments.get(blockIdx) || [];
         const groupCount = blockSamples.filter(sample =>
-          getCovariateKey(sample, selectedCovariates) === groupKey
+          sample.treatmentKey === groupKey
         ).length;
         return { blockIdx, groupCount };
       });
@@ -447,7 +447,7 @@ function validatePerBlockDistribution(
 
     // Count samples by group in this block
     samples.forEach(sample => {
-      const groupKey = getCovariateKey(sample, selectedCovariates);
+      const groupKey = sample.treatmentKey || '';
       groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
     });
 
@@ -581,25 +581,24 @@ function doBalancedRandomization(
           rowSamples,
           plates[plateIdx],
           rowIdx,
-          selectedCovariates,
           numColumns
         );
       }
     });
 
-    const spatialQuality = analyzePlateSpatialQuality(plates[plateIdx], selectedCovariates, numRows, numColumns);
+    const spatialQuality = analyzePlateSpatialQuality(plates[plateIdx], numRows, numColumns);
     console.log(`Spatial Quality Analysis: Plate ${plateIdx + 1}: H=${spatialQuality.horizontalClusters}, V=${spatialQuality.verticalClusters}, CR=${spatialQuality.crossRowClusters}, Total=${spatialQuality.totalClusters}`);
   });
 
   // STEP 6: Global optimization pass - swap positions to further reduce clustering
   console.log('\n=== Starting Global Optimization ===');
-  const totalImprovements = optimizeAllPlates(plates, selectedCovariates, numRows, numColumns, 100);
+  const totalImprovements = optimizeAllPlates(plates, numRows, numColumns, 100);
   console.log(`=== Optimization Complete: ${totalImprovements} total improvements ===\n`);
 
   // STEP 7: Analyze spatial quality after optimization
   console.log('Final Spatial Quality Analysis:');
   plateAssignments.forEach((_, plateIdx) => {
-    const finalQuality = analyzePlateSpatialQuality(plates[plateIdx], selectedCovariates, numRows, numColumns);
+    const finalQuality = analyzePlateSpatialQuality(plates[plateIdx], numRows, numColumns);
     console.log(`  Plate ${plateIdx + 1}: H=${finalQuality.horizontalClusters}, V=${finalQuality.verticalClusters}, CR=${finalQuality.crossRowClusters}, Total=${finalQuality.totalClusters}`);
   });
 

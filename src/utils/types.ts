@@ -9,6 +9,7 @@ export enum BlockType {
 export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
+  treatmentKey?: string;  // Covariate combination key, calculated based on selected covariates
 }
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;

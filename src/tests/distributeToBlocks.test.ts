@@ -6,7 +6,8 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
   // Helper function to create mock samples with specific covariate values
   const createSample = (name: string, gender: string, plate: string, treatment: string): SearchData => ({
     name,
-    metadata: { Gender: gender, Plate: plate, Treatment: treatment }
+    metadata: { Gender: gender, Plate: plate, Treatment: treatment },
+    treatmentKey: `${gender}|${plate}|${treatment}` // Add treatmentKey for tests
   });
 
   // Helper function to count samples per covariate group in result
@@ -457,21 +458,24 @@ describe('calculateExpectedMinimums', () => {
     // Group 1: 20 samples
     const group1Samples = Array.from({ length: 20 }, (_, i) => ({
       name: `sample_1_${i + 1}`,
-      metadata: { Gender: 'Male', Plate: 'P_1', Treatment: 'Control' }
+      metadata: { Gender: 'Male', Plate: 'P_1', Treatment: 'Control' },
+      treatmentKey: 'Male|P_1|Control'
     }));
     groups.set('Male|P_1|Control', group1Samples);
     
     // Group 2: 10 samples
     const group2Samples = Array.from({ length: 10 }, (_, i) => ({
       name: `sample_2_${i + 1}`,
-      metadata: { Gender: 'Female', Plate: 'P_2', Treatment: 'Blinded' }
+      metadata: { Gender: 'Female', Plate: 'P_2', Treatment: 'Blinded' },
+      treatmentKey: 'Female|P_2|Blinded'
     }));
     groups.set('Female|P_2|Blinded', group2Samples);
     
     // Group 3: 6 samples
     const group3Samples = Array.from({ length: 6 }, (_, i) => ({
       name: `sample_3_${i + 1}`,
-      metadata: { Gender: 'Male', Plate: 'P_3', Treatment: 'X-Ray' }
+      metadata: { Gender: 'Male', Plate: 'P_3', Treatment: 'X-Ray' },
+      treatmentKey: 'Male|P_3|X-Ray'
     }));
     groups.set('Male|P_3|X-Ray', group3Samples);
     

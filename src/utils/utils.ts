@@ -67,6 +67,12 @@ export function randomizeSearches(
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
+  // Add treatment key
+  searches.forEach(search => {
+    search.treatmentKey = getCovariateKey(search, selectedCovariates);}
+  );
+
+
   switch (algorithm) {
     case 'balanced':
       return balancedBlockRandomization(searches, selectedCovariates, keepEmptyInLastPlate, numRows, numColumns);

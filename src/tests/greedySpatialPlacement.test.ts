@@ -13,7 +13,8 @@ describe('Greedy Spatial Placement', () => {
       gender: gender,
       protocol,
       treatment
-    }
+    },
+    treatmentKey: `${gender}|${protocol}|${treatment}`
   });
 
   describe('calculateClusterScore', () => {
@@ -21,9 +22,8 @@ describe('Greedy Spatial Placement', () => {
       const plates: (SearchData | undefined)[][][] = [
         Array.from({ length: 8 }, () => new Array(12).fill(undefined))
       ];
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
 
-      const score = calculateClusterScore(plates[0], 0, 0, 'Male|P1|Control', selectedCovariates, 12);
+      const score = calculateClusterScore(plates[0], 0, 0, 'Male|P1|Control', 12);
 
       expect(score).toBe(0);
     });
@@ -35,11 +35,10 @@ describe('Greedy Spatial Placement', () => {
       ];
       plates[0][0][0] = sample1;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
       const treatmentKey = 'Male|P1|Control';
 
       // Check position 1 (right next to position 0)
-      const score = calculateClusterScore(plates[0], 0, 1, treatmentKey, selectedCovariates, 12);
+      const score = calculateClusterScore(plates[0], 0, 1, treatmentKey, 12);
 
       expect(score).toBe(10); // Heavy penalty for horizontal adjacency
     });
@@ -51,11 +50,10 @@ describe('Greedy Spatial Placement', () => {
       ];
       plates[0][0][0] = sample1;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
       const treatmentKey = 'Male|P1|Control';
 
       // Check position in row 1, column 0 (directly below)
-      const score = calculateClusterScore(plates[0], 1, 0, treatmentKey, selectedCovariates, 12);
+      const score = calculateClusterScore(plates[0], 1, 0, treatmentKey, 12);
 
       expect(score).toBe(10); // Heavy penalty for vertical adjacency
     });
@@ -68,11 +66,10 @@ describe('Greedy Spatial Placement', () => {
       // Place sample at last column of row 0
       plates[0][0][11] = sample1;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
       const treatmentKey = 'Male|P1|Control';
 
       // Check first column of row 1 (cross-row position)
-      const score = calculateClusterScore(plates[0], 1, 0, treatmentKey, selectedCovariates, 12);
+      const score = calculateClusterScore(plates[0], 1, 0, treatmentKey, 12);
 
       expect(score).toBe(8); // Medium-high penalty for cross-row adjacency
     });
@@ -84,11 +81,10 @@ describe('Greedy Spatial Placement', () => {
       ];
       plates[0][0][0] = sample1;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
       const differentTreatmentKey = 'Female|P2|Treatment';
 
       // Check position 1 (right next to position 0, but different treatment)
-      const score = calculateClusterScore(plates[0], 0, 1, differentTreatmentKey, selectedCovariates, 12);
+      const score = calculateClusterScore(plates[0], 0, 1, differentTreatmentKey, 12);
 
       expect(score).toBe(0); // No penalty for different treatment
     });
@@ -107,21 +103,16 @@ describe('Greedy Spatial Placement', () => {
       const plates: (SearchData | undefined)[][][] = [
         Array.from({ length: 8 }, () => new Array(12).fill(undefined))
       ];
-      const selectedCovariates = ['sex', 'protocol', 'treatment'];
 
-      greedyPlaceInRow(samples, plates[0], 0, selectedCovariates, 12);
+      greedyPlaceInRow(samples, plates[0], 0, 12);
 
       // Check that the two Male|P1|Control samples are not adjacent
       let adjacentCount = 0;
       for (let col = 0; col < 11; col++) {
         const current = plates[0][0][col];
         const next = plates[0][0][col + 1];
-        if (current && next) {
-          const currentKey = `${current.metadata.sex}|${current.metadata.protocol}|${current.metadata.treatment}`;
-          const nextKey = `${next.metadata.sex}|${next.metadata.protocol}|${next.metadata.treatment}`;
-          if (currentKey === nextKey) {
-            adjacentCount++;
-          }
+        if (current && next && current.treatmentKey === next.treatmentKey) {
+          adjacentCount++;
         }
       }
 
@@ -138,9 +129,8 @@ describe('Greedy Spatial Placement', () => {
       const plates: (SearchData | undefined)[][][] = [
         Array.from({ length: 8 }, () => new Array(12).fill(undefined))
       ];
-      const selectedCovariates = ['sex', 'protocol', 'treatment'];
 
-      greedyPlaceInRow(samples, plates[0], 0, selectedCovariates, 12);
+      greedyPlaceInRow(samples, plates[0], 0, 12);
 
       // Count placed samples
       const placedCount = plates[0][0].filter(s => s !== undefined).length;
@@ -160,8 +150,7 @@ describe('Greedy Spatial Placement', () => {
       plate[0][0] = sample1;
       plate[0][1] = sample2;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
-      const quality = analyzePlateSpatialQuality(plate, selectedCovariates, 8, 12);
+      const quality = analyzePlateSpatialQuality(plate, 8, 12);
 
       expect(quality.horizontalClusters).toBe(1);
       expect(quality.verticalClusters).toBe(0);
@@ -178,8 +167,7 @@ describe('Greedy Spatial Placement', () => {
       plate[0][0] = sample1;
       plate[1][0] = sample2;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
-      const quality = analyzePlateSpatialQuality(plate, selectedCovariates, 8, 12);
+      const quality = analyzePlateSpatialQuality(plate, 8, 12);
 
       expect(quality.horizontalClusters).toBe(0);
       expect(quality.verticalClusters).toBe(1);
@@ -196,8 +184,7 @@ describe('Greedy Spatial Placement', () => {
       plate[0][11] = sample1; // Last column of row 0
       plate[1][0] = sample2; // First column of row 1
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
-      const quality = analyzePlateSpatialQuality(plate, selectedCovariates, 8, 12);
+      const quality = analyzePlateSpatialQuality(plate, 8, 12);
 
       expect(quality.horizontalClusters).toBe(0);
       expect(quality.verticalClusters).toBe(0);
@@ -217,8 +204,7 @@ describe('Greedy Spatial Placement', () => {
       plate[0][5] = sample2;
       plate[0][2] = sample3;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
-      const quality = analyzePlateSpatialQuality(plate, selectedCovariates, 8, 12);
+      const quality = analyzePlateSpatialQuality(plate, 8, 12);
 
       expect(quality.totalClusters).toBe(0);
     });
@@ -244,8 +230,7 @@ describe('Greedy Spatial Placement', () => {
       plates[1][0][0] = sample3;
       plates[1][1][0] = sample4;
 
-      const selectedCovariates = ['gender', 'protocol', 'treatment'];
-      const quality = analyzeOverallSpatialQuality(plates, selectedCovariates, 8, 12);
+      const quality = analyzeOverallSpatialQuality(plates, 8, 12);
 
       expect(quality.plateQualities).toHaveLength(2);
       expect(quality.plateQualities[0].plateIndex).toBe(0);

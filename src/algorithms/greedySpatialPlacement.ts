@@ -1,5 +1,12 @@
 import { SearchData } from '../utils/types';
-import { shuffleArray, getCovariateKey } from '../utils/utils';
+import { shuffleArray } from '../utils/utils';
+
+/**
+ * Helper to safely get treatment key from a sample
+ */
+function getTreatmentKey(sample: SearchData | undefined): string | undefined {
+  return sample?.treatmentKey;
+}
 
 /**
  * Calculate a clustering score for placing a sample at a specific position.
@@ -9,7 +16,6 @@ import { shuffleArray, getCovariateKey } from '../utils/utils';
  * @param rowIdx - Row index within the plate
  * @param colIdx - Column index within the row
  * @param treatmentKey - The covariate group key of the sample being placed
- * @param selectedCovariates - List of selected covariate names
  * @param numColumns - Total number of columns per row
  * @returns Clustering score (lower is better)
  */
@@ -17,17 +23,10 @@ export function calculateClusterScore(
   plate: (SearchData | undefined)[][],
   rowIdx: number,
   colIdx: number,
-  treatmentKey: string,
-  selectedCovariates: string[],
+  treatmentKey: string | undefined,
   numColumns: number
 ): number {
   let score = 0;
-
-  // Helper to get treatment key from a sample
-  const getTreatmentKey = (sample: SearchData | undefined): string | null => {
-    if (!sample) return null;
-    return getCovariateKey(sample, selectedCovariates);
-  };
 
   // Check left neighbor (horizontal)
   if (colIdx > 0) {
@@ -71,14 +70,12 @@ export function calculateClusterScore(
  * @param rowSamples - Array of samples to place in this row
  * @param plate - The 2D grid of the current plate (will be modified)
  * @param rowIdx - Row index within the plate
- * @param selectedCovariates - List of selected covariate names
  * @param numColumns - Total number of columns per row
  */
 export function greedyPlaceInRow(
   rowSamples: SearchData[],
   plate: (SearchData | undefined)[][],
   rowIdx: number,
-  selectedCovariates: string[],
   numColumns: number
 ): void {
   if (rowSamples.length === 0) return;
@@ -96,7 +93,7 @@ export function greedyPlaceInRow(
   for (const sample of shuffledSamples) {
     if (availablePositions.length === 0) break;
 
-    const treatmentKey = getCovariateKey(sample, selectedCovariates);
+    const treatmentKey = sample.treatmentKey;
 
     // Score each available position
     const positionScores = availablePositions.map(col => ({
@@ -106,7 +103,6 @@ export function greedyPlaceInRow(
         rowIdx,
         col,
         treatmentKey,
-        selectedCovariates,
         numColumns
       )
     }));
@@ -158,25 +154,18 @@ export interface OverallSpatialQuality {
  * Returns metrics about clustering.
  *
  * @param plate - The 2D grid of a single plate
- * @param selectedCovariates - List of selected covariate names
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @returns Object with clustering metrics for the plate
  */
 export function analyzePlateSpatialQuality(
   plate: (SearchData | undefined)[][],
-  selectedCovariates: string[],
   numRows: number,
   numColumns: number
 ): Omit<PlateSpatialQuality, 'plateIndex'> {
   let horizontalClusters = 0;
   let verticalClusters = 0;
   let crossRowClusters = 0;
-
-  const getTreatmentKey = (sample: SearchData | undefined): string | null => {
-    if (!sample) return null;
-    return getCovariateKey(sample, selectedCovariates);
-  };
 
   for (let row = 0; row < numRows; row++) {
     for (let col = 0; col < numColumns; col++) {
@@ -224,14 +213,12 @@ export function analyzePlateSpatialQuality(
  * Returns per-plate metrics and overall totals.
  *
  * @param plates - The 3D grid of plates
- * @param selectedCovariates - List of selected covariate names
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @returns Object with per-plate and overall clustering metrics
  */
 export function analyzeOverallSpatialQuality(
   plates: (SearchData | undefined)[][][],
-  selectedCovariates: string[],
   numRows: number,
   numColumns: number
 ): OverallSpatialQuality {
@@ -241,7 +228,7 @@ export function analyzeOverallSpatialQuality(
   let totalCrossRowClusters = 0;
 
   plates.forEach((plate, plateIndex) => {
-    const quality = analyzePlateSpatialQuality(plate, selectedCovariates, numRows, numColumns);
+    const quality = analyzePlateSpatialQuality(plate, numRows, numColumns);
 
     plateQualities.push({
       plateIndex,
@@ -267,14 +254,12 @@ export function analyzeOverallSpatialQuality(
  * This is used to evaluate the quality of the entire plate layout.
  *
  * @param plate - The 2D grid of a single plate
- * @param selectedCovariates - List of selected covariate names
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @returns Total clustering score (lower is better)
  */
 function calculatePlateTotalScore(
   plate: (SearchData | undefined)[][],
-  selectedCovariates: string[],
   numRows: number,
   numColumns: number
 ): number {
@@ -285,8 +270,8 @@ function calculatePlateTotalScore(
       const sample = plate[row][col];
       if (!sample) continue;
 
-      const treatmentKey = getCovariateKey(sample, selectedCovariates);
-      totalScore += calculateClusterScore(plate, row, col, treatmentKey, selectedCovariates, numColumns);
+      const treatmentKey = sample.treatmentKey;
+      totalScore += calculateClusterScore(plate, row, col, treatmentKey, numColumns);
     }
   }
 
@@ -297,14 +282,12 @@ function calculatePlateTotalScore(
  * Identify all positions that are part of a cluster (have same-treatment neighbors).
  *
  * @param plate - The 2D grid of a single plate
- * @param selectedCovariates - List of selected covariate names
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @returns Array of positions that are in clusters
  */
 function identifyClusteredPositions(
   plate: (SearchData | undefined)[][],
-  selectedCovariates: string[],
   numRows: number,
   numColumns: number
 ): Array<{ row: number; col: number }> {
@@ -316,8 +299,8 @@ function identifyClusteredPositions(
       const currentSample = plate[row][col];
       if (!currentSample) continue;
 
-      const currentKey = getTreatmentKey(currentSample, selectedCovariates);
-      const clustered = isClustered(col, row, plate, currentKey, selectedCovariates, numColumns, numRows);;
+      const currentKey = getTreatmentKey(currentSample);
+      const clustered = isClustered(col, row, plate, currentKey, numColumns, numRows);;
 
       if (clustered) {
         clusteredPositions.push({ row, col });
@@ -328,25 +311,18 @@ function identifyClusteredPositions(
   return clusteredPositions;
 }
 
-function getTreatmentKey(sample: SearchData | undefined, selectedCovariates: string[]): string | null
-{
-  if (!sample) return null;
-    return getCovariateKey(sample, selectedCovariates);
-}
-
 function isClustered(
   col: number,
   row: number,
   plate: (SearchData | undefined)[][],
-  currentKey: string | null,
-  selectedCovariates: string[],
+  currentKey: string | undefined,
   numColumns: number,
   numRows: number): boolean {
 
   // Check left neighbor
   if (col > 0) {
     const leftSample = plate[row][col - 1];
-    if (getTreatmentKey(leftSample, selectedCovariates) === currentKey) {
+    if (getTreatmentKey(leftSample) === currentKey) {
       return true;
     }
   }
@@ -354,7 +330,7 @@ function isClustered(
   // Check right neighbor
   if (!isClustered && col < numColumns - 1) {
     const rightSample = plate[row][col + 1];
-    if (getTreatmentKey(rightSample, selectedCovariates) === currentKey) {
+    if (getTreatmentKey(rightSample) === currentKey) {
       return true;
     }
   }
@@ -362,7 +338,7 @@ function isClustered(
   // Check above neighbor
   if (!isClustered && row > 0) {
     const aboveSample = plate[row - 1][col];
-    if (getTreatmentKey(aboveSample, selectedCovariates) === currentKey) {
+    if (getTreatmentKey(aboveSample) === currentKey) {
       return true;
     }
   }
@@ -370,7 +346,7 @@ function isClustered(
   // Check below neighbor
   if (!isClustered && row < numRows - 1) {
     const belowSample = plate[row + 1][col];
-    if (getTreatmentKey(belowSample, selectedCovariates) === currentKey) {
+    if (getTreatmentKey(belowSample) === currentKey) {
       return true;
     }
   }
@@ -378,7 +354,7 @@ function isClustered(
   // Check cross-row (last column of previous row)
   if (!isClustered && col === 0 && row > 0) {
     const prevRowLastSample = plate[row - 1][numColumns - 1];
-    if (getTreatmentKey(prevRowLastSample, selectedCovariates) === currentKey) {
+    if (getTreatmentKey(prevRowLastSample) === currentKey) {
       return true;
     }
   }
@@ -386,7 +362,7 @@ function isClustered(
   // Check cross-row (first column of next row)
   if (!isClustered && col === numColumns - 1 && row < numRows - 1) {
     const nextRowFirstSample = plate[row + 1][0];
-    if (getTreatmentKey(nextRowFirstSample, selectedCovariates) === currentKey) {
+    if (getTreatmentKey(nextRowFirstSample) === currentKey) {
       return true;
     }
   }
@@ -398,7 +374,6 @@ function isClustered(
  * Uses a targeted hill-climbing approach: identifies clustered positions and tries swapping them.
  *
  * @param plate - The 2D grid of a single plate (will be modified)
- * @param selectedCovariates - List of selected covariate names
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @param maxIterations - Maximum number of swap attempts (default: 100)
@@ -406,13 +381,12 @@ function isClustered(
  */
 export function optimizePlateLayout(
   plate: (SearchData | undefined)[][],
-  selectedCovariates: string[],
   numRows: number,
   numColumns: number,
   maxIterations: number = 100
 ): number {
   let improvementsMade = 0;
-  let currentScore = calculatePlateTotalScore(plate, selectedCovariates, numRows, numColumns);
+  let currentScore = calculatePlateTotalScore(plate, numRows, numColumns);
 
   console.log(`Starting optimization with initial score: ${currentScore}`);
 
@@ -429,7 +403,7 @@ export function optimizePlateLayout(
   // Try targeted swaps
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     // Identify currently clustered positions
-    const clusteredPositions = identifyClusteredPositions(plate, selectedCovariates, numRows, numColumns);
+    const clusteredPositions = identifyClusteredPositions(plate, numRows, numColumns);
 
     if (clusteredPositions.length === 0) {
       console.log(`  No clusters found after ${iteration} iterations`);
@@ -462,7 +436,7 @@ export function optimizePlateLayout(
     plate[pos2.row][pos2.col] = temp;
 
     // Calculate new score
-    const newScore = calculatePlateTotalScore(plate, selectedCovariates, numRows, numColumns);
+    const newScore = calculatePlateTotalScore(plate, numRows, numColumns);
 
     // Keep the swap if it improves the score
     if (newScore < currentScore) {
@@ -477,7 +451,7 @@ export function optimizePlateLayout(
     }
   }
 
-  const finalClustered = identifyClusteredPositions(plate, selectedCovariates, numRows, numColumns);
+  const finalClustered = identifyClusteredPositions(plate, numRows, numColumns);
   console.log(`Optimization complete: ${improvementsMade} improvements made, final score: ${currentScore}, remaining clustered positions: ${finalClustered.length}`);
   return improvementsMade;
 }
@@ -486,7 +460,6 @@ export function optimizePlateLayout(
  * Perform global optimization on all plates.
  *
  * @param plates - The 3D grid of plates (will be modified)
- * @param selectedCovariates - List of selected covariate names
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
  * @param maxIterationsPerPlate - Maximum number of swap attempts per plate (default: 100)
@@ -494,7 +467,6 @@ export function optimizePlateLayout(
  */
 export function optimizeAllPlates(
   plates: (SearchData | undefined)[][][],
-  selectedCovariates: string[],
   numRows: number,
   numColumns: number,
   maxIterationsPerPlate: number = 100
@@ -505,7 +477,6 @@ export function optimizeAllPlates(
     console.log(`\nOptimizing plate ${plateIndex + 1}...`);
     const improvements = optimizePlateLayout(
       plate,
-      selectedCovariates,
       numRows,
       numColumns,
       maxIterationsPerPlate

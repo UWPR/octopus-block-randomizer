@@ -266,6 +266,22 @@ const Plate: React.FC<PlateProps> = ({
                 </span>
                 {' '}Bal: {formatScore(plateQuality.balanceScore)}
               </span>
+              {QUALITY_DISPLAY_CONFIG.showClusteringScore && (
+                <span
+                  style={{
+                    ...currentStyles.qualityScore,
+                    color: getQualityColor(plateQuality.clusteringScore)
+                  }}
+                >
+                  <span style={{
+                    ...currentStyles.qualityBadge,
+                    backgroundColor: getQualityColor(plateQuality.clusteringScore)
+                  }}>
+                    {getCompactQualityLevel(plateQuality.clusteringScore)}
+                  </span>
+                  {' '}Clust: {formatScore(plateQuality.clusteringScore)}
+                </span>
+              )}
               {QUALITY_DISPLAY_CONFIG.showRowScore && (
                 <span
                   style={{

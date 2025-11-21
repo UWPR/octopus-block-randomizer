@@ -102,16 +102,19 @@ export type QualityLevel = keyof typeof QUALITY_LEVEL_CONFIG;
 // Quality display configuration
 export interface QualityDisplayConfig {
   showRowScore: boolean;
+  showClusteringScore: boolean;
 }
 
 // Default quality display configuration
 export const DEFAULT_QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRowScore: true
+  showRowScore: false,
+  showClusteringScore: true
 };
 
 // Global quality display configuration - change this flag to control row score visibility
 export const QUALITY_DISPLAY_CONFIG: QualityDisplayConfig = {
-  showRowScore: true  // Set to false to hide row scores
+  showRowScore: false,  // Set to false to hide row scores
+  showClusteringScore: true
 };
 
 // Developer mode configuration

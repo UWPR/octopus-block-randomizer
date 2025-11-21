@@ -107,6 +107,90 @@ const calculatePlateBalance = (
   return { overallScore, groupDetails };
 };
 
+/**
+ * Calculate spatial clustering score for a plate
+ * Uses the spatial quality analysis from greedySpatialPlacement
+ * Returns a score from 0-100 where 100 = no clustering, 0 = maximum clustering
+ * 
+ * The score is based on the number of same-treatment adjacencies:
+ * - Horizontal adjacencies (same row, adjacent columns)
+ * - Vertical adjacencies (same column, adjacent rows)
+ * - Cross-row adjacencies (last column of row N, first column of row N+1)
+ * 
+ * @param plate - The 2D grid of a single plate
+ * @param numRows - Total number of rows per plate
+ * @param numColumns - Total number of columns per row
+ * @returns Clustering score (0-100)
+ */
+const calculateClusteringScore = (
+  plate: (SearchData | undefined)[][],
+  numRows: number,
+  numColumns: number
+): number => {
+  // Import the spatial quality analysis function
+  const { analyzePlateSpatialQuality } = require('../algorithms/greedySpatialPlacement');
+  
+  // Get the spatial quality metrics
+  const quality = analyzePlateSpatialQuality(plate, numRows, numColumns);
+  
+  // Count total filled positions in the plate
+  let totalFilledPositions = 0;
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numColumns; col++) {
+      if (plate[row][col] !== undefined) {
+        totalFilledPositions++;
+      }
+    }
+  }
+  
+  if (totalFilledPositions === 0) return 100; // Empty plate has perfect score
+  if (totalFilledPositions === 1) return 100; // Single sample has perfect score
+  
+  // Calculate the theoretical minimum number of adjacencies
+  // In a perfect checkerboard pattern with 2 groups, we'd have 0 adjacencies
+  // But with multiple groups and irregular distributions, some adjacencies are unavoidable
+  
+  // Calculate maximum possible adjacencies for this plate configuration
+  // Each filled position can have up to 4 neighbors (left, right, up, down)
+  // But we count each adjacency once (not twice), so we count edges, not positions
+  let maxHorizontalAdjacencies = 0;
+  let maxVerticalAdjacencies = 0;
+  let maxCrossRowAdjacencies = 0;
+  
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numColumns; col++) {
+      if (plate[row][col] !== undefined) {
+        // Count potential horizontal adjacency (to the right)
+        if (col < numColumns - 1 && plate[row][col + 1] !== undefined) {
+          maxHorizontalAdjacencies++;
+        }
+        // Count potential vertical adjacency (below)
+        if (row < numRows - 1 && plate[row + 1][col] !== undefined) {
+          maxVerticalAdjacencies++;
+        }
+        // Count potential cross-row adjacency
+        if (col === numColumns - 1 && row < numRows - 1 && plate[row + 1][0] !== undefined) {
+          maxCrossRowAdjacencies++;
+        }
+      }
+    }
+  }
+  
+  const maxTotalAdjacencies = maxHorizontalAdjacencies + maxVerticalAdjacencies + maxCrossRowAdjacencies;
+  
+  if (maxTotalAdjacencies === 0) return 100; // No possible adjacencies
+  
+  // Calculate clustering ratio
+  // 0 clusters = perfect (100 score)
+  // All possible adjacencies are clusters = worst (0 score)
+  const clusterRatio = quality.totalClusters / maxTotalAdjacencies;
+  
+  // Convert to score (0-100)
+  const score = Math.round((1 - clusterRatio) * 100);
+  
+  return Math.max(0, Math.min(100, score));
+}
+
 
 /**
  * Calculate row clustering score
@@ -115,7 +199,6 @@ const calculatePlateBalance = (
  */
 const calculateRowClusteringScore = (
   plateRows: (SearchData | undefined)[][],
-  selectedCovariates: string[]
 ): { averageScore: number; rowScores: number[] } => {
   if (plateRows.length === 0) return { averageScore: 0, rowScores: [] };
 
@@ -413,6 +496,7 @@ export const calculatePlateDiversityMetrics = (
   if (!searches.length || !plateAssignments.size || !selectedCovariates.length) {
     return {
       averageBalanceScore: 0,
+      averageClusteringScore: 0,
       averageRowClusteringScore: 0,
       plateScores: []
     };
@@ -434,8 +518,13 @@ export const calculatePlateDiversityMetrics = (
     // Calculate randomization score (spatial clustering) if enabled
     const plateRows = randomizedPlates[plateIndex] || [];
     const rowClusteringResult = displayConfig.showRowScore
-      ? calculateRowClusteringScore(plateRows, selectedCovariates)
+      ? calculateRowClusteringScore(plateRows)
       : { averageScore: 0, rowScores: [] };
+
+    // Calculate spatial clustering score if enabled
+    const clusteringScore = displayConfig.showClusteringScore
+      ? calculateClusteringScore(plateRows, plateRows.length, plateRows[0]?.length || 12)
+      : 0;
 
     // Calculate overall score based on display configuration
     const overallScore = displayConfig.showRowScore
@@ -445,6 +534,7 @@ export const calculatePlateDiversityMetrics = (
     plateScores.push({
       plateIndex,
       balanceScore: plateBalance.overallScore,
+      clusteringScore: clusteringScore,
       rowClusteringScore: rowClusteringResult.averageScore,
       rowScores: rowClusteringResult.rowScores,
       overallScore,
@@ -453,12 +543,16 @@ export const calculatePlateDiversityMetrics = (
   });
 
   const averageBalanceScore = calculateMean(plateScores.map(score => score.balanceScore));
+  const averageClusteringScore = displayConfig.showClusteringScore
+    ? calculateMean(plateScores.map(score => score.clusteringScore))
+    : 0;
   const averageRowClusteringScore = displayConfig.showRowScore
     ? calculateMean(plateScores.map(score => score.rowClusteringScore))
     : 0;
 
   return {
     averageBalanceScore,
+    averageClusteringScore,
     averageRowClusteringScore,
     plateScores
   };
@@ -474,9 +568,19 @@ export const calculateOverallQuality = (
   const recommendations: string[] = [];
 
   // Calculate overall score based on display configuration
-  const overallScore = displayConfig.showRowScore
-    ? (plateDiversity.averageBalanceScore + plateDiversity.averageRowClusteringScore) / 2
-    : plateDiversity.averageBalanceScore;
+  let scoreCount = 1;
+  let totalScore = plateDiversity.averageBalanceScore;
+  if (displayConfig.showClusteringScore)
+  {
+    scoreCount++;
+    totalScore += plateDiversity.averageClusteringScore;
+  }
+  if (displayConfig.showRowScore)
+  {
+    totalScore++;
+    totalScore += plateDiversity.averageRowClusteringScore;
+  }
+  const overallScore = totalScore / scoreCount;
 
   // Determine quality level using utility function
   const level = getQualityLevel(overallScore);

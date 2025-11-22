@@ -553,8 +553,10 @@ function doBalancedRandomization(
     const actualRowsToUse = Math.min(rowsNeeded, numRows);
     console.log(`Plate ${plateIdx + 1} has ${totalPlateSamples} samples, needs ${rowsNeeded} rows, using ${actualRowsToUse} rows`);
 
-    // Calculate row capacities. Fill rows sequentially, leaving empty cells in the last row
-    const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, true, numColumns, BlockType.ROW);
+    // Calculate row capacities based on keepEmptyInLastPlate setting
+    // If keepEmptyInLastPlate is true, fill rows sequentially (empty cells in last row)
+    // If keepEmptyInLastPlate is false, distribute empty cells randomly across rows
+    const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, keepEmptyInLastPlate, numColumns, BlockType.ROW);
 
     // Calculate expected minimums per row
     const expectedRowMinimums = calculateExpectedMinimums(

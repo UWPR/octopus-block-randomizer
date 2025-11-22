@@ -83,9 +83,10 @@ export function greedyPlaceInRow(
   // Shuffle samples first to add randomness when multiple positions have equal scores
   const shuffledSamples = shuffleArray([...rowSamples]);
 
-  // Track available positions in this row
+  // Track available positions in this row - use ALL columns, not just the first N
+  // This allows empty wells to be distributed randomly throughout the row
   const availablePositions: number[] = [];
-  for (let col = 0; col < Math.min(numColumns, rowSamples.length); col++) {
+  for (let col = 0; col < numColumns; col++) {
     availablePositions.push(col);
   }
 

@@ -86,20 +86,20 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                       {getCompactQualityLevel(metrics.plateDiversity.averageBalanceScore)}
                     </span>
                   </div>
-                  {QUALITY_DISPLAY_CONFIG.showRowScore && (
+                  {QUALITY_DISPLAY_CONFIG.showClusteringScore && (
                     <div style={styles.compactScoreItem}>
-                      <span style={styles.compactItemLabel}>Avg Row Score:</span>
+                      <span style={styles.compactItemLabel}>Avg Clustering Score:</span>
                       <span style={{
                         ...styles.compactItemValue,
-                        color: getQualityColor(metrics.plateDiversity.averageRowClusteringScore)
+                        color: getQualityColor(metrics.plateDiversity.averageClusteringScore)
                       }}>
-                        {formatScore(metrics.plateDiversity.averageRowClusteringScore)}
+                        {formatScore(metrics.plateDiversity.averageClusteringScore)}
                       </span>
                       <span style={{
                         ...styles.qualityBadge,
-                        backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageRowClusteringScore))
+                        backgroundColor: getQualityLevelColor(getQualityLevel(metrics.plateDiversity.averageClusteringScore))
                       }}>
-                        {getCompactQualityLevel(metrics.plateDiversity.averageRowClusteringScore)}
+                        {getCompactQualityLevel(metrics.plateDiversity.averageClusteringScore)}
                       </span>
                     </div>
                   )}
@@ -144,25 +144,25 @@ const QualityMetricsPanel: React.FC<QualityMetricsPanelProps> = ({
                                 ...styles.qualityBadge,
                                 backgroundColor: getQualityLevelColor(getQualityLevel(plate.balanceScore))
                               }}>
-                                {getQualityLevel(plate.balanceScore).charAt(0).toUpperCase()}
+                                {getCompactQualityLevel(plate.balanceScore)}
                               </span>
                               {' '}{formatScore(plate.balanceScore)}
                             </span>
                           </div>
-                          {QUALITY_DISPLAY_CONFIG.showRowScore && (
+                          {QUALITY_DISPLAY_CONFIG.showClusteringScore && (
                             <div style={styles.scoreItem}>
-                              <span style={styles.scoreLabel}>Row Score:</span>
+                              <span style={styles.scoreLabel}>Clustering Score:</span>
                               <span style={{
                                 ...styles.scoreValue,
-                                color: getQualityColor(plate.rowClusteringScore)
+                                color: getQualityColor(plate.clusteringScore)
                               }}>
                                 <span style={{
                                   ...styles.qualityBadge,
-                                  backgroundColor: getQualityLevelColor(getQualityLevel(plate.rowClusteringScore))
+                                  backgroundColor: getQualityLevelColor(getQualityLevel(plate.clusteringScore))
                                 }}>
-                                  {getQualityLevel(plate.rowClusteringScore).charAt(0).toUpperCase()}
+                                  {getCompactQualityLevel(plate.clusteringScore)}
                                 </span>
-                                {' '}{formatScore(plate.rowClusteringScore)}
+                                {' '}{formatScore(plate.clusteringScore)}
                               </span>
                             </div>
                           )}

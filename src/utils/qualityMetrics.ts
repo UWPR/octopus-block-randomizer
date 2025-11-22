@@ -152,7 +152,7 @@ const calculateClusteringScore = (
   
   // Calculate maximum possible adjacencies for this plate configuration
   // Each filled position can have up to 4 neighbors (left, right, up, down)
-  // But we count each adjacency once (not twice), so we count edges, not positions
+  // But we count each adjacency once, so we count edges, not positions
   let maxHorizontalAdjacencies = 0;
   let maxVerticalAdjacencies = 0;
   let maxCrossRowAdjacencies = 0;

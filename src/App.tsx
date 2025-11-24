@@ -88,7 +88,9 @@ const App: React.FC = () => {
 
   // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
-  const [controlLabels, setControlLabels] = useState<string>('');
+  const [controlColumn, setControlColumn] = useState<string>('');
+  const [controlColumnValues, setControlColumnValues] = useState<string[]>([]);
+  const [selectedControlValues, setSelectedControlValues] = useState<string[]>([]);
 
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>(defaultAlgorithm);
@@ -131,7 +133,9 @@ const App: React.FC = () => {
 
       // Reset configuration states
       setSelectedCovariates([]);
-      setControlLabels('');
+      setControlColumn('');
+      setControlColumnValues([]);
+      setSelectedControlValues([]);
 
       // Reset algorithm selection (keep defaults)
       setSelectedAlgorithm(defaultAlgorithm);
@@ -158,6 +162,24 @@ const App: React.FC = () => {
     setSelectedCombination(null);
   };
 
+  // Update control column values when control column changes
+  useEffect(() => {
+    if (controlColumn && searches.length > 0) {
+      const uniqueValues = new Set<string>();
+      searches.forEach(search => {
+        const value = search.metadata[controlColumn];
+        if (value) {
+          uniqueValues.add(value);
+        }
+      });
+      setControlColumnValues(Array.from(uniqueValues).sort());
+      setSelectedControlValues([]); // Reset selected values when column changes
+    } else {
+      setControlColumnValues([]);
+      setSelectedControlValues([]);
+    }
+  }, [controlColumn, searches]);
+
 
 
   // Algorithm selection handler
@@ -180,17 +202,66 @@ const App: React.FC = () => {
     resetCovariateState();
   };
 
-  // Control labels change handler
-  const handleControlLabelsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setControlLabels(event.target.value);
+  // ID column change handler with reset
+  const handleIdColumnChangeWithReset = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    handleIdColumnChange(event);
+    resetCovariateState();
+  };
+
+  // Control column change handler
+  const handleControlColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setControlColumn(event.target.value);
+    resetCovariateState();
+  };
+
+  // Control value checkbox handler
+  const handleControlValueToggle = (value: string) => {
+    setSelectedControlValues(prev => {
+      if (prev.includes(value)) {
+        return prev.filter(v => v !== value);
+      } else {
+        return [...prev, value];
+      }
+    });
     resetCovariateState();
   };
 
 
 
+  // Helper function to mark controls and update treatment keys
+  const prepareSearchesWithControlInfo = (searchesList: SearchData[]) => {
+    searchesList.forEach(search => {
+      // Determine if this sample is a control
+      let isControl = false;
+      let controlValue = '';
+
+      // Check if control column is selected and values are checked
+      if (controlColumn && selectedControlValues.length > 0) {
+        const sampleValue = search.metadata[controlColumn];
+        if (sampleValue && selectedControlValues.includes(sampleValue)) {
+          isControl = true;
+          controlValue = sampleValue;
+        }
+      }
+
+      search.isControl = isControl;
+
+      // If control is based on a column that's not in selected covariates, prepend to treatment key
+      if (isControl && controlColumn && controlValue && !selectedCovariates.includes(controlColumn)) {
+        const originalKey = getCovariateKey(search, selectedCovariates);
+        search.treatmentKey = `${controlValue}|${originalKey}`;
+      } else {
+        search.treatmentKey = getCovariateKey(search, selectedCovariates);
+      }
+    });
+  };
+
   // Main processing handler
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Prepare searches with control information
+      prepareSearchesWithControlInfo(searches);
+
       // Process randomization
       const success = processRandomization(
         searches,
@@ -202,11 +273,22 @@ const App: React.FC = () => {
       );
 
       if (success) {
-        // Generate colors
-        const colors = generateCovariateColors(searches, selectedCovariates, controlLabels);
+        // Generate colors (pass control info for proper color assignment)
+        const colors = generateCovariateColors(
+          searches,
+          selectedCovariates,
+          controlColumn,
+          selectedControlValues
+        );
 
         // Generate summary data
-        generateSummaryData(colors, searches, selectedCovariates, controlLabels);
+        generateSummaryData(
+          colors,
+          searches,
+          selectedCovariates,
+          controlColumn,
+          selectedControlValues
+        );
       }
     }
   };
@@ -242,6 +324,9 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Prepare searches with control information
+      prepareSearchesWithControlInfo(searches);
+
       // Re-randomize - colors are already generated, so we don't need to regenerate them
       reRandomize(
         searches,
@@ -257,6 +342,9 @@ const App: React.FC = () => {
   // Single plate re-randomization handler
   const handleReRandomizePlate = (plateIndex: number) => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Prepare searches with control information
+      prepareSearchesWithControlInfo(searches);
+
       reRandomizeSinglePlate(
         plateIndex,
         searches,
@@ -340,12 +428,15 @@ const App: React.FC = () => {
         <ConfigurationForm
           availableColumns={availableColumns}
           selectedIdColumn={selectedIdColumn}
-          onIdColumnChange={handleIdColumnChange}
+          onIdColumnChange={handleIdColumnChangeWithReset}
           searches={searches}
           selectedCovariates={selectedCovariates}
           onCovariateChange={handleCovariateChange}
-          controlLabels={controlLabels}
-          onControlLabelsChange={handleControlLabelsChange}
+          controlColumn={controlColumn}
+          onControlColumnChange={handleControlColumnChange}
+          controlColumnValues={controlColumnValues}
+          selectedControlValues={selectedControlValues}
+          onControlValueToggle={handleControlValueToggle}
           selectedAlgorithm={selectedAlgorithm}
           onAlgorithmChange={handleAlgorithmChange}
           keepEmptyInLastPlate={keepEmptyInLastPlate}
@@ -438,6 +529,8 @@ const App: React.FC = () => {
                 onToggleSummary={() => setShowSummary(!showSummary)}
                 selectedCombination={selectedCombination}
                 onSummaryItemClick={handleSummaryItemClick}
+                controlColumn={controlColumn}
+                selectedControlValues={selectedControlValues}
               />
 
               <QualityLegend />

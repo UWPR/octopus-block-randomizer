@@ -10,6 +10,7 @@ export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
   treatmentKey?: string;  // Covariate combination key, calculated based on selected covariates
+  isControl?: boolean;  // Whether this sample is a control/reference sample
 }
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;
@@ -27,12 +28,12 @@ export const getAllAlgorithms = (): RandomizationAlgorithm[] =>
 // Get algorithms in UI display order
 export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] => {
   const algorithms: RandomizationAlgorithm[] = ['balanced'];
-  
+
   // Show all algorithms in developer mode, otherwise show only the base algorithm
   if (isDeveloperMode()) {
     return ['balanced', 'greedy'] as RandomizationAlgorithm[];
   }
-  
+
   return algorithms;
 };
 
@@ -48,6 +49,7 @@ export interface SummaryItem {
   color: string;
   useOutline: boolean;
   useStripes: boolean;
+  controlColumnValue?: string; // Value from the control column if applicable
 }
 
 export interface CovariateColorInfo {

@@ -71,23 +71,32 @@ export function calculateClusterScore(
  * @param plate - The 2D grid of the current plate (will be modified)
  * @param rowIdx - Row index within the plate
  * @param numColumns - Total number of columns per row
+ * @param keepEmptyAtEnd - If true, empty spots are at the end; if false, distributed randomly
  */
 export function greedyPlaceInRow(
   rowSamples: SearchData[],
   plate: (SearchData | undefined)[][],
   rowIdx: number,
-  numColumns: number
+  numColumns: number,
+  keepEmptyAtEnd: boolean = true
 ): void {
   if (rowSamples.length === 0) return;
 
   // Shuffle samples first to add randomness when multiple positions have equal scores
   const shuffledSamples = shuffleArray([...rowSamples]);
 
-  // Track available positions in this row - use ALL columns, not just the first N
-  // This allows empty wells to be distributed randomly throughout the row
+  // Track available positions in this row
   const availablePositions: number[] = [];
-  for (let col = 0; col < numColumns; col++) {
-    availablePositions.push(col);
+  if (keepEmptyAtEnd) {
+    // Only use positions up to the number of samples - empty wells at the end
+    for (let col = 0; col < rowSamples.length; col++) {
+      availablePositions.push(col);
+    }
+  } else {
+    // Use all columns - empty wells distributed randomly
+    for (let col = 0; col < numColumns; col++) {
+      availablePositions.push(col);
+    }
   }
 
   // Place each sample one by one

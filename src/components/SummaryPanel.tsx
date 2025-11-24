@@ -7,6 +7,8 @@ interface SummaryPanelProps {
   onToggleSummary: () => void;
   selectedCombination: string | null;
   onSummaryItemClick: (combination: string) => void;
+  controlColumn?: string;
+  selectedControlValues?: string[];
 }
 
 const SummaryPanel: React.FC<SummaryPanelProps> = ({
@@ -15,6 +17,8 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
   onToggleSummary,
   selectedCombination,
   onSummaryItemClick,
+  controlColumn,
+  selectedControlValues = [],
 }) => {
   if (summaryData.length === 0 || !showSummary) return null;
 
@@ -22,41 +26,57 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
     <div style={styles.summaryContainer}>
       <div style={styles.summaryPanel}>
         <div style={styles.summaryGrid}>
-          {summaryData.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                ...styles.summaryItem,
-                ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
-                cursor: 'pointer'
-              }}
-              onClick={() => onSummaryItemClick(item.combination)}
-            >
-              <div style={styles.summaryHeader}>
-                <div
-                  style={{
-                    ...styles.colorIndicator,
-                    backgroundColor: item.useOutline ? 'transparent' : item.color,
-                    ...(item.useStripes && {
-                      background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)`
-                    }),
-                    border: item.useOutline ? `4px solid ${item.color}` : styles.colorIndicator.border,
-                    boxSizing: 'border-box' as const
-                  }}
-                />
-                <span style={styles.summaryCount}>
-                  {item.count}
-                </span>
+          {summaryData.map((item, index) => {
+            // A group is control only if it has a control column value AND that value is in the selected control values
+            const isControl = item.controlColumnValue !== undefined &&
+                             selectedControlValues.includes(item.controlColumnValue);
+
+            return (
+              <div
+                key={index}
+                style={{
+                  ...styles.summaryItem,
+                  ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
+                  ...(isControl ? styles.summaryItemControl : {}),
+                  cursor: 'pointer'
+                }}
+                onClick={() => onSummaryItemClick(item.combination)}
+              >
+                <div style={styles.summaryHeader}>
+                  <div
+                    style={{
+                      ...styles.colorIndicator,
+                      backgroundColor: item.useOutline ? 'transparent' : item.color,
+                      ...(item.useStripes && {
+                        background: `repeating-linear-gradient(45deg, ${item.color}, ${item.color} 2px, transparent 2px, transparent 4px)`
+                      }),
+                      border: item.useOutline ? `4px solid ${item.color}` : styles.colorIndicator.border,
+                      boxSizing: 'border-box' as const
+                    }}
+                  />
+                  <span style={styles.summaryCount}>
+                    {item.count}
+                  </span>
+                </div>
+                <div style={styles.summaryDetails}>
+                  {/* Show control column value only for control items */}
+                  {isControl && controlColumn && (
+                    <div key={controlColumn} style={styles.covariateDetail}>
+                      <strong>{controlColumn}:</strong> {item.controlColumnValue}
+                    </div>
+                  )}
+                  {/* Show other covariates, excluding control column only for control items to avoid duplication */}
+                  {Object.entries(item.values)
+                    .filter(([covariate]) => !(isControl && covariate === controlColumn))
+                    .map(([covariate, value]) => (
+                      <div key={covariate} style={styles.covariateDetail}>
+                        <strong>{covariate}:</strong> {value}
+                      </div>
+                    ))}
+                </div>
               </div>
-              <div style={styles.summaryDetails}>
-                {Object.entries(item.values).map(([covariate, value]) => (
-                  <div key={covariate} style={styles.covariateDetail}>
-                    <strong>{covariate}:</strong> {value}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -95,6 +115,9 @@ const styles = {
     backgroundColor: '#e3f2fd',
     border: '2px solid #2196f3',
     boxShadow: '0 1px 4px rgba(33, 150, 243, 0.2)',
+  },
+  summaryItemControl: {
+    border: '2px dashed #dc3545',
   },
   summaryHeader: {
     display: 'flex',

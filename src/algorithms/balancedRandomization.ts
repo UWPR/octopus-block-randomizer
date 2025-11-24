@@ -75,6 +75,34 @@ function getAvailableBlocks(
   return availableBlocks;
 }
 
+// Helper function to sort groups by size (descending) with randomization for equal-sized groups
+function sortGroupsBySize(
+  groupsMap: Map<string, SearchData[]>
+): Array<[string, SearchData[]]> {
+  const groupsArray = Array.from(groupsMap.entries());
+
+  // Group by sample count
+  const sizeGroups = new Map<number, Array<[string, SearchData[]]>>();
+  groupsArray.forEach(([groupKey, samples]) => {
+    const size = samples.length;
+    if (!sizeGroups.has(size)) {
+      sizeGroups.set(size, []);
+    }
+    sizeGroups.get(size)!.push([groupKey, samples]);
+  });
+
+  // Sort sizes descending and shuffle groups within each size
+  const sortedSizes = Array.from(sizeGroups.keys()).sort((a, b) => b - a);
+  const result: Array<[string, SearchData[]]> = [];
+  sortedSizes.forEach(size => {
+    const groupsInSize = sizeGroups.get(size)!;
+    const shuffledGroups = shuffleArray(groupsInSize);
+    result.push(...shuffledGroups);
+  });
+
+  return result;
+}
+
 // Helper function to calculate expected minimum samples per block (plates or rows) for each covariate group
 // Throws an error if the total samples exceed available capacity or if any block's expected minimums exceed its capacity
 //
@@ -318,8 +346,7 @@ function processUnplacedGroups(
   blockType: BlockType
 ): void {
   const numBlocks = blockCapacities.length;
-  const sortedUnplacedGroups = Array.from(unplacedGroupsMap.entries())
-    .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
+  const sortedUnplacedGroups = sortGroupsBySize(unplacedGroupsMap);
 
   sortedUnplacedGroups.forEach(([groupKey, remainingSamples]) => {
     console.log(`Phase 2A (${blockType}): Unplaced group ${groupKey}: ${remainingSamples.length} samples`);
@@ -331,21 +358,38 @@ function processUnplacedGroups(
       return;
     }
 
-    // Sort available blocks by available capacity descending (most space first)
-    const sortedAvailableBlocks = availableBlocks.sort((a, b) => {
-      const availableCapacityA = blockCapacities[a] - blockCounts[a];
-      const availableCapacityB = blockCapacities[b] - blockCounts[b];
-      return availableCapacityB - availableCapacityA; // Descending order
+    // Sort by available capacity descending, but randomize blocks with the same capacity
+    const blocksWithCapacity = availableBlocks.map(blockIdx => ({
+      blockIdx,
+      availableCapacity: blockCapacities[blockIdx] - blockCounts[blockIdx]
+    }));
+
+    // Group by capacity
+    const capacityGroups = new Map<number, number[]>();
+    blocksWithCapacity.forEach(({ blockIdx, availableCapacity }) => {
+      if (!capacityGroups.has(availableCapacity)) {
+        capacityGroups.set(availableCapacity, []);
+      }
+      capacityGroups.get(availableCapacity)!.push(blockIdx);
+    });
+
+    // Sort capacities descending and shuffle blocks within each capacity group
+    const sortedCapacities = Array.from(capacityGroups.keys()).sort((a, b) => b - a);
+    const blocksToUse: number[] = [];
+    sortedCapacities.forEach(capacity => {
+      const blocksInGroup = capacityGroups.get(capacity)!;
+      const shuffledGroup = shuffleArray(blocksInGroup);
+      blocksToUse.push(...shuffledGroup);
     });
 
     const placedSamples = distributeSamplesAcrossBlocks(
       remainingSamples,
-      sortedAvailableBlocks,
+      blocksToUse,
       blockCapacities,
       blockAssignments,
       blockCounts,
       `Placing 1 unplaced (${blockType})`,
-      true // Use sorted order
+      true // Use the order determined above
     );
 
     if (placedSamples < remainingSamples.length) {
@@ -366,8 +410,7 @@ function processOverflowGroups(
   fullCapacity: number = 96
 ): void {
   const numPlates = plateCapacities.length;
-  const sortedOverflowGroups = Array.from(overflowSamplesMap.entries())
-    .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
+  const sortedOverflowGroups = sortGroupsBySize(overflowSamplesMap);
 
   sortedOverflowGroups.forEach(([groupKey, remainingSamples]) => {
     console.log(`Phase 2B (${blockType}): Overflow group ${groupKey}: ${remainingSamples.length} samples`);
@@ -407,9 +450,23 @@ function processOverflowGroups(
         return { blockIdx, groupCount };
       });
 
-      // Sort by group count (ascending) to prioritize blocks with fewer samples of this group
-      blockGroupCounts.sort((a, b) => a.groupCount - b.groupCount);
-      prioritizedBlocks = blockGroupCounts.map(item => item.blockIdx);
+      // Group by count
+      const countGroups = new Map<number, number[]>();
+      blockGroupCounts.forEach(({ blockIdx, groupCount }) => {
+        if (!countGroups.has(groupCount)) {
+          countGroups.set(groupCount, []);
+        }
+        countGroups.get(groupCount)!.push(blockIdx);
+      });
+
+      // Sort counts ascending and shuffle blocks within each count group
+      const sortedCounts = Array.from(countGroups.keys()).sort((a, b) => a - b);
+      prioritizedBlocks = [];
+      sortedCounts.forEach(count => {
+        const blocksInGroup = countGroups.get(count)!;
+        const shuffledGroup = shuffleArray(blocksInGroup);
+        prioritizedBlocks.push(...shuffledGroup);
+      });
     } else {
       // No prioritization - shuffle all available blocks equally
       prioritizedBlocks = shuffleArray([...availableBlocks]);
@@ -583,7 +640,8 @@ function doBalancedRandomization(
           rowSamples,
           plates[plateIdx],
           rowIdx,
-          numColumns
+          numColumns,
+          keepEmptyInLastPlate
         );
       }
     });

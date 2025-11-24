@@ -1,31 +1,17 @@
 import { useState, useCallback } from 'react';
 import { SearchData, SummaryItem, CovariateColorInfo } from '../utils/types';
-import { getCovariateKey, getTextColorForBackground } from '../utils/utils';
+import { getCovariateKey, getTextColorForBackground, sortCombinationsByCountAndName } from '../utils/utils';
 import { BRIGHT_COLOR_PALETTE, QC_COLOR_PALETTE } from '../utils/configs';
 
 export function useCovariateColors() {
   const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});
   const [summaryData, setSummaryData] = useState<SummaryItem[]>([]);
 
-  // Helper function to parse control labels
-  const parseControlLabels = useCallback((controlLabels: string): string[] => {
-    return controlLabels
-      .split(',')
-      .map(label => label.trim())
-      .filter(label => label.length > 0);
-  }, []);
-
-  // Helper function to determine if a combination is a control
-  const isControlCombination = useCallback((combination: string, controlLabelsList: string[]): boolean => {
-    return controlLabelsList.length > 0 && controlLabelsList.some(controlLabel =>
-      combination.toLowerCase().includes(controlLabel.toLowerCase())
-    );
-  }, []);
-
   const generateCovariateColors = useCallback((
     searches: SearchData[],
     selectedCovariates: string[],
-    controlLabels: string
+    controlColumn?: string,
+    selectedControlValues?: string[]
   ) => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
       // Group searches by covariate combinations and count them
@@ -35,32 +21,34 @@ export function useCovariateColors() {
         combinationCounts.set(combination, (combinationCounts.get(combination) || 0) + 1);
       });
 
-      // Parse control labels
-      const controlLabelsList = parseControlLabels(controlLabels);
-
       // Separate control combinations from regular combinations
       const controlCombinations: string[] = [];
       const regularCombinations: string[] = [];
 
       Array.from(combinationCounts.keys()).forEach((combination) => {
-        if (isControlCombination(combination, controlLabelsList)) {
+        // Check if any search with this combination is marked as control
+        const hasControlSample = searches.some(search =>
+          getCovariateKey(search, selectedCovariates) === combination && search.isControl
+        );
+
+        if (hasControlSample) {
           controlCombinations.push(combination);
         } else {
           regularCombinations.push(combination);
         }
       });
 
-      // Sort control combinations by count (descending)
-      controlCombinations.sort((a, b) => (combinationCounts.get(b) || 0) - (combinationCounts.get(a) || 0));
+      // Sort control combinations by count (descending), then alphabetically
+      const sortedControlCombinations = sortCombinationsByCountAndName(controlCombinations, combinationCounts);
 
-      // Sort regular combinations by count (descending)
-      regularCombinations.sort((a, b) => (combinationCounts.get(b) || 0) - (combinationCounts.get(a) || 0));
+      // Sort regular combinations by count (descending), then alphabetically
+      const sortedRegularCombinations = sortCombinationsByCountAndName(regularCombinations, combinationCounts);
 
       // Assign colors in the new order
       const covariateColorsMap: { [key: string]: CovariateColorInfo } = {};
 
       // debugger; // 🔍 BREAKPOINT: Check QC color assignment logic
-      controlCombinations.forEach((combination, colorIndex) => {
+      sortedControlCombinations.forEach((combination, colorIndex) => {
         const paletteIndex = colorIndex % QC_COLOR_PALETTE.length;
         const cycle = Math.floor(colorIndex / QC_COLOR_PALETTE.length);
         const color = QC_COLOR_PALETTE[paletteIndex];
@@ -73,7 +61,7 @@ export function useCovariateColors() {
         };
       });
 
-      regularCombinations.forEach((combination, colorIndex) => {
+      sortedRegularCombinations.forEach((combination, colorIndex) => {
         const paletteIndex = colorIndex % BRIGHT_COLOR_PALETTE.length;
         const cycle = Math.floor(colorIndex / BRIGHT_COLOR_PALETTE.length);
         const color = BRIGHT_COLOR_PALETTE[paletteIndex];
@@ -90,20 +78,22 @@ export function useCovariateColors() {
       return covariateColorsMap;
     }
     return {};
-  }, [parseControlLabels, isControlCombination]);
+  }, []);
 
   // Generate summary data for the panel
   const generateSummaryData = useCallback((
     colors: { [key: string]: CovariateColorInfo },
     searches: SearchData[],
     selectedCovariates: string[],
-    controlLabels: string
+    controlColumn?: string,
+    selectedControlValues?: string[]
   ) => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
       // Group searches by their covariate combinations using getCovariateKey
       const combinationsMap = new Map<string, {
         values: { [key: string]: string };
         count: number;
+        controlColumnValue?: string;
       }>();
 
       searches.forEach((search) => {
@@ -118,9 +108,16 @@ export function useCovariateColors() {
           const existing = combinationsMap.get(combinationKey)!;
           existing.count++;
         } else {
+          // Get control column value if control column is selected
+          let controlValue: string | undefined = undefined;
+          if (controlColumn) {
+            controlValue = search.metadata[controlColumn] || undefined;
+          }
+
           combinationsMap.set(combinationKey, {
             values: covariateValues,
-            count: 1
+            count: 1,
+            controlColumnValue: controlValue
           });
         }
       });
@@ -139,35 +136,57 @@ export function useCovariateColors() {
           count: data.count,
           color: colorInfo.color,
           useOutline: colorInfo.useOutline,
-          useStripes: colorInfo.useStripes
+          useStripes: colorInfo.useStripes,
+          controlColumnValue: data.controlColumnValue
         };
       });
 
-      // Parse control labels for sorting
-      const controlLabelsList = parseControlLabels(controlLabels);
+      // Separate controls and regular combinations for sorting
+      const controlSummary: SummaryItem[] = [];
+      const regularSummary: SummaryItem[] = [];
 
-      // Sort: controls first, then by count (descending), then by combination name
-      summary.sort((a, b) => {
-        // Determine if combinations are controls
-        const aIsControl = isControlCombination(a.combination, controlLabelsList);
-        const bIsControl = isControlCombination(b.combination, controlLabelsList);
-
-        // Controls come first
-        if (aIsControl && !bIsControl) return -1;
-        if (!aIsControl && bIsControl) return 1;
-
-        // Within same type (both controls or both regular), sort by count descending
-        if (b.count !== a.count) return b.count - a.count;
-        
-        // If counts are equal, sort by combination name
-        return a.combination.localeCompare(b.combination);
+      summary.forEach(item => {
+        const isControl = searches.some(search =>
+          getCovariateKey(search, selectedCovariates) === item.combination && search.isControl
+        );
+        if (isControl) {
+          controlSummary.push(item);
+        } else {
+          regularSummary.push(item);
+        }
       });
 
-      setSummaryData(summary);
-      return summary;
+      // Create count maps for sorting
+      const controlCounts = new Map(controlSummary.map(item => [item.combination, item.count]));
+      const regularCounts = new Map(regularSummary.map(item => [item.combination, item.count]));
+
+      // Sort each group using the common helper
+      const sortedControlKeys = sortCombinationsByCountAndName(
+        controlSummary.map(item => item.combination),
+        controlCounts
+      );
+      const sortedRegularKeys = sortCombinationsByCountAndName(
+        regularSummary.map(item => item.combination),
+        regularCounts
+      );
+
+      // Rebuild summary in sorted order: controls first, then regular
+      const sortedSummary: SummaryItem[] = [];
+      sortedControlKeys.forEach(key => {
+        const item = controlSummary.find(s => s.combination === key);
+        if (item) sortedSummary.push(item);
+      });
+      sortedRegularKeys.forEach(key => {
+        const item = regularSummary.find(s => s.combination === key);
+        if (item) sortedSummary.push(item);
+      });
+
+      setSummaryData(sortedSummary);
+      return sortedSummary;
+
     }
     return [];
-  }, [parseControlLabels, isControlCombination]);
+  }, []);
 
   const resetColors = () => {
     setCovariateColors({});

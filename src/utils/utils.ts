@@ -21,6 +21,30 @@ export function getCovariateKey(search: SearchData, selectedCovariates: string[]
 }
 
 /**
+ * Sort covariate combinations by count (descending), then alphabetically
+ * @param combinations - Array of combination keys to sort
+ * @param counts - Map of combination keys to their counts
+ * @returns Sorted array of combination keys
+ */
+export function sortCombinationsByCountAndName(
+  combinations: string[],
+  counts: Map<string, number>
+): string[] {
+  return [...combinations].sort((a, b) => {
+    const countA = counts.get(a) || 0;
+    const countB = counts.get(b) || 0;
+
+    // Sort by count descending
+    if (countB !== countA) {
+      return countB - countA;
+    }
+
+    // If counts are equal, sort alphabetically
+    return a.localeCompare(b);
+  });
+}
+
+/**
  * Calculate appropriate text color (white or black) based on background color luminance
  * Uses WCAG formula for relative luminance calculation
  */

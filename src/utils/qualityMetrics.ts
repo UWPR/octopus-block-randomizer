@@ -111,12 +111,12 @@ const calculatePlateBalance = (
  * Calculate spatial clustering score for a plate
  * Uses the spatial quality analysis from greedySpatialPlacement
  * Returns a score from 0-100 where 100 = no clustering, 0 = maximum clustering
- * 
+ *
  * The score is based on the number of same-treatment adjacencies:
  * - Horizontal adjacencies (same row, adjacent columns)
  * - Vertical adjacencies (same column, adjacent rows)
  * - Cross-row adjacencies (last column of row N, first column of row N+1)
- * 
+ *
  * @param plate - The 2D grid of a single plate
  * @param numRows - Total number of rows per plate
  * @param numColumns - Total number of columns per row
@@ -129,10 +129,10 @@ const calculateClusteringScore = (
 ): number => {
   // Import the spatial quality analysis function
   const { analyzePlateSpatialQuality } = require('../algorithms/greedySpatialPlacement');
-  
+
   // Get the spatial quality metrics
   const quality = analyzePlateSpatialQuality(plate, numRows, numColumns);
-  
+
   // Count total filled positions in the plate
   let totalFilledPositions = 0;
   for (let row = 0; row < numRows; row++) {
@@ -142,21 +142,21 @@ const calculateClusteringScore = (
       }
     }
   }
-  
+
   if (totalFilledPositions === 0) return 100; // Empty plate has perfect score
   if (totalFilledPositions === 1) return 100; // Single sample has perfect score
-  
+
   // Calculate the theoretical minimum number of adjacencies
   // In a perfect checkerboard pattern with 2 groups, we'd have 0 adjacencies
   // But with multiple groups and irregular distributions, some adjacencies are unavoidable
-  
+
   // Calculate maximum possible adjacencies for this plate configuration
   // Each filled position can have up to 4 neighbors (left, right, up, down)
   // But we count each adjacency once, so we count edges, not positions
   let maxHorizontalAdjacencies = 0;
   let maxVerticalAdjacencies = 0;
   let maxCrossRowAdjacencies = 0;
-  
+
   for (let row = 0; row < numRows; row++) {
     for (let col = 0; col < numColumns; col++) {
       if (plate[row][col] !== undefined) {
@@ -175,26 +175,26 @@ const calculateClusteringScore = (
       }
     }
   }
-  
+
   const maxTotalAdjacencies = maxHorizontalAdjacencies + maxVerticalAdjacencies + maxCrossRowAdjacencies;
-  
+
   if (maxTotalAdjacencies === 0) return 100; // No possible adjacencies
-  
+
   // Calculate clustering ratio
   // 0 clusters = perfect (100 score)
   // All possible adjacencies are clusters = worst (0 score)
   const clusterRatio = quality.totalClusters / maxTotalAdjacencies;
-  
+
   // Convert to score (0-100)
   const score = Math.round((1 - clusterRatio) * 100);
-  
+
   return Math.max(0, Math.min(100, score));
 }
 
 
 /**
  * Calculate row clustering score
- * Measures clustering (runs of same group) 
+ * Measures clustering (runs of same group)
  * Higher score = better distribution (less clustering)
  */
 const calculateRowClusteringScore = (
@@ -216,7 +216,7 @@ const calculateRowClusteringScore = (
       continue;
     }
 
-    const rowKeys = rowSamples.map(sample => sample.treatmentKey || '');
+    const rowKeys = rowSamples.map(sample => sample.covariateKey || '');
 
     // Calculate clustering score
     const rowScore = calculateRowScore(rowKeys);
@@ -238,7 +238,7 @@ const calculateRowClusteringScore = (
  * in actualRunCounts.
  */
 const calculateExpectedRunsByGroup = (
-  rowKeys: string[], 
+  rowKeys: string[],
   actualRunCounts: Map<string, Map<number, number>>
 ): Map<string, Map<number, number>> => {
   const n = rowKeys.length;
@@ -286,7 +286,7 @@ export const calculateExpectedRunsByGroupForTest = ( rowKeys: string[] ): Map<st
  * 2. Calculate gaps between non-target slots
  * 3. Choose which gaps will have runs of given size
  * 4. Place remaining target members in remaining gaps
- * 
+ *
  * Exported for testing
  */
 export const calculateExpectedRuns = (
@@ -295,11 +295,11 @@ export const calculateExpectedRuns = (
   runLength: number,
   totalArrangements: number
 ): number => {
-  // Calculate n (total sequence length) 
+  // Calculate n (total sequence length)
   const n = Array.from(composition.values()).reduce((sum, count) => sum + count, 0);
   // Get the target group size
   const groupSize = composition.get(targetGroup) || 0;
-  
+
   if (groupSize < runLength) return 0;
   if (runLength < 2) return 0;
 
@@ -380,12 +380,12 @@ export const calculateMultinomialCoefficient = (n: number, groups: number[]): nu
 
 /**
  * Calculate ways to distribute items in gaps (stars and bars problem)
- * 
+ *
  * NOTE: This is an APPROXIMATION. It doesn't exclude distributions where
  * remaining items form additional runs of the target length.
  * For example, if checking for runs of length 2, a gap with exactly 2 items
  * would form another run, but this is counted here.
- * 
+ *
  * This means expected run counts may be slightly overestimated.
  */
 const calculateWaysToDistributeInGaps = (items: number, gaps: number): number => {
@@ -454,13 +454,13 @@ const calculateRowScore = (rowKeys: string[]): number => {
 
   // Calculate expected runs for the specific group-runLength combinations that occurred
   const expectedRunsByGroup = calculateExpectedRunsByGroup(rowKeys, actualRunCountsByGroup);
-  
+
   let totalPenalty = 0;
 
   // Compare actual vs expected runs for each group and length
   actualRunCountsByGroup.forEach((groupRunCounts, groupKey) => {
     const expectedGroupRuns = expectedRunsByGroup.get(groupKey) || new Map<number, number>();
-    
+
     groupRunCounts.forEach((actualCount, runLength) => {
       const expectedCount = expectedGroupRuns.get(runLength) || 0;
       const excess = Math.max(0, actualCount - expectedCount);

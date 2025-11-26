@@ -7,8 +7,9 @@ interface SummaryPanelProps {
   onToggleSummary: () => void;
   selectedCombination: string | null;
   onSummaryItemClick: (combination: string) => void;
-  controlColumn?: string;
-  selectedControlValues?: string[];
+  qcColumn?: string;
+  selectedQcValues?: string[];
+  selectedCovariates?: string[];
 }
 
 const SummaryPanel: React.FC<SummaryPanelProps> = ({
@@ -17,19 +18,54 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
   onToggleSummary,
   selectedCombination,
   onSummaryItemClick,
-  controlColumn,
-  selectedControlValues = [],
+  qcColumn: qcColumn,
+  selectedQcValues: selectedQcValues = [],
+  selectedCovariates = [],
 }) => {
   if (summaryData.length === 0 || !showSummary) return null;
+
+  // Get unique values for each covariate
+  const covariateUniqueValues = new Map<string, Set<string>>();
+  summaryData.forEach(item => {
+    Object.entries(item.values).forEach(([covariate, value]) => {
+      if (!covariateUniqueValues.has(covariate)) {
+        covariateUniqueValues.set(covariate, new Set());
+      }
+      covariateUniqueValues.get(covariate)!.add(value);
+    });
+  });
 
   return (
     <div style={styles.summaryContainer}>
       <div style={styles.summaryPanel}>
+        {/* Compact Summary Header */}
+        <div style={styles.summaryInfo}>
+          {qcColumn && selectedQcValues.length > 0 && (
+            <div style={styles.summaryInfoRow}>
+              <span style={styles.summaryLabel}>QC Column:</span>
+              <span style={styles.summaryValue}>
+                {qcColumn} ({selectedQcValues.join(', ')})
+              </span>
+            </div>
+          )}
+          {selectedCovariates.map(covariate => {
+            const values = covariateUniqueValues.get(covariate);
+            if (!values || values.size === 0) return null;
+            return (
+              <div key={covariate} style={styles.summaryInfoRow}>
+                <span style={styles.summaryLabel}>{covariate}:</span>
+                <span style={styles.summaryValue}>
+                  {Array.from(values).sort().join(', ')}
+                </span>
+              </div>
+            );
+          })}
+        </div>
         <div style={styles.summaryGrid}>
           {summaryData.map((item, index) => {
-            // A group is control only if it has a control column value AND that value is in the selected control values
-            const isControl = item.controlColumnValue !== undefined &&
-                             selectedControlValues.includes(item.controlColumnValue);
+            // A group is QC only if it has a QC column value AND that value is in the selected QC values
+            const isQC = item.qcColumnValue !== undefined &&
+                             selectedQcValues.includes(item.qcColumnValue);
 
             return (
               <div
@@ -37,7 +73,7 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
                 style={{
                   ...styles.summaryItem,
                   ...(selectedCombination === item.combination ? styles.summaryItemSelected : {}),
-                  ...(isControl ? styles.summaryItemControl : {}),
+                  ...(isQC ? styles.summaryItemQc : {}),
                   cursor: 'pointer'
                 }}
                 onClick={() => onSummaryItemClick(item.combination)}
@@ -57,17 +93,20 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
                   <span style={styles.summaryCount}>
                     {item.count}
                   </span>
+                  {isQC && (
+                    <span style={styles.qcBadge}>QC</span>
+                  )}
                 </div>
                 <div style={styles.summaryDetails}>
-                  {/* Show control column value only for control items */}
-                  {isControl && controlColumn && (
-                    <div key={controlColumn} style={styles.covariateDetail}>
-                      <strong>{controlColumn}:</strong> {item.controlColumnValue}
+                  {/* Show QC column value only for QC items */}
+                  {isQC && qcColumn && (
+                    <div key={qcColumn} style={styles.covariateDetail}>
+                      <strong>{qcColumn}:</strong> {item.qcColumnValue}
                     </div>
                   )}
-                  {/* Show other covariates, excluding control column only for control items to avoid duplication */}
+                  {/* Show other covariates, excluding QC column only for QC items to avoid duplication */}
                   {Object.entries(item.values)
-                    .filter(([covariate]) => !(isControl && covariate === controlColumn))
+                    .filter(([covariate]) => !(isQC && covariate === qcColumn))
                     .map(([covariate, value]) => (
                       <div key={covariate} style={styles.covariateDetail}>
                         <strong>{covariate}:</strong> {value}
@@ -94,6 +133,32 @@ const styles = {
     padding: '12px',
     border: '1px solid #dee2e6',
   },
+  summaryInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+    marginBottom: '12px',
+    padding: '8px',
+    backgroundColor: '#fff',
+    borderRadius: '4px',
+    border: '1px solid #e9ecef',
+  },
+  summaryInfoRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '6px',
+    fontSize: '11px',
+    lineHeight: '1.4',
+  },
+  summaryLabel: {
+    fontWeight: '600',
+    color: '#495057',
+    minWidth: 'fit-content',
+  },
+  summaryValue: {
+    color: '#6c757d',
+    wordBreak: 'break-word' as const,
+  },
   summaryGrid: {
     display: 'flex',
     flexWrap: 'wrap' as const,
@@ -116,7 +181,7 @@ const styles = {
     border: '2px solid #2196f3',
     boxShadow: '0 1px 4px rgba(33, 150, 243, 0.2)',
   },
-  summaryItemControl: {
+  summaryItemQc: {
     border: '2px dashed #dc3545',
   },
   summaryHeader: {
@@ -124,6 +189,17 @@ const styles = {
     alignItems: 'center',
     gap: '6px',
     marginBottom: '4px',
+    flexWrap: 'wrap' as const,
+  },
+  qcBadge: {
+    fontSize: '9px',
+    fontWeight: '700',
+    color: '#dc3545',
+    backgroundColor: '#fff',
+    border: '1px solid #dc3545',
+    borderRadius: '3px',
+    padding: '1px 4px',
+    marginLeft: 'auto',
   },
   colorIndicator: {
     width: '14px',

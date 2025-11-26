@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { SearchData, CovariateColorInfo } from './types';
-import { getCovariateKey } from './utils';
+import { getTreatmentKey } from './utils';
 
 interface ExcelExportOptions {
   searches: SearchData[];
@@ -179,8 +179,8 @@ function createPlateSheet(
         cell.border = THIN_BLACK_BORDERS;
 
         if (sample) {
-          // Use treatment covariates for color lookup
-          const colorInfo = covariateColors[getCovariateKey(sample, treatmentCovariates)];
+          // Use treatmentKey for color lookup
+          const colorInfo = covariateColors[getTreatmentKey(sample)];
 
           if (subRow === 0) {
             // Row 1: Color indicator (this will override the border if needed)
@@ -263,7 +263,7 @@ function createLegendSheet(
   // Count samples by covariate combination (total) - use treatment covariates
   const combinationCounts = new Map<string, number>();
   searches.forEach(search => {
-    const key = getCovariateKey(search, treatmentCovariates);
+    const key = getTreatmentKey(search);
     combinationCounts.set(key, (combinationCounts.get(key) || 0) + 1);
   });
 
@@ -273,7 +273,7 @@ function createLegendSheet(
     plate.forEach(row => {
       row.forEach(sample => {
         if (sample) {
-          const key = getCovariateKey(sample, treatmentCovariates);
+          const key = getTreatmentKey(sample);
           if (!plateCounts.has(key)) {
             plateCounts.set(key, new Map());
           }
@@ -381,7 +381,7 @@ function createSampleDetailsSheet(
   // Add each sample
   searches.forEach(search => {
     const location = sampleLocations.get(search.name);
-    const colorInfo = covariateColors[getCovariateKey(search, treatmentCovariates)];
+    const colorInfo = covariateColors[getTreatmentKey(search)];
 
     const rowData = [
       search.name,

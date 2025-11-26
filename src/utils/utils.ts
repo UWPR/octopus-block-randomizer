@@ -1,4 +1,4 @@
-import { SearchData, RandomizationAlgorithm } from './types';
+import { SearchData, RandomizationAlgorithm, CovariateConfig } from './types';
 import { QualityLevel, QUALITY_LEVEL_CONFIG } from './configs';
 import Papa from 'papaparse';
 import { balancedBlockRandomization } from '../algorithms/balancedRandomization';
@@ -14,10 +14,50 @@ export function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-export function getCovariateKey(search: SearchData, selectedCovariates: string[]): string {
-  return selectedCovariates
+/**
+ * Generate a covariate key for a search sample, optionally including QC prefix
+ * @param search - The search sample
+ * @param config - Covariate configuration (treatment covariates and QC / Reference settings)
+ * @returns Covariate key string (e.g., "QC|Balb_cJ|Control|0" or "Balb_cJ|Control|0")
+ */
+/**
+ * Get the treatment key for a sample, throwing an error if not set
+ * @param sample - The search sample
+ * @returns The treatment key
+ * @throws Error if treatmentKey is not set
+ */
+export function getTreatmentKey(sample: SearchData): string {
+  if (!sample.covariateKey) {
+    throw new Error(`treatmentKey not set for sample: ${sample.name}`);
+  }
+  return sample.covariateKey;
+}
+
+export function getCovariateKey(
+  search: SearchData,
+  config: CovariateConfig
+): string {
+  const { selectedCovariates, qcColumn: qcColumn, selectedQcValues: selectedQcValues } = config;
+
+  // Build the base covariate key
+  const baseKey = selectedCovariates
     .map(cov => search.metadata[cov] || 'N/A')
     .join('|');
+
+// Check if this sample is a QC sample and QC column is not in covariates
+  if (qcColumn && selectedQcValues && selectedQcValues.length > 0
+    && !selectedCovariates.includes(qcColumn))
+   {
+    const sampleValue = search.metadata[qcColumn];
+    const isQC = sampleValue && selectedQcValues.includes(sampleValue);
+
+    // Prepend QC value if sample is QC and QC column is not a covariate
+    if (isQC) {
+      return `${sampleValue}|${baseKey}`;
+    }
+  }
+
+  return baseKey;
 }
 
 /**
@@ -68,7 +108,11 @@ export function groupByCovariates(searches: SearchData[], selectedCovariates: st
   const groups = new Map<string, SearchData[]>();
 
   searches.forEach(search => {
-    const key = getCovariateKey(search, selectedCovariates);
+    // treatmentKey should always be set by prepareSearches
+    if (!search.covariateKey) {
+      throw new Error(`treatmentKey not set for sample: ${search.name}`);
+    }
+    const key = search.covariateKey;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -91,11 +135,8 @@ export function randomizeSearches(
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
-  // Add treatment key
-  searches.forEach(search => {
-    search.treatmentKey = getCovariateKey(search, selectedCovariates);}
-  );
-
+  // treatmentKey should already be set by prepareSearches
+  // No need to set it here as it may include QC prefix
 
   switch (algorithm) {
     case 'balanced':

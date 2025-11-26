@@ -5,7 +5,7 @@ import { shuffleArray } from '../utils/utils';
  * Helper to safely get treatment key from a sample
  */
 function getTreatmentKey(sample: SearchData | undefined): string | undefined {
-  return sample?.treatmentKey;
+  return sample?.covariateKey;
 }
 
 /**
@@ -103,7 +103,7 @@ export function greedyPlaceInRow(
   for (const sample of shuffledSamples) {
     if (availablePositions.length === 0) break;
 
-    const treatmentKey = sample.treatmentKey;
+    const treatmentKey = sample.covariateKey;
 
     // Score each available position
     const positionScores = availablePositions.map(col => ({
@@ -280,7 +280,7 @@ function calculatePlateTotalScore(
       const sample = plate[row][col];
       if (!sample) continue;
 
-      const treatmentKey = sample.treatmentKey;
+      const treatmentKey = sample.covariateKey;
       totalScore += calculateClusterScore(plate, row, col, treatmentKey, numColumns);
     }
   }

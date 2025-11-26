@@ -8,7 +8,7 @@ import PlatesGrid from './components/PlatesGrid';
 import QualityMetricsPanel from './components/QualityMetricsPanel';
 import QualityLegend from './components/QualityLegend';
 import { SearchData, RandomizationAlgorithm } from './utils/types';
-import { downloadCSV, getCovariateKey, getQualityLevelColor, formatScore } from './utils/utils';
+import { downloadCSV, getCovariateKey, getTreatmentKey, getQualityLevelColor, formatScore } from './utils/utils';
 import { exportToExcel } from './utils/excelExport';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useModalDrag } from './hooks/useModalDrag';
@@ -88,9 +88,9 @@ const App: React.FC = () => {
 
   // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
-  const [controlColumn, setControlColumn] = useState<string>('');
-  const [controlColumnValues, setControlColumnValues] = useState<string[]>([]);
-  const [selectedControlValues, setSelectedControlValues] = useState<string[]>([]);
+  const [qcColumn, setQcColumn] = useState<string>('');
+  const [qcColumnValues, setQcColumnValues] = useState<string[]>([]);
+  const [selectedQcValues, setSelectedQcValues] = useState<string[]>([]);
 
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>(defaultAlgorithm);
@@ -133,9 +133,9 @@ const App: React.FC = () => {
 
       // Reset configuration states
       setSelectedCovariates([]);
-      setControlColumn('');
-      setControlColumnValues([]);
-      setSelectedControlValues([]);
+      setQcColumn('');
+      setQcColumnValues([]);
+      setSelectedQcValues([]);
 
       // Reset algorithm selection (keep defaults)
       setSelectedAlgorithm(defaultAlgorithm);
@@ -162,23 +162,23 @@ const App: React.FC = () => {
     setSelectedCombination(null);
   };
 
-  // Update control column values when control column changes
+  // Update QC column values when QC column changes
   useEffect(() => {
-    if (controlColumn && searches.length > 0) {
+    if (qcColumn && searches.length > 0) {
       const uniqueValues = new Set<string>();
       searches.forEach(search => {
-        const value = search.metadata[controlColumn];
+        const value = search.metadata[qcColumn];
         if (value) {
           uniqueValues.add(value);
         }
       });
-      setControlColumnValues(Array.from(uniqueValues).sort());
-      setSelectedControlValues([]); // Reset selected values when column changes
+      setQcColumnValues(Array.from(uniqueValues).sort());
+      setSelectedQcValues([]); // Reset selected values when column changes
     } else {
-      setControlColumnValues([]);
-      setSelectedControlValues([]);
+      setQcColumnValues([]);
+      setSelectedQcValues([]);
     }
-  }, [controlColumn, searches]);
+  }, [qcColumn, searches]);
 
 
 
@@ -208,15 +208,15 @@ const App: React.FC = () => {
     resetCovariateState();
   };
 
-  // Control column change handler
-  const handleControlColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setControlColumn(event.target.value);
+  // QC column change handler
+  const handleQcColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setQcColumn(event.target.value);
     resetCovariateState();
   };
 
-  // Control value checkbox handler
-  const handleControlValueToggle = (value: string) => {
-    setSelectedControlValues(prev => {
+  // QC value checkbox handler
+  const handleQcValueToggle = (value: string) => {
+    setSelectedQcValues(prev => {
       if (prev.includes(value)) {
         return prev.filter(v => v !== value);
       } else {
@@ -228,39 +228,36 @@ const App: React.FC = () => {
 
 
 
-  // Helper function to mark controls and update treatment keys
-  const prepareSearchesWithControlInfo = (searchesList: SearchData[]) => {
+  // Helper function to set treatment keys and mark QC / reference samples
+  const prepareSearches = (searchesList: SearchData[]) => {
     searchesList.forEach(search => {
-      // Determine if this sample is a control
-      let isControl = false;
-      let controlValue = '';
+      // Determine if this sample is a QC / reference sample
+      let isQC = false;
 
-      // Check if control column is selected and values are checked
-      if (controlColumn && selectedControlValues.length > 0) {
-        const sampleValue = search.metadata[controlColumn];
-        if (sampleValue && selectedControlValues.includes(sampleValue)) {
-          isControl = true;
-          controlValue = sampleValue;
+      // Check if QC column is selected and values are checked
+      if (qcColumn && selectedQcValues.length > 0) {
+        const sampleValue = search.metadata[qcColumn];
+        if (sampleValue && selectedQcValues.includes(sampleValue)) {
+          isQC = true;
         }
       }
 
-      search.isControl = isControl;
+      search.isQC = isQC;
 
-      // If control is based on a column that's not in selected covariates, prepend to treatment key
-      if (isControl && controlColumn && controlValue && !selectedCovariates.includes(controlColumn)) {
-        const originalKey = getCovariateKey(search, selectedCovariates);
-        search.treatmentKey = `${controlValue}|${originalKey}`;
-      } else {
-        search.treatmentKey = getCovariateKey(search, selectedCovariates);
-      }
+      // Generate treatment key using getCovariateKey with QC info
+      search.covariateKey = getCovariateKey(search, {
+        selectedCovariates,
+        qcColumn: qcColumn,
+        selectedQcValues: selectedQcValues
+      });
     });
   };
 
   // Main processing handler
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Prepare searches with control information
-      prepareSearchesWithControlInfo(searches);
+      // Prepare searches with QC information
+      prepareSearches(searches);
 
       // Process randomization
       const success = processRandomization(
@@ -273,12 +270,12 @@ const App: React.FC = () => {
       );
 
       if (success) {
-        // Generate colors (pass control info for proper color assignment)
+        // Generate colors (pass QC info for proper color assignment)
         const colors = generateCovariateColors(
           searches,
           selectedCovariates,
-          controlColumn,
-          selectedControlValues
+          qcColumn,
+          selectedQcValues
         );
 
         // Generate summary data
@@ -286,8 +283,8 @@ const App: React.FC = () => {
           colors,
           searches,
           selectedCovariates,
-          controlColumn,
-          selectedControlValues
+          qcColumn,
+          selectedQcValues
         );
       }
     }
@@ -324,8 +321,8 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Prepare searches with control information
-      prepareSearchesWithControlInfo(searches);
+      // Prepare searches with QC information
+      prepareSearches(searches);
 
       // Re-randomize - colors are already generated, so we don't need to regenerate them
       reRandomize(
@@ -342,8 +339,8 @@ const App: React.FC = () => {
   // Single plate re-randomization handler
   const handleReRandomizePlate = (plateIndex: number) => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Prepare searches with control information
-      prepareSearchesWithControlInfo(searches);
+      // Prepare searches with QC information
+      prepareSearches(searches);
 
       reRandomizeSinglePlate(
         plateIndex,
@@ -399,9 +396,12 @@ const App: React.FC = () => {
   const isSearchHighlighted = (search: SearchData): boolean => {
     if (!selectedCombination) return false;
 
-    const searchCombination = getCovariateKey(search, selectedCovariates);
-
-    return searchCombination === selectedCombination;
+    try {
+      return getTreatmentKey(search) === selectedCombination;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
   };
 
 
@@ -432,11 +432,11 @@ const App: React.FC = () => {
           searches={searches}
           selectedCovariates={selectedCovariates}
           onCovariateChange={handleCovariateChange}
-          controlColumn={controlColumn}
-          onControlColumnChange={handleControlColumnChange}
-          controlColumnValues={controlColumnValues}
-          selectedControlValues={selectedControlValues}
-          onControlValueToggle={handleControlValueToggle}
+          qcColumn={qcColumn}
+          onQcColumnChange={handleQcColumnChange}
+          qcColumnValues={qcColumnValues}
+          selectedQcValues={selectedQcValues}
+          onQcValueToggle={handleQcValueToggle}
           selectedAlgorithm={selectedAlgorithm}
           onAlgorithmChange={handleAlgorithmChange}
           keepEmptyInLastPlate={keepEmptyInLastPlate}
@@ -529,8 +529,9 @@ const App: React.FC = () => {
                 onToggleSummary={() => setShowSummary(!showSummary)}
                 selectedCombination={selectedCombination}
                 onSummaryItemClick={handleSummaryItemClick}
-                controlColumn={controlColumn}
-                selectedControlValues={selectedControlValues}
+                qcColumn={qcColumn}
+                selectedQcValues={selectedQcValues}
+                selectedCovariates={selectedCovariates}
               />
 
               <QualityLegend />

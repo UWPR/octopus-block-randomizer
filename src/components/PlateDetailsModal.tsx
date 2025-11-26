@@ -1,7 +1,7 @@
 import React from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../utils/types';
 import { QUALITY_DISPLAY_CONFIG } from '../utils/configs';
-import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
+import { getTreatmentKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
 
 interface PlateDetailsModalProps {
   show: boolean;
@@ -165,22 +165,27 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                             {randomizedPlates[plateIndex][rowIndex]
                               .filter(sample => sample !== undefined)
                               .map((sample, colIndex) => {
-                                const key = getCovariateKey(sample!, selectedCovariates);
-                                const colorInfo = covariateColors[key] || { color: '#cccccc', useOutline: false, useStripes: false, textColor: '#000' };
-                                return (
-                                  <div
-                                    key={colIndex}
-                                    style={{
-                                      ...styles.rowCompositionCell,
-                                      backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
-                                      ...(colorInfo.useStripes && {
-                                        background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)`
-                                      }),
-                                      border: colorInfo.useOutline ? `1px solid ${colorInfo.color}` : '1px solid rgba(0,0,0,0.1)',
-                                    }}
-                                    title={key}
-                                  />
-                                );
+                                try {
+                                  const key = getTreatmentKey(sample!);
+                                  const colorInfo = covariateColors[key] || { color: '#cccccc', useOutline: false, useStripes: false, textColor: '#000' };
+                                  return (
+                                    <div
+                                      key={colIndex}
+                                      style={{
+                                        ...styles.rowCompositionCell,
+                                        backgroundColor: colorInfo.useOutline ? 'transparent' : colorInfo.color,
+                                        ...(colorInfo.useStripes && {
+                                          background: `repeating-linear-gradient(45deg, ${colorInfo.color}, ${colorInfo.color} 2px, transparent 2px, transparent 4px)`
+                                        }),
+                                        border: colorInfo.useOutline ? `1px solid ${colorInfo.color}` : '1px solid rgba(0,0,0,0.1)',
+                                      }}
+                                      title={key}
+                                    />
+                                  );
+                                } catch (error) {
+                                  console.error(error);
+                                  return null;
+                                }
                               })}
                           </div>
                         )}
@@ -197,15 +202,23 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
 
                 // Calculate distribution for this plate
                 plateSamples.forEach(sample => {
-                  const key = getCovariateKey(sample, selectedCovariates);
-                  covariateDistribution.set(key, (covariateDistribution.get(key) || 0) + 1);
+                  try {
+                    const key = getTreatmentKey(sample);
+                    covariateDistribution.set(key, (covariateDistribution.get(key) || 0) + 1);
+                  } catch (error) {
+                    console.error(error);
+                  }
                 });
 
                 // Calculate global distribution for percentage calculation
                 const globalDistribution = new Map<string, number>();
                 searches.forEach(sample => {
-                  const key = getCovariateKey(sample, selectedCovariates);
-                  globalDistribution.set(key, (globalDistribution.get(key) || 0) + 1);
+                  try {
+                    const key = getTreatmentKey(sample);
+                    globalDistribution.set(key, (globalDistribution.get(key) || 0) + 1);
+                  } catch (error) {
+                    console.error(error);
+                  }
                 });
 
                 return (

@@ -7,16 +7,16 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
   const createSample = (name: string, gender: string, plate: string, treatment: string): SearchData => ({
     name,
     metadata: { Gender: gender, Plate: plate, Treatment: treatment },
-    treatmentKey: `${gender}|${plate}|${treatment}` // Add treatmentKey for tests
+    covariateKey: `${gender}|${plate}|${treatment}` // Add treatmentKey for tests
   });
 
   // Helper function to count samples per covariate group in result
   const countSamplesPerGroup = (result: Map<number, SearchData[]>, selectedCovariates: string[]): Map<string, Map<number, number>> => {
     const groupCounts = new Map<string, Map<number, number>>();
-    
+
     result.forEach((samples, blockIndex) => {
       samples.forEach(sample => {
-        const groupKey = getCovariateKey(sample, selectedCovariates);
+        const groupKey = getCovariateKey(sample, { selectedCovariates } );
         if (!groupCounts.has(groupKey)) {
           groupCounts.set(groupKey, new Map());
         }
@@ -26,14 +26,14 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
         groupCounts.get(groupKey)!.set(blockIndex, groupCounts.get(groupKey)!.get(blockIndex)! + 1);
       });
     });
-    
+
     return groupCounts;
   };
 
    test('Should distribute covariate groups proportionally across multiple plates (exact counts)', () => {
     // Create 40 samples with 9 covariate groups
     const samples: SearchData[] = [];
-    
+
     // Group 1: Control (8 samples)
     // Group 2: Female_P1_Blinded (4 samples)
     // Group 3: Male_P1_Blinded (4 samples)
@@ -53,7 +53,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
     const genders = ['Male', 'Female'];
     const plates = ['P_1', 'P_2'];
     const treatments = ['Blinded', 'X-Ray'];
-    
+
     genders.forEach(gender => {
       plates.forEach(plate => {
         treatments.forEach(treatment => {
@@ -71,7 +71,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
     const selectedCovariates = ['Gender', 'Plate', 'Treatment'];
     const covariateGroups = groupByCovariates(samples, selectedCovariates);
     expect(covariateGroups.size).toBe(9);
-    
+
     // Create 2 plates with capacity 20 each
     const blockCapacities = [20, 20];
 
@@ -107,7 +107,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
 
     // Verify proportional distribution
     const groupCounts = countSamplesPerGroup(result, selectedCovariates);
-    
+
     // Control group (8 samples) should be distributed 4 per plate
     const controlCounts = groupCounts.get('N/A|N/A|Control');
     expect(controlCounts?.size).toBe(2);
@@ -134,17 +134,17 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
   test('should distribute covariate groups proportionally across multiple plates', () => {
     // Create 120 samples with 3 covariate groups
     const samples: SearchData[] = [];
-    
+
     // Group 1: Male_P_1_Control (60 samples)
     for (let i = 1; i <= 60; i++) {
       samples.push(createSample(`M_P1_C_${i}`, 'Male', 'P_1', 'Control'));
     }
-    
+
     // Group 2: Female_P_2_Blinded (40 samples)
     for (let i = 1; i <= 40; i++) {
       samples.push(createSample(`F_P2_B_${i}`, 'Female', 'P_2', 'Blinded'));
     }
-    
+
     // Group 3: Male_P_3_X-Ray (20 samples)
     for (let i = 1; i <= 20; i++) {
       samples.push(createSample(`M_P3_X_${i}`, 'Male', 'P_3', 'X-Ray'));
@@ -152,11 +152,11 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
 
     const selectedCovariates = ['Gender', 'Plate', 'Treatment'];
     const covariateGroups = groupByCovariates(samples, selectedCovariates);
-    
+
     // Create 4 plates with capacity 30 each
     const blockCapacities = [30, 30, 30, 30];
     const plateCount = blockCapacities.length;
-    
+
     const maxCapacity = 30;
     const blockType = BlockType.PLATE;
     const expectedMinimums = calculateExpectedMinimums(blockCapacities, covariateGroups, maxCapacity, blockType);
@@ -191,7 +191,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
 
     // Verify proportional distribution of covariate groups
     const groupCounts = countSamplesPerGroup(result, selectedCovariates);
-    
+
     // Group 1 (60 samples) should be distributed 15 per plate
     const group1Counts = groupCounts.get('Male|P_1|Control');
     expect(group1Counts?.size).toBe(plateCount);
@@ -226,12 +226,12 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
   test('Should handle uneven plate capacities with proportional distribution based on capacity ratios', () => {
     // Create 100 samples with 2 covariate groups
     const samples: SearchData[] = [];
-    
+
     // Group 1: Female_P_1_Control (70 samples)
     for (let i = 1; i <= 70; i++) {
       samples.push(createSample(`F_P1_C_${i}`, 'Female', 'P_1', 'Control'));
     }
-    
+
     // Group 2: Male_P_2_Blinded (30 samples)
     for (let i = 1; i <= 30; i++) {
       samples.push(createSample(`M_P2_B_${i}`, 'Male', 'P_2', 'Blinded'));
@@ -239,10 +239,10 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
 
     const selectedCovariates = ['Gender', 'Plate', 'Treatment'];
     const covariateGroups = groupByCovariates(samples, selectedCovariates);
-    
+
     // Create plates with different capacities
     const blockCapacities = [40, 40, 20];
-    
+
     const maxCapacity = 40;
     const blockType = BlockType.PLATE;
     const expectedMinimums = calculateExpectedMinimums(blockCapacities, covariateGroups, maxCapacity, blockType);
@@ -296,7 +296,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
     // OVERFLOW DISTRIBUTION ANALYSIS:
     // Expected minimums: Plate 0 (33 total), Plate 1 (33 total), Plate 2 (17 total) = 83 expected minimum
     // Total samples: 100, so 17 overflow samples need to be distributed
-    // 
+    //
     // Group 1 (70 samples): Expected minimums 23 + 23 + 12 = 58, so 12 overflow samples
     // Group 2 (30 samples): Expected minimums 10 + 10 + 5 = 25, so 5 overflow samples
     //
@@ -313,18 +313,18 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
     // Group 2 overflow placement (5 samples):
     // - All 5 overflow samples go to Plate 0 and 1 (since Plate 2 is at capacity)
     // - Final distribution should have all plates at full capacity (40, 40, 20)
-    
+
     // Verify that all samples are distributed beyond expected minimums
     const group1Total = (group1Counts!.get(0) || 0) + (group1Counts!.get(1) || 0) + (group1Counts!.get(2) || 0);
     const group2Total = (group2Counts!.get(0) || 0) + (group2Counts!.get(1) || 0) + (group2Counts!.get(2) || 0);
-    
+
     expect(group1Total).toBe(70); // All Group 1 samples distributed
     expect(group2Total).toBe(30); // All Group 2 samples distributed
-    
+
     // Verify overflow distribution behavior for Group 1
     // Plate 2 should get exactly 3 overflow samples (reaching capacity at 15 total)
     expect(group1Counts!.get(2)).toBe(15); // 12 minimum + 3 overflow = 15
-    
+
     // Plates 0 and 1 should split the remaining 9 overflow samples
     // One will get 4, the other will get 5 (so 27 and 28 total)
     const plate0Group1 = group1Counts!.get(0) || 0;
@@ -332,7 +332,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
     expect([27, 28]).toContain(plate0Group1);
     expect([27, 28]).toContain(plate1Group1);
     expect(plate0Group1 + plate1Group1).toBe(55); // 23 + 23 + 9 overflow = 55
-    
+
     // Verify overflow distribution behavior for Group 2
     // Plates 0 and 1 should split all 5 overflow samples
     const plate0Group2 = group2Counts!.get(0) || 0;
@@ -347,9 +347,9 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
     const plate0Total = (group1Counts!.get(0) || 0) + (group2Counts!.get(0) || 0);
     const plate1Total = (group1Counts!.get(1) || 0) + (group2Counts!.get(1) || 0);
     const plate2Total = (group1Counts!.get(2) || 0) + (group2Counts!.get(2) || 0);
-    
+
     expect(plate0Total).toBe(40); // Plate 0 at full capacity
-    expect(plate1Total).toBe(40); // Plate 1 at full capacity  
+    expect(plate1Total).toBe(40); // Plate 1 at full capacity
     expect(plate2Total).toBe(20); // Plate 2 at full capacity
   });
 
@@ -357,12 +357,12 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
   test('Should handle single plate distribution', () => {
     // Create 50 samples with 2 covariate groups
     const samples: SearchData[] = [];
-    
+
     // Group 1: Male_P_1_X-Ray (30 samples)
     for (let i = 1; i <= 30; i++) {
       samples.push(createSample(`M_P1_X_${i}`, 'Male', 'P_1', 'X-Ray'));
     }
-    
+
     // Group 2: Female_P_3_Control (20 samples)
     for (let i = 1; i <= 20; i++) {
       samples.push(createSample(`F_P3_C_${i}`, 'Female', 'P_3', 'Control'));
@@ -370,7 +370,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
 
     const selectedCovariates = ['Gender', 'Plate', 'Treatment'];
     const covariateGroups = groupByCovariates(samples, selectedCovariates);
-    
+
     // Single plate with sufficient capacity
     const blockCapacities = [60];
     const maxCapacity = 30;
@@ -402,17 +402,17 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
   test('should handle edge case with more plates than needed', () => {
     // Create 30 samples with 1 covariate group
     const samples: SearchData[] = [];
-    
+
     for (let i = 1; i <= 30; i++) {
       samples.push(createSample(`F_P2_B_${i}`, 'Female', 'P_2', 'Blinded'));
     }
 
     const selectedCovariates = ['Gender', 'Plate', 'Treatment'];
     const covariateGroups = groupByCovariates(samples, selectedCovariates);
-    
+
     // 5 plates but only need 2-3 plates for 30 samples
     const blockCapacities = [15, 15, 15, 15, 15];
-    
+
     const maxCapacity = 60;
     const blockType = BlockType.PLATE;
     const expectedMinimums = {};
@@ -435,11 +435,11 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
         usedPlates++;
       }
     });
-    
+
     expect(totalSamples).toBe(30);
     expect(usedPlates).toBeGreaterThan(0);
     expect(usedPlates).toBeLessThanOrEqual(5);
-    
+
     // Each used plate should be at or under capacity
     result.forEach(samples => {
       if (samples.length > 0) {
@@ -454,7 +454,7 @@ describe('calculateExpectedMinimums', () => {
   // Helper function to create covariate groups for testing
   const createTestGroups = (): Map<string, SearchData[]> => {
     const groups = new Map<string, SearchData[]>();
-    
+
     // Group 1: 20 samples
     const group1Samples = Array.from({ length: 20 }, (_, i) => ({
       name: `sample_1_${i + 1}`,
@@ -462,7 +462,7 @@ describe('calculateExpectedMinimums', () => {
       treatmentKey: 'Male|P_1|Control'
     }));
     groups.set('Male|P_1|Control', group1Samples);
-    
+
     // Group 2: 10 samples
     const group2Samples = Array.from({ length: 10 }, (_, i) => ({
       name: `sample_2_${i + 1}`,
@@ -470,7 +470,7 @@ describe('calculateExpectedMinimums', () => {
       treatmentKey: 'Female|P_2|Blinded'
     }));
     groups.set('Female|P_2|Blinded', group2Samples);
-    
+
     // Group 3: 6 samples
     const group3Samples = Array.from({ length: 6 }, (_, i) => ({
       name: `sample_3_${i + 1}`,
@@ -478,7 +478,7 @@ describe('calculateExpectedMinimums', () => {
       treatmentKey: 'Male|P_3|X-Ray'
     }));
     groups.set('Male|P_3|X-Ray', group3Samples);
-    
+
     return groups;
   };
 

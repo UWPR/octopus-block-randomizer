@@ -445,7 +445,7 @@ function processOverflowGroups(
       const blockGroupCounts = availableBlocks.map(blockIdx => {
         const blockSamples = blockAssignments.get(blockIdx) || [];
         const groupCount = blockSamples.filter(sample =>
-          sample.treatmentKey === groupKey
+          sample.covariateKey === groupKey
         ).length;
         return { blockIdx, groupCount };
       });
@@ -504,7 +504,7 @@ function validatePerBlockDistribution(
 
     // Count samples by group in this block
     samples.forEach(sample => {
-      const groupKey = sample.treatmentKey || '';
+      const groupKey = sample.covariateKey || '';
       groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
     });
 

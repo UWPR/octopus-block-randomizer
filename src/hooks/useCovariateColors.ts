@@ -1,7 +1,18 @@
 import { useState, useCallback } from 'react';
 import { SearchData, SummaryItem, CovariateColorInfo } from '../utils/types';
-import { getCovariateKey, getTextColorForBackground, sortCombinationsByCountAndName } from '../utils/utils';
+import { getTextColorForBackground, sortCombinationsByCountAndName, getTreatmentKey } from '../utils/utils';
 import { BRIGHT_COLOR_PALETTE, QC_COLOR_PALETTE } from '../utils/configs';
+
+/**
+ * Check if all samples in a combination are QCs
+ * @param searches - All search samples
+ * @param combination - The combination key to check
+ * @returns true if all samples with this combination are QC / refernece samples
+ */
+function isQcCombination(searches: SearchData[], combination: string): boolean {
+  const samplesInCombination = searches.filter(search => search.covariateKey === combination);
+  return samplesInCombination.length > 0 && samplesInCombination.every(search => search.isQC);
+}
 
 export function useCovariateColors() {
   const [covariateColors, setCovariateColors] = useState<{ [key: string]: CovariateColorInfo }>({});
@@ -10,36 +21,32 @@ export function useCovariateColors() {
   const generateCovariateColors = useCallback((
     searches: SearchData[],
     selectedCovariates: string[],
-    controlColumn?: string,
-    selectedControlValues?: string[]
+    qcColumn?: string,
+    selectedQcValues?: string[]
   ) => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
       // Group searches by covariate combinations and count them
+      // treatmentKey should always be set by prepareSearches
       const combinationCounts = new Map<string, number>();
       searches.forEach((search) => {
-        const combination = getCovariateKey(search, selectedCovariates);
+        const combination = getTreatmentKey(search);
         combinationCounts.set(combination, (combinationCounts.get(combination) || 0) + 1);
       });
 
-      // Separate control combinations from regular combinations
-      const controlCombinations: string[] = [];
+      // Separate QC combinations from regular combinations
+      const qcCombinations: string[] = [];
       const regularCombinations: string[] = [];
 
       Array.from(combinationCounts.keys()).forEach((combination) => {
-        // Check if any search with this combination is marked as control
-        const hasControlSample = searches.some(search =>
-          getCovariateKey(search, selectedCovariates) === combination && search.isControl
-        );
-
-        if (hasControlSample) {
-          controlCombinations.push(combination);
+        if (isQcCombination(searches, combination)) {
+          qcCombinations.push(combination);
         } else {
           regularCombinations.push(combination);
         }
       });
 
-      // Sort control combinations by count (descending), then alphabetically
-      const sortedControlCombinations = sortCombinationsByCountAndName(controlCombinations, combinationCounts);
+      // Sort QC combinations by count (descending), then alphabetically
+      const sortedQcCombinations = sortCombinationsByCountAndName(qcCombinations, combinationCounts);
 
       // Sort regular combinations by count (descending), then alphabetically
       const sortedRegularCombinations = sortCombinationsByCountAndName(regularCombinations, combinationCounts);
@@ -48,7 +55,7 @@ export function useCovariateColors() {
       const covariateColorsMap: { [key: string]: CovariateColorInfo } = {};
 
       // debugger; // 🔍 BREAKPOINT: Check QC color assignment logic
-      sortedControlCombinations.forEach((combination, colorIndex) => {
+      sortedQcCombinations.forEach((combination, colorIndex) => {
         const paletteIndex = colorIndex % QC_COLOR_PALETTE.length;
         const cycle = Math.floor(colorIndex / QC_COLOR_PALETTE.length);
         const color = QC_COLOR_PALETTE[paletteIndex];
@@ -85,15 +92,15 @@ export function useCovariateColors() {
     colors: { [key: string]: CovariateColorInfo },
     searches: SearchData[],
     selectedCovariates: string[],
-    controlColumn?: string,
-    selectedControlValues?: string[]
+    qcColumn?: string,
+    selectedQcValues?: string[]
   ) => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
       // Group searches by their covariate combinations using getCovariateKey
       const combinationsMap = new Map<string, {
         values: { [key: string]: string };
         count: number;
-        controlColumnValue?: string;
+        qcColumnValue?: string;
       }>();
 
       searches.forEach((search) => {
@@ -102,22 +109,23 @@ export function useCovariateColors() {
           covariateValues[covariate] = search.metadata[covariate] || 'N/A';
         });
 
-        const combinationKey = getCovariateKey(search, selectedCovariates);
+        // treatmentKey should always be set
+        const combinationKey = getTreatmentKey(search);
 
         if (combinationsMap.has(combinationKey)) {
           const existing = combinationsMap.get(combinationKey)!;
           existing.count++;
         } else {
-          // Get control column value if control column is selected
-          let controlValue: string | undefined = undefined;
-          if (controlColumn) {
-            controlValue = search.metadata[controlColumn] || undefined;
+          // Get QC column value if QC column is selected
+          let qcValue: string | undefined = undefined;
+          if (qcColumn) {
+            qcValue = search.metadata[qcColumn] || undefined;
           }
 
           combinationsMap.set(combinationKey, {
             values: covariateValues,
             count: 1,
-            controlColumnValue: controlValue
+            qcColumnValue: qcValue
           });
         }
       });
@@ -137,43 +145,40 @@ export function useCovariateColors() {
           color: colorInfo.color,
           useOutline: colorInfo.useOutline,
           useStripes: colorInfo.useStripes,
-          controlColumnValue: data.controlColumnValue
+          qcColumnValue: data.qcColumnValue
         };
       });
 
-      // Separate controls and regular combinations for sorting
-      const controlSummary: SummaryItem[] = [];
+      // Separate QCs and regular combinations for sorting
+      const qcSummary: SummaryItem[] = [];
       const regularSummary: SummaryItem[] = [];
 
       summary.forEach(item => {
-        const isControl = searches.some(search =>
-          getCovariateKey(search, selectedCovariates) === item.combination && search.isControl
-        );
-        if (isControl) {
-          controlSummary.push(item);
+        if (isQcCombination(searches, item.combination)) {
+          qcSummary.push(item);
         } else {
           regularSummary.push(item);
         }
       });
 
       // Create count maps for sorting
-      const controlCounts = new Map(controlSummary.map(item => [item.combination, item.count]));
+      const qcCounts = new Map(qcSummary.map(item => [item.combination, item.count]));
       const regularCounts = new Map(regularSummary.map(item => [item.combination, item.count]));
 
       // Sort each group using the common helper
-      const sortedControlKeys = sortCombinationsByCountAndName(
-        controlSummary.map(item => item.combination),
-        controlCounts
+      const sortedQcKeys = sortCombinationsByCountAndName(
+        qcSummary.map(item => item.combination),
+        qcCounts
       );
       const sortedRegularKeys = sortCombinationsByCountAndName(
         regularSummary.map(item => item.combination),
         regularCounts
       );
 
-      // Rebuild summary in sorted order: controls first, then regular
+      // Rebuild summary in sorted order: QCs first, then regular
       const sortedSummary: SummaryItem[] = [];
-      sortedControlKeys.forEach(key => {
-        const item = controlSummary.find(s => s.combination === key);
+      sortedQcKeys.forEach(key => {
+        const item = qcSummary.find(s => s.combination === key);
         if (item) sortedSummary.push(item);
       });
       sortedRegularKeys.forEach(key => {

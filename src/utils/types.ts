@@ -9,8 +9,14 @@ export enum BlockType {
 export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
-  treatmentKey?: string;  // Covariate combination key, calculated based on selected covariates
-  isControl?: boolean;  // Whether this sample is a control/reference sample
+  covariateKey?: string;  // Covariate combination key, calculated based on selected covariates
+  isQC?: boolean;  // Whether this sample is a QC/reference sample
+}
+
+export interface CovariateConfig {
+  selectedCovariates: string[];  // Treatment covariate column names
+  qcColumn?: string;  // QC/reference column name
+  selectedQcValues?: string[];  // QC/reference values
 }
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;
@@ -49,7 +55,7 @@ export interface SummaryItem {
   color: string;
   useOutline: boolean;
   useStripes: boolean;
-  controlColumnValue?: string; // Value from the control column if applicable
+  qcColumnValue?: string; // Value from the QC column if applicable
 }
 
 export interface CovariateColorInfo {

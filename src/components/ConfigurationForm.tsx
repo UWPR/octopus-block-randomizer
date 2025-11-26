@@ -8,11 +8,11 @@ interface ConfigurationFormProps {
   searches: any[];
   selectedCovariates: string[];
   onCovariateChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  controlColumn: string;
-  onControlColumnChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  controlColumnValues: string[];
-  selectedControlValues: string[];
-  onControlValueToggle: (value: string) => void;
+  qcColumn: string;
+  onQcColumnChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  qcColumnValues: string[];
+  selectedQcValues: string[];
+  onQcValueToggle: (value: string) => void;
   selectedAlgorithm: RandomizationAlgorithm;
   onAlgorithmChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   keepEmptyInLastPlate: boolean;
@@ -31,11 +31,11 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   searches,
   selectedCovariates,
   onCovariateChange,
-  controlColumn,
-  onControlColumnChange,
-  controlColumnValues,
-  selectedControlValues,
-  onControlValueToggle,
+  qcColumn: qcColumn,
+  onQcColumnChange: onQcColumnChange,
+  qcColumnValues: qcColumnValues,
+  selectedQcValues: selectedQcValues,
+  onQcValueToggle: onQcValueToggle,
   selectedAlgorithm,
   onAlgorithmChange,
   keepEmptyInLastPlate,
@@ -68,13 +68,13 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             ))}
           </select>
 
-          <label htmlFor="controlColumn" style={{ ...styles.compactLabel, marginTop: '10px' }}>
-            Control/Reference Column (optional):
+          <label htmlFor="qcColumn" style={{ ...styles.compactLabel, marginTop: '10px' }}>
+            QC/Reference Column (optional):
           </label>
           <select
-            id="controlColumn"
-            value={controlColumn}
-            onChange={onControlColumnChange}
+            id="qcColumn"
+            value={qcColumn}
+            onChange={onQcColumnChange}
             style={styles.compactSelect}
           >
             <option value="">None</option>
@@ -85,16 +85,16 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             ))}
           </select>
 
-          {controlColumnValues.length > 0 && (
+          {qcColumnValues.length > 0 && (
             <div style={styles.controlValuesContainer}>
-              <small style={styles.compactLabel}>Select control/reference values:</small>
+              <small style={styles.compactLabel}>Select QC/reference values:</small>
               <div style={styles.checkboxGroup}>
-                {controlColumnValues.map((value) => (
+                {qcColumnValues.map((value) => (
                   <label key={value} style={styles.checkboxLabel}>
                     <input
                       type="checkbox"
-                      checked={selectedControlValues.includes(value)}
-                      onChange={() => onControlValueToggle(value)}
+                      checked={selectedQcValues.includes(value)}
+                      onChange={() => onQcValueToggle(value)}
                       style={styles.checkbox}
                     />
                     {value}

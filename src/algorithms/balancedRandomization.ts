@@ -337,6 +337,40 @@ function distributeSamplesAcrossBlocks(
   return sampleIndex;
 }
 
+/**
+ * Helper function to sort blocks by a metric and randomize blocks with equal values
+ * @param blocks - Array of block indices with their associated metric values
+ * @param sortAscending - If true, sort metrics ascending; if false, descending
+ * @returns Sorted array of block indices with randomization within equal-metric groups
+ */
+function sortBlocksByMetricWithRandomization<T extends { blockIdx: number; metric: number }>(
+  blocks: T[],
+  sortAscending: boolean = false
+): number[] {
+  // Group blocks by their metric value
+  const metricGroups = new Map<number, number[]>();
+  blocks.forEach(({ blockIdx, metric }) => {
+    if (!metricGroups.has(metric)) {
+      metricGroups.set(metric, []);
+    }
+    metricGroups.get(metric)!.push(blockIdx);
+  });
+
+  // Sort metric values and shuffle blocks within each group
+  const sortedMetrics = Array.from(metricGroups.keys()).sort((a, b) =>
+    sortAscending ? a - b : b - a
+  );
+
+  const sortedBlocks: number[] = [];
+  sortedMetrics.forEach(metric => {
+    const blocksInGroup = metricGroups.get(metric)!;
+    const shuffledGroup = shuffleArray(blocksInGroup);
+    sortedBlocks.push(...shuffledGroup);
+  });
+
+  return sortedBlocks;
+}
+
 // Helper function for Phase 2A - unplaced groups
 function processUnplacedGroups(
   unplacedGroupsMap: Map<string, SearchData[]>,
@@ -361,26 +395,10 @@ function processUnplacedGroups(
     // Sort by available capacity descending, but randomize blocks with the same capacity
     const blocksWithCapacity = availableBlocks.map(blockIdx => ({
       blockIdx,
-      availableCapacity: blockCapacities[blockIdx] - blockCounts[blockIdx]
+      metric: blockCapacities[blockIdx] - blockCounts[blockIdx]
     }));
 
-    // Group by capacity
-    const capacityGroups = new Map<number, number[]>();
-    blocksWithCapacity.forEach(({ blockIdx, availableCapacity }) => {
-      if (!capacityGroups.has(availableCapacity)) {
-        capacityGroups.set(availableCapacity, []);
-      }
-      capacityGroups.get(availableCapacity)!.push(blockIdx);
-    });
-
-    // Sort capacities descending and shuffle blocks within each capacity group
-    const sortedCapacities = Array.from(capacityGroups.keys()).sort((a, b) => b - a);
-    const blocksToUse: number[] = [];
-    sortedCapacities.forEach(capacity => {
-      const blocksInGroup = capacityGroups.get(capacity)!;
-      const shuffledGroup = shuffleArray(blocksInGroup);
-      blocksToUse.push(...shuffledGroup);
-    });
+    const blocksToUse = sortBlocksByMetricWithRandomization(blocksWithCapacity, false);
 
     const placedSamples = distributeSamplesAcrossBlocks(
       remainingSamples,
@@ -447,26 +465,10 @@ function processOverflowGroups(
         const groupCount = blockSamples.filter(sample =>
           sample.covariateKey === groupKey
         ).length;
-        return { blockIdx, groupCount };
+        return { blockIdx, metric: groupCount };
       });
 
-      // Group by count
-      const countGroups = new Map<number, number[]>();
-      blockGroupCounts.forEach(({ blockIdx, groupCount }) => {
-        if (!countGroups.has(groupCount)) {
-          countGroups.set(groupCount, []);
-        }
-        countGroups.get(groupCount)!.push(blockIdx);
-      });
-
-      // Sort counts ascending and shuffle blocks within each count group
-      const sortedCounts = Array.from(countGroups.keys()).sort((a, b) => a - b);
-      prioritizedBlocks = [];
-      sortedCounts.forEach(count => {
-        const blocksInGroup = countGroups.get(count)!;
-        const shuffledGroup = shuffleArray(blocksInGroup);
-        prioritizedBlocks.push(...shuffledGroup);
-      });
+      prioritizedBlocks = sortBlocksByMetricWithRandomization(blockGroupCounts, true);
     } else {
       // No prioritization - shuffle all available blocks equally
       prioritizedBlocks = shuffleArray([...availableBlocks]);

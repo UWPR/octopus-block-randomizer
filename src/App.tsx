@@ -229,7 +229,7 @@ const App: React.FC = () => {
 
 
   // Helper function to set treatment keys and mark QC / reference samples
-  const prepareSearches = (searchesList: SearchData[]) => {
+  const processMetadata = (searchesList: SearchData[]) => {
     searchesList.forEach(search => {
       // Determine if this sample is a QC / reference sample
       let isQC = false;
@@ -256,8 +256,8 @@ const App: React.FC = () => {
   // Main processing handler
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Prepare searches with QC information
-      prepareSearches(searches);
+      // Process metadata and set the covariateKey
+      processMetadata(searches);
 
       // Process randomization
       const success = processRandomization(
@@ -321,8 +321,8 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Prepare searches with QC information
-      prepareSearches(searches);
+      // Process metadata and set the covariateKey
+      processMetadata(searches);
 
       // Re-randomize - colors are already generated, so we don't need to regenerate them
       reRandomize(
@@ -339,8 +339,8 @@ const App: React.FC = () => {
   // Single plate re-randomization handler
   const handleReRandomizePlate = (plateIndex: number) => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
-      // Prepare searches with QC information
-      prepareSearches(searches);
+      // Process metadata and set the covariateKey
+      processMetadata(searches);
 
       reRandomizeSinglePlate(
         plateIndex,

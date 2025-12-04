@@ -108,7 +108,7 @@ export function groupByCovariates(searches: SearchData[], selectedCovariates: st
   const groups = new Map<string, SearchData[]>();
 
   searches.forEach(search => {
-    // treatmentKey should always be set by prepareSearches
+    // covariateKey should already be set by processMetadata
     if (!search.covariateKey) {
       throw new Error(`treatmentKey not set for sample: ${search.name}`);
     }
@@ -135,8 +135,6 @@ export function randomizeSearches(
   plates: (SearchData | undefined)[][][];
   plateAssignments?: Map<number, SearchData[]>;
 } {
-  // treatmentKey should already be set by prepareSearches
-  // No need to set it here as it may include QC prefix
 
   switch (algorithm) {
     case 'balanced':

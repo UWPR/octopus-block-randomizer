@@ -26,7 +26,7 @@ export function useCovariateColors() {
   ) => {
     if (selectedCovariates.length > 0 && searches.length > 0) {
       // Group searches by covariate combinations and count them
-      // treatmentKey should always be set by prepareSearches
+      // covariateKey should always be set by processMetadata
       const combinationCounts = new Map<string, number>();
       searches.forEach((search) => {
         const combination = getCovariateKey(search);

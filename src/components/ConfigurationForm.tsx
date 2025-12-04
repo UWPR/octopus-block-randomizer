@@ -89,7 +89,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
 
           {qcColumnValues.length > 0 && (
             <div style={styles.qcValuesContainer}>
-              <small style={styles.compactLabel}>Select QC/reference values:</small>
+              <small style={styles.compactLabel}>Select QC/Reference values:</small>
               <div style={styles.checkboxGroup}>
                 {qcColumnValues.map((value) => (
                   <label key={value} style={styles.checkboxLabel}>

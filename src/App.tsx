@@ -228,10 +228,10 @@ const App: React.FC = () => {
 
 
 
-  // Helper function to set treatment keys and mark QC / reference samples
+  // Helper function to set treatment keys and mark QC/Reference samples
   const processMetadata = (searchesList: SearchData[]) => {
     searchesList.forEach(search => {
-      // Determine if this sample is a QC / reference sample
+      // Determine if this sample is a QC/Reference sample
       let isQC = false;
 
       // Check if QC column is selected and values are checked

@@ -10,13 +10,13 @@ export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
   covariateKey?: string;  // Covariate combination key, calculated based on selected covariates
-  isQC?: boolean;  // Whether this sample is a QC/reference sample
+  isQC?: boolean;  // Whether this sample is a QC/Reference sample
 }
 
 export interface CovariateConfig {
   selectedCovariates: string[];  // Treatment covariate column names
-  qcColumn?: string;  // QC/reference column name
-  selectedQcValues?: string[];  // QC/reference values
+  qcColumn?: string;  // QC/Reference column name
+  selectedQcValues?: string[];  // QC/Reference values
 }
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;

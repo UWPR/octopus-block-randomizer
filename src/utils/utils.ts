@@ -17,7 +17,7 @@ export function shuffleArray<T>(array: T[]): T[] {
 /**
  * Generate a covariate key for a search sample, optionally including QC prefix
  * @param search - The search sample
- * @param config - Covariate configuration (treatment covariates and QC / Reference settings)
+ * @param config - Covariate configuration (treatment covariates and QC/Reference settings)
  * @returns Covariate key string (e.g., "QC|Balb_cJ|Control|0" or "Balb_cJ|Control|0")
  */
 /**

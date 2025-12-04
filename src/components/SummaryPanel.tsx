@@ -42,24 +42,24 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
         <div style={styles.summaryInfo}>
           {qcColumn && selectedQcValues.length > 0 && (
             <div style={styles.summaryInfoRow}>
-              <span style={styles.summaryLabel}>QC Column:</span>
+              <span style={styles.summaryLabel}>QC/Reference Column:</span>
+              <span style={styles.summaryValue}>{qcColumn}</span>
+              <span style={styles.summaryLabel}> Selected Values:</span>
+              <span style={styles.summaryValue}>{selectedQcValues.join(', ')}</span>
+            </div>
+          )}
+          {selectedCovariates.length > 0 && (
+            <div style={styles.summaryInfoRow}>
+              <span style={styles.summaryLabel}>Treatment Covariates:</span>
               <span style={styles.summaryValue}>
-                {qcColumn} ({selectedQcValues.join(', ')})
+                {selectedCovariates.map(covariate => {
+                  const values = covariateUniqueValues.get(covariate);
+                  if (!values || values.size === 0) return null;
+                  return `${covariate} (${Array.from(values).sort().join(', ')})`;
+                }).filter(Boolean).join(' • ')}
               </span>
             </div>
           )}
-          {selectedCovariates.map(covariate => {
-            const values = covariateUniqueValues.get(covariate);
-            if (!values || values.size === 0) return null;
-            return (
-              <div key={covariate} style={styles.summaryInfoRow}>
-                <span style={styles.summaryLabel}>{covariate}:</span>
-                <span style={styles.summaryValue}>
-                  {Array.from(values).sort().join(', ')}
-                </span>
-              </div>
-            );
-          })}
         </div>
         <div style={styles.summaryGrid}>
           {summaryData.map((item, index) => {

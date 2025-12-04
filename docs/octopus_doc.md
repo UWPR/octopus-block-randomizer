@@ -183,7 +183,7 @@ The average of balance and randomization scores, calculated at both plate level 
 
 1. **Select Relevant Covariates**: Choose only the experimental factors that matter for your analysis. Too many covariates can make perfect balance difficult to achieve.
 
-2. **Use QC / Reference Labels**: Specifying QC/reference samples helps you quickly identify these important samples with darker colors.
+2. **Use QC / Reference Labels**: Specifying QC/Reference samples helps you quickly identify these important samples with darker colors.
 
 3. **Start with Default Algorithm**: The Balanced Spatial Randomization algorithm works well for most experimental designs.
 

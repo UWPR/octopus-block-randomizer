@@ -78,15 +78,17 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             style={styles.compactSelect}
           >
             <option value="">None</option>
-            {availableColumns.map((column) => (
-              <option key={column} value={column}>
-                {column}
-              </option>
-            ))}
+            {availableColumns
+              .filter((column) => column !== selectedIdColumn)
+              .map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
           </select>
 
           {qcColumnValues.length > 0 && (
-            <div style={styles.controlValuesContainer}>
+            <div style={styles.qcValuesContainer}>
               <small style={styles.compactLabel}>Select QC/reference values:</small>
               <div style={styles.checkboxGroup}>
                 {qcColumnValues.map((value) => (
@@ -368,7 +370,7 @@ const styles = {
     color: '#666',
     fontStyle: 'italic',
   },
-  controlValuesContainer: {
+  qcValuesContainer: {
     marginTop: '8px',
     padding: '10px',
     backgroundColor: '#fff',

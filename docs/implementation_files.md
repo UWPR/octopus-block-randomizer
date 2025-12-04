@@ -5,7 +5,7 @@ The original code was refactored, and new components and hooks were created to s
 ### Core Components
 
 - **App.tsx**: Main application managing state, interactions, and quality metrics integration
-- **ConfigurationForm.tsx**: Enhanced form with algorithm selection, plate dimensions, and control sample options
+- **ConfigurationForm.tsx**: Enhanced form with algorithm selection, plate dimensions, and QC / Reference sample options
 - **Plate.tsx**: Individual plate rendering with compact/full views, quality scores display, and re-randomization buttons
 - **PlatesGrid.tsx**: Grid layout management for multiple plates with quality metrics integration
 - **SummaryPanel.tsx**: Covariate groups summary with interactive highlighting and sorting

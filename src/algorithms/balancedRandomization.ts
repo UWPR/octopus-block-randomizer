@@ -75,6 +75,34 @@ function getAvailableBlocks(
   return availableBlocks;
 }
 
+// Helper function to sort groups by size (descending) with randomization for equal-sized groups
+function sortGroupsBySize(
+  groupsMap: Map<string, SearchData[]>
+): Array<[string, SearchData[]]> {
+  const groupsArray = Array.from(groupsMap.entries());
+
+  // Group by sample count
+  const sizeGroups = new Map<number, Array<[string, SearchData[]]>>();
+  groupsArray.forEach(([groupKey, samples]) => {
+    const size = samples.length;
+    if (!sizeGroups.has(size)) {
+      sizeGroups.set(size, []);
+    }
+    sizeGroups.get(size)!.push([groupKey, samples]);
+  });
+
+  // Sort sizes descending and shuffle groups within each size
+  const sortedSizes = Array.from(sizeGroups.keys()).sort((a, b) => b - a);
+  const result: Array<[string, SearchData[]]> = [];
+  sortedSizes.forEach(size => {
+    const groupsInSize = sizeGroups.get(size)!;
+    const shuffledGroups = shuffleArray(groupsInSize);
+    result.push(...shuffledGroups);
+  });
+
+  return result;
+}
+
 // Helper function to calculate expected minimum samples per block (plates or rows) for each covariate group
 // Throws an error if the total samples exceed available capacity or if any block's expected minimums exceed its capacity
 //
@@ -309,6 +337,40 @@ function distributeSamplesAcrossBlocks(
   return sampleIndex;
 }
 
+/**
+ * Helper function to sort blocks by a metric and randomize blocks with equal values
+ * @param blocks - Array of block indices with their associated metric values
+ * @param sortAscending - If true, sort metrics ascending; if false, descending
+ * @returns Sorted array of block indices with randomization within equal-metric groups
+ */
+function sortBlocksByMetricWithRandomization<T extends { blockIdx: number; metric: number }>(
+  blocks: T[],
+  sortAscending: boolean = false
+): number[] {
+  // Group blocks by their metric value
+  const metricGroups = new Map<number, number[]>();
+  blocks.forEach(({ blockIdx, metric }) => {
+    if (!metricGroups.has(metric)) {
+      metricGroups.set(metric, []);
+    }
+    metricGroups.get(metric)!.push(blockIdx);
+  });
+
+  // Sort metric values and shuffle blocks within each group
+  const sortedMetrics = Array.from(metricGroups.keys()).sort((a, b) =>
+    sortAscending ? a - b : b - a
+  );
+
+  const sortedBlocks: number[] = [];
+  sortedMetrics.forEach(metric => {
+    const blocksInGroup = metricGroups.get(metric)!;
+    const shuffledGroup = shuffleArray(blocksInGroup);
+    sortedBlocks.push(...shuffledGroup);
+  });
+
+  return sortedBlocks;
+}
+
 // Helper function for Phase 2A - unplaced groups
 function processUnplacedGroups(
   unplacedGroupsMap: Map<string, SearchData[]>,
@@ -318,8 +380,7 @@ function processUnplacedGroups(
   blockType: BlockType
 ): void {
   const numBlocks = blockCapacities.length;
-  const sortedUnplacedGroups = Array.from(unplacedGroupsMap.entries())
-    .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
+  const sortedUnplacedGroups = sortGroupsBySize(unplacedGroupsMap);
 
   sortedUnplacedGroups.forEach(([groupKey, remainingSamples]) => {
     console.log(`Phase 2A (${blockType}): Unplaced group ${groupKey}: ${remainingSamples.length} samples`);
@@ -331,21 +392,22 @@ function processUnplacedGroups(
       return;
     }
 
-    // Sort available blocks by available capacity descending (most space first)
-    const sortedAvailableBlocks = availableBlocks.sort((a, b) => {
-      const availableCapacityA = blockCapacities[a] - blockCounts[a];
-      const availableCapacityB = blockCapacities[b] - blockCounts[b];
-      return availableCapacityB - availableCapacityA; // Descending order
-    });
+    // Sort by available capacity descending, but randomize blocks with the same capacity
+    const blocksWithCapacity = availableBlocks.map(blockIdx => ({
+      blockIdx,
+      metric: blockCapacities[blockIdx] - blockCounts[blockIdx]
+    }));
+
+    const blocksToUse = sortBlocksByMetricWithRandomization(blocksWithCapacity, false);
 
     const placedSamples = distributeSamplesAcrossBlocks(
       remainingSamples,
-      sortedAvailableBlocks,
+      blocksToUse,
       blockCapacities,
       blockAssignments,
       blockCounts,
       `Placing 1 unplaced (${blockType})`,
-      true // Use sorted order
+      true // Use the order determined above
     );
 
     if (placedSamples < remainingSamples.length) {
@@ -366,8 +428,7 @@ function processOverflowGroups(
   fullCapacity: number = 96
 ): void {
   const numPlates = plateCapacities.length;
-  const sortedOverflowGroups = Array.from(overflowSamplesMap.entries())
-    .sort(([, samplesA], [, samplesB]) => samplesB.length - samplesA.length);
+  const sortedOverflowGroups = sortGroupsBySize(overflowSamplesMap);
 
   sortedOverflowGroups.forEach(([groupKey, remainingSamples]) => {
     console.log(`Phase 2B (${blockType}): Overflow group ${groupKey}: ${remainingSamples.length} samples`);
@@ -402,14 +463,12 @@ function processOverflowGroups(
       const blockGroupCounts = availableBlocks.map(blockIdx => {
         const blockSamples = blockAssignments.get(blockIdx) || [];
         const groupCount = blockSamples.filter(sample =>
-          sample.treatmentKey === groupKey
+          sample.covariateKey === groupKey
         ).length;
-        return { blockIdx, groupCount };
+        return { blockIdx, metric: groupCount };
       });
 
-      // Sort by group count (ascending) to prioritize blocks with fewer samples of this group
-      blockGroupCounts.sort((a, b) => a.groupCount - b.groupCount);
-      prioritizedBlocks = blockGroupCounts.map(item => item.blockIdx);
+      prioritizedBlocks = sortBlocksByMetricWithRandomization(blockGroupCounts, true);
     } else {
       // No prioritization - shuffle all available blocks equally
       prioritizedBlocks = shuffleArray([...availableBlocks]);
@@ -447,7 +506,7 @@ function validatePerBlockDistribution(
 
     // Count samples by group in this block
     samples.forEach(sample => {
-      const groupKey = sample.treatmentKey || '';
+      const groupKey = sample.covariateKey || '';
       groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
     });
 
@@ -583,7 +642,8 @@ function doBalancedRandomization(
           rowSamples,
           plates[plateIdx],
           rowIdx,
-          numColumns
+          numColumns,
+          keepEmptyInLastPlate
         );
       }
     });

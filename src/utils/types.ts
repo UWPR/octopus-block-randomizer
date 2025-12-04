@@ -9,7 +9,14 @@ export enum BlockType {
 export interface SearchData {
   name: string;
   metadata: { [key: string]: string };
-  treatmentKey?: string;  // Covariate combination key, calculated based on selected covariates
+  covariateKey?: string;  // Covariate combination key, calculated based on selected covariates
+  isQC?: boolean;  // Whether this sample is a QC/Reference sample
+}
+
+export interface CovariateConfig {
+  selectedCovariates: string[];  // Treatment covariate column names
+  qcColumn?: string;  // QC/Reference column name
+  selectedQcValues?: string[];  // QC/Reference values
 }
 
 export type RandomizationAlgorithm = keyof typeof ALGORITHM_CONFIG;
@@ -27,12 +34,12 @@ export const getAllAlgorithms = (): RandomizationAlgorithm[] =>
 // Get algorithms in UI display order
 export const getAlgorithmsInDisplayOrder = (): RandomizationAlgorithm[] => {
   const algorithms: RandomizationAlgorithm[] = ['balanced'];
-  
+
   // Show all algorithms in developer mode, otherwise show only the base algorithm
   if (isDeveloperMode()) {
     return ['balanced', 'greedy'] as RandomizationAlgorithm[];
   }
-  
+
   return algorithms;
 };
 
@@ -48,6 +55,7 @@ export interface SummaryItem {
   color: string;
   useOutline: boolean;
   useStripes: boolean;
+  qcColumnValue?: string; // Value from the QC column if applicable
 }
 
 export interface CovariateColorInfo {

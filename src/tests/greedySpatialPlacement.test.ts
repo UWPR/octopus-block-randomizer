@@ -14,7 +14,7 @@ describe('Greedy Spatial Placement', () => {
       protocol,
       treatment
     },
-    treatmentKey: `${gender}|${protocol}|${treatment}`
+    covariateKey: `${gender}|${protocol}|${treatment}`
   });
 
   describe('calculateClusterScore', () => {
@@ -111,7 +111,7 @@ describe('Greedy Spatial Placement', () => {
       for (let col = 0; col < 11; col++) {
         const current = plates[0][0][col];
         const next = plates[0][0][col + 1];
-        if (current && next && current.treatmentKey === next.treatmentKey) {
+        if (current && next && current.covariateKey === next.covariateKey) {
           adjacentCount++;
         }
       }

@@ -2,10 +2,10 @@ import { SearchData } from '../utils/types';
 import { shuffleArray } from '../utils/utils';
 
 /**
- * Helper to safely get treatment key from a sample
+ * Local helper to safely get covariate key from a sample (handles undefined)
  */
 function getTreatmentKey(sample: SearchData | undefined): string | undefined {
-  return sample?.treatmentKey;
+  return sample?.covariateKey;
 }
 
 /**
@@ -71,30 +71,39 @@ export function calculateClusterScore(
  * @param plate - The 2D grid of the current plate (will be modified)
  * @param rowIdx - Row index within the plate
  * @param numColumns - Total number of columns per row
+ * @param keepEmptyAtEnd - If true, empty spots are at the end; if false, distributed randomly
  */
 export function greedyPlaceInRow(
   rowSamples: SearchData[],
   plate: (SearchData | undefined)[][],
   rowIdx: number,
-  numColumns: number
+  numColumns: number,
+  keepEmptyAtEnd: boolean = true
 ): void {
   if (rowSamples.length === 0) return;
 
   // Shuffle samples first to add randomness when multiple positions have equal scores
   const shuffledSamples = shuffleArray([...rowSamples]);
 
-  // Track available positions in this row - use ALL columns, not just the first N
-  // This allows empty wells to be distributed randomly throughout the row
+  // Track available positions in this row
   const availablePositions: number[] = [];
-  for (let col = 0; col < numColumns; col++) {
-    availablePositions.push(col);
+  if (keepEmptyAtEnd) {
+    // Only use positions up to the number of samples - empty wells at the end
+    for (let col = 0; col < rowSamples.length; col++) {
+      availablePositions.push(col);
+    }
+  } else {
+    // Use all columns - empty wells distributed randomly
+    for (let col = 0; col < numColumns; col++) {
+      availablePositions.push(col);
+    }
   }
 
   // Place each sample one by one
   for (const sample of shuffledSamples) {
     if (availablePositions.length === 0) break;
 
-    const treatmentKey = sample.treatmentKey;
+    const treatmentKey = sample.covariateKey;
 
     // Score each available position
     const positionScores = availablePositions.map(col => ({
@@ -271,7 +280,7 @@ function calculatePlateTotalScore(
       const sample = plate[row][col];
       if (!sample) continue;
 
-      const treatmentKey = sample.treatmentKey;
+      const treatmentKey = sample.covariateKey;
       totalScore += calculateClusterScore(plate, row, col, treatmentKey, numColumns);
     }
   }

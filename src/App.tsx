@@ -8,7 +8,7 @@ import PlatesGrid from './components/PlatesGrid';
 import QualityMetricsPanel from './components/QualityMetricsPanel';
 import QualityLegend from './components/QualityLegend';
 import { SearchData, RandomizationAlgorithm } from './utils/types';
-import { downloadCSV, getCovariateKey, getQualityLevelColor, formatScore } from './utils/utils';
+import { downloadCSV, buildCovariateKey, getCovariateKey, getQualityLevelColor, formatScore } from './utils/utils';
 import { exportToExcel } from './utils/excelExport';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useModalDrag } from './hooks/useModalDrag';
@@ -88,7 +88,9 @@ const App: React.FC = () => {
 
   // Configuration states
   const [selectedCovariates, setSelectedCovariates] = useState<string[]>([]);
-  const [controlLabels, setControlLabels] = useState<string>('');
+  const [qcColumn, setQcColumn] = useState<string>('');
+  const [qcColumnValues, setQcColumnValues] = useState<string[]>([]);
+  const [selectedQcValues, setSelectedQcValues] = useState<string[]>([]);
 
   // Algorithm selection
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<RandomizationAlgorithm>(defaultAlgorithm);
@@ -131,7 +133,9 @@ const App: React.FC = () => {
 
       // Reset configuration states
       setSelectedCovariates([]);
-      setControlLabels('');
+      setQcColumn('');
+      setQcColumnValues([]);
+      setSelectedQcValues([]);
 
       // Reset algorithm selection (keep defaults)
       setSelectedAlgorithm(defaultAlgorithm);
@@ -158,6 +162,24 @@ const App: React.FC = () => {
     setSelectedCombination(null);
   };
 
+  // Update QC column values when QC column changes
+  useEffect(() => {
+    if (qcColumn && searches.length > 0) {
+      const uniqueValues = new Set<string>();
+      searches.forEach(search => {
+        const value = search.metadata[qcColumn];
+        if (value) {
+          uniqueValues.add(value);
+        }
+      });
+      setQcColumnValues(Array.from(uniqueValues).sort());
+      setSelectedQcValues([]); // Reset selected values when column changes
+    } else {
+      setQcColumnValues([]);
+      setSelectedQcValues([]);
+    }
+  }, [qcColumn, searches]);
+
 
 
   // Algorithm selection handler
@@ -180,17 +202,63 @@ const App: React.FC = () => {
     resetCovariateState();
   };
 
-  // Control labels change handler
-  const handleControlLabelsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setControlLabels(event.target.value);
+  // ID column change handler with reset
+  const handleIdColumnChangeWithReset = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    handleIdColumnChange(event);
+    resetCovariateState();
+  };
+
+  // QC column change handler
+  const handleQcColumnChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setQcColumn(event.target.value);
+    resetCovariateState();
+  };
+
+  // QC value checkbox handler
+  const handleQcValueToggle = (value: string) => {
+    setSelectedQcValues(prev => {
+      if (prev.includes(value)) {
+        return prev.filter(v => v !== value);
+      } else {
+        return [...prev, value];
+      }
+    });
     resetCovariateState();
   };
 
 
 
+  // Helper function to set treatment keys and mark QC/Reference samples
+  const processMetadata = (searchesList: SearchData[]) => {
+    searchesList.forEach(search => {
+      // Determine if this sample is a QC/Reference sample
+      let isQC = false;
+
+      // Check if QC column is selected and values are checked
+      if (qcColumn && selectedQcValues.length > 0) {
+        const sampleValue = search.metadata[qcColumn];
+        if (sampleValue && selectedQcValues.includes(sampleValue)) {
+          isQC = true;
+        }
+      }
+
+      search.isQC = isQC;
+
+      // Generate covariate key using buildCovariateKey with QC info
+      search.covariateKey = buildCovariateKey(search, {
+        selectedCovariates,
+        qcColumn: qcColumn,
+        selectedQcValues: selectedQcValues
+      });
+    });
+  };
+
   // Main processing handler
   const handleProcessRandomization = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Process metadata and set the covariateKey
+      processMetadata(searches);
+
       // Process randomization
       const success = processRandomization(
         searches,
@@ -202,11 +270,22 @@ const App: React.FC = () => {
       );
 
       if (success) {
-        // Generate colors
-        const colors = generateCovariateColors(searches, selectedCovariates, controlLabels);
+        // Generate colors (pass QC info for proper color assignment)
+        const colors = generateCovariateColors(
+          searches,
+          selectedCovariates,
+          qcColumn,
+          selectedQcValues
+        );
 
         // Generate summary data
-        generateSummaryData(colors, searches, selectedCovariates, controlLabels);
+        generateSummaryData(
+          colors,
+          searches,
+          selectedCovariates,
+          qcColumn,
+          selectedQcValues
+        );
       }
     }
   };
@@ -242,6 +321,9 @@ const App: React.FC = () => {
   // Re-randomization handler
   const handleReRandomize = () => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Process metadata and set the covariateKey
+      processMetadata(searches);
+
       // Re-randomize - colors are already generated, so we don't need to regenerate them
       reRandomize(
         searches,
@@ -257,6 +339,9 @@ const App: React.FC = () => {
   // Single plate re-randomization handler
   const handleReRandomizePlate = (plateIndex: number) => {
     if (selectedIdColumn && selectedCovariates.length > 0 && searches.length > 0) {
+      // Process metadata and set the covariateKey
+      processMetadata(searches);
+
       reRandomizeSinglePlate(
         plateIndex,
         searches,
@@ -311,9 +396,12 @@ const App: React.FC = () => {
   const isSearchHighlighted = (search: SearchData): boolean => {
     if (!selectedCombination) return false;
 
-    const searchCombination = getCovariateKey(search, selectedCovariates);
-
-    return searchCombination === selectedCombination;
+    try {
+      return getCovariateKey(search) === selectedCombination;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
   };
 
 
@@ -340,12 +428,15 @@ const App: React.FC = () => {
         <ConfigurationForm
           availableColumns={availableColumns}
           selectedIdColumn={selectedIdColumn}
-          onIdColumnChange={handleIdColumnChange}
+          onIdColumnChange={handleIdColumnChangeWithReset}
           searches={searches}
           selectedCovariates={selectedCovariates}
           onCovariateChange={handleCovariateChange}
-          controlLabels={controlLabels}
-          onControlLabelsChange={handleControlLabelsChange}
+          qcColumn={qcColumn}
+          onQcColumnChange={handleQcColumnChange}
+          qcColumnValues={qcColumnValues}
+          selectedQcValues={selectedQcValues}
+          onQcValueToggle={handleQcValueToggle}
           selectedAlgorithm={selectedAlgorithm}
           onAlgorithmChange={handleAlgorithmChange}
           keepEmptyInLastPlate={keepEmptyInLastPlate}
@@ -377,7 +468,7 @@ const App: React.FC = () => {
           {/* Plates Visualization */}
           {isProcessed && randomizedPlates.length > 0 && (
             <>
-              <div style={styles.viewControls}>
+              <div style={styles.viewQcs}>
                 {metrics && (
                   <button
                     onClick={toggleMetrics}
@@ -410,14 +501,14 @@ const App: React.FC = () => {
 
                 <button
                   onClick={() => setCompactView(!compactView)}
-                  style={styles.controlButton}
+                  style={styles.qcButton}
                 >
                   {compactView ? 'Full Size View' : 'Compact View'}
                 </button>
 
                 <button
                   onClick={handleReRandomize}
-                  style={styles.controlButton}
+                  style={styles.qcButton}
                   title="Generate new randomization"
                 >
                   Re-randomize
@@ -438,6 +529,9 @@ const App: React.FC = () => {
                 onToggleSummary={() => setShowSummary(!showSummary)}
                 selectedCombination={selectedCombination}
                 onSummaryItemClick={handleSummaryItemClick}
+                qcColumn={qcColumn}
+                selectedQcValues={selectedQcValues}
+                selectedCovariates={selectedCovariates}
               />
 
               <QualityLegend />
@@ -581,7 +675,7 @@ const styles = {
     backgroundColor: '#ccc',
     cursor: 'not-allowed',
   },
-  viewControls: {
+  viewQcs: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -589,7 +683,7 @@ const styles = {
     marginBottom: '25px',
     flexWrap: 'wrap' as const,
   },
-  controlButton: {
+  qcButton: {
     padding: '8px 16px',
     backgroundColor: '#f8f9fa',
     border: '1px solid #dee2e6',

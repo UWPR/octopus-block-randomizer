@@ -8,8 +8,11 @@ interface ConfigurationFormProps {
   searches: any[];
   selectedCovariates: string[];
   onCovariateChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  controlLabels: string;
-  onControlLabelsChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  qcColumn: string;
+  onQcColumnChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  qcColumnValues: string[];
+  selectedQcValues: string[];
+  onQcValueToggle: (value: string) => void;
   selectedAlgorithm: RandomizationAlgorithm;
   onAlgorithmChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   keepEmptyInLastPlate: boolean;
@@ -28,8 +31,11 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   searches,
   selectedCovariates,
   onCovariateChange,
-  controlLabels,
-  onControlLabelsChange,
+  qcColumn: qcColumn,
+  onQcColumnChange: onQcColumnChange,
+  qcColumnValues: qcColumnValues,
+  selectedQcValues: selectedQcValues,
+  onQcValueToggle: onQcValueToggle,
   selectedAlgorithm,
   onAlgorithmChange,
   keepEmptyInLastPlate,
@@ -62,20 +68,43 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             ))}
           </select>
 
-          <label htmlFor="controlLabels" style={{ ...styles.compactLabel, marginTop: '10px' }}>
-            Control/Reference Sample Labels (optional):
+          <label htmlFor="qcColumn" style={{ ...styles.compactLabel, marginTop: '10px' }}>
+            QC/Reference Column (optional):
           </label>
-          <input
-            id="controlLabels"
-            type="text"
-            value={controlLabels}
-            onChange={onControlLabelsChange}
-            placeholder="e.g., Inter-Experiment Reference, Control, QC"
-            style={styles.compactTextInput}
-          />
-          <small style={styles.compactHint}>
-            Enter labels separated by commas. Samples containing these labels will get priority colors.
-          </small>
+          <select
+            id="qcColumn"
+            value={qcColumn}
+            onChange={onQcColumnChange}
+            style={styles.compactSelect}
+          >
+            <option value="">None</option>
+            {availableColumns
+              .filter((column) => column !== selectedIdColumn)
+              .map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+          </select>
+
+          {qcColumnValues.length > 0 && (
+            <div style={styles.qcValuesContainer}>
+              <small style={styles.compactLabel}>Select QC/Reference values:</small>
+              <div style={styles.checkboxGroup}>
+                {qcColumnValues.map((value) => (
+                  <label key={value} style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={selectedQcValues.includes(value)}
+                      onChange={() => onQcValueToggle(value)}
+                      style={styles.checkbox}
+                    />
+                    {value}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <label htmlFor="algorithm" style={{ ...styles.compactLabel, marginTop: '10px' }}>
             Randomization Algorithm:
@@ -118,7 +147,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                   }
                 });
                 const uniqueValues = Array.from(values).sort();
-                
+
                 // Format display: show values if 5 or less, otherwise show count
                 let displayText = covariate;
                 if (uniqueValues.length > 0) {
@@ -128,7 +157,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                     displayText += ` (${uniqueValues.length} values)`;
                   }
                 }
-                
+
                 return (
                   <option key={covariate} value={covariate}>
                     {displayText}
@@ -340,6 +369,28 @@ const styles = {
     fontSize: '12px',
     color: '#666',
     fontStyle: 'italic',
+  },
+  qcValuesContainer: {
+    marginTop: '8px',
+    padding: '10px',
+    backgroundColor: '#fff',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+  },
+  checkboxGroup: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+    marginTop: '6px',
+    maxHeight: '120px',
+    overflowY: 'auto' as const,
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: '13px',
+    color: '#333',
+    cursor: 'pointer',
   },
 };
 

@@ -138,23 +138,32 @@ const Plate: React.FC<PlateProps> = ({
 
   // Optimized cell renderers
   const renderCompactCell = useCallback((search: SearchData, isHighlighted: boolean) => {
-    const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || DEFAULT_COLOR_INFO;
-    const cellStyle = createSearchCellStyle(colorInfo, isHighlighted);
+    try {
+      const colorInfo = covariateColors[getCovariateKey(search)] || DEFAULT_COLOR_INFO;
+      const cellStyle = createSearchCellStyle(colorInfo, isHighlighted);
 
-    return (
-      <div
-        style={{
-          ...currentStyles.compactSearchIndicator,
-          ...cellStyle
-        }}
-        draggable={true}
-        onDragStart={(event) => onDragStart(event, search.name)}
-      />
-    );
+      return (
+        <div
+          style={{
+            ...currentStyles.compactSearchIndicator,
+            ...cellStyle
+          }}
+          draggable={true}
+          onDragStart={(event) => onDragStart(event, search.name)}
+        />
+      );
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
   }, [covariateColors, selectedCovariates, currentStyles.compactSearchIndicator, createSearchCellStyle, onDragStart]);
 
   const renderFullCell = useCallback((search: SearchData, isHighlighted: boolean) => {
-    const colorInfo = covariateColors[getCovariateKey(search, selectedCovariates)] || DEFAULT_COLOR_INFO;
+    if (!search.covariateKey) {
+      console.error(`treatmentKey not set for sample: ${search.name}`);
+      return null;
+    }
+    const colorInfo = covariateColors[search.covariateKey] || DEFAULT_COLOR_INFO;
     const pattern = compact ? STRIPE_PATTERNS.compact : STRIPE_PATTERNS.full;
     const outlineBorderWidth = compact ? '3px' : '6px';
 

@@ -64,8 +64,8 @@ Choose which column contains your unique sample identifiers. The app will automa
 #### Choose Covariates
 Select which experimental factors should be balanced across plates. You can select multiple covariates (e.g., Treatment Group, Time Point, Dose Level). The selected covariates will be displayed below the selection box.
 
-#### Set Control/Reference Samples (Optional)
-Enter comma-separated labels for control or reference samples (e.g., "Control, QC, Reference"). These groups will receive brighter, priority colors for easy identification.
+#### Set QC/Reference Samples (Optional)
+Enter comma-separated labels for QC or reference samples (e.g., "QC, Reference"). These groups will receive darker colors for easy identification.
 
 #### Select Randomization Algorithm
 - **Balanced Spatial Randomization**: Default choice for most experiments
@@ -183,7 +183,7 @@ The average of balance and randomization scores, calculated at both plate level 
 
 1. **Select Relevant Covariates**: Choose only the experimental factors that matter for your analysis. Too many covariates can make perfect balance difficult to achieve.
 
-2. **Use Control Labels**: Specifying control/reference samples helps you quickly identify these important samples with bright, priority colors.
+2. **Use QC / Reference Labels**: Specifying QC/Reference samples helps you quickly identify these important samples with darker colors.
 
 3. **Start with Default Algorithm**: The Balanced Spatial Randomization algorithm works well for most experimental designs.
 
@@ -232,7 +232,7 @@ The randomization score analyzes spatial neighbor relationships (8-directional: 
 For each sample position:
   Count neighbors from different covariate groups
   Calculate ratio = Different Neighbors / Total Neighbor Comparisons
-  
+
 Randomization Score = (Total Different Neighbors / Total Comparisons) × 100
 ```
 

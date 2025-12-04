@@ -1,7 +1,7 @@
 import React from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../utils/types';
 import { QUALITY_DISPLAY_CONFIG } from '../utils/configs';
-import { getTreatmentKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
+import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
 
 interface PlateDetailsModalProps {
   show: boolean;
@@ -166,7 +166,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                               .filter(sample => sample !== undefined)
                               .map((sample, colIndex) => {
                                 try {
-                                  const key = getTreatmentKey(sample!);
+                                  const key = getCovariateKey(sample!);
                                   const colorInfo = covariateColors[key] || { color: '#cccccc', useOutline: false, useStripes: false, textColor: '#000' };
                                   return (
                                     <div
@@ -203,7 +203,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                 // Calculate distribution for this plate
                 plateSamples.forEach(sample => {
                   try {
-                    const key = getTreatmentKey(sample);
+                    const key = getCovariateKey(sample);
                     covariateDistribution.set(key, (covariateDistribution.get(key) || 0) + 1);
                   } catch (error) {
                     console.error(error);
@@ -214,7 +214,7 @@ const PlateDetailsModal: React.FC<PlateDetailsModalProps> = ({
                 const globalDistribution = new Map<string, number>();
                 searches.forEach(sample => {
                   try {
-                    const key = getTreatmentKey(sample);
+                    const key = getCovariateKey(sample);
                     globalDistribution.set(key, (globalDistribution.get(key) || 0) + 1);
                   } catch (error) {
                     console.error(error);

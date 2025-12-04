@@ -8,7 +8,7 @@ import PlatesGrid from './components/PlatesGrid';
 import QualityMetricsPanel from './components/QualityMetricsPanel';
 import QualityLegend from './components/QualityLegend';
 import { SearchData, RandomizationAlgorithm } from './utils/types';
-import { downloadCSV, getCovariateKey, getTreatmentKey, getQualityLevelColor, formatScore } from './utils/utils';
+import { downloadCSV, buildCovariateKey, getCovariateKey, getQualityLevelColor, formatScore } from './utils/utils';
 import { exportToExcel } from './utils/excelExport';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useModalDrag } from './hooks/useModalDrag';
@@ -244,8 +244,8 @@ const App: React.FC = () => {
 
       search.isQC = isQC;
 
-      // Generate treatment key using getCovariateKey with QC info
-      search.covariateKey = getCovariateKey(search, {
+      // Generate covariate key using buildCovariateKey with QC info
+      search.covariateKey = buildCovariateKey(search, {
         selectedCovariates,
         qcColumn: qcColumn,
         selectedQcValues: selectedQcValues
@@ -397,7 +397,7 @@ const App: React.FC = () => {
     if (!selectedCombination) return false;
 
     try {
-      return getTreatmentKey(search) === selectedCombination;
+      return getCovariateKey(search) === selectedCombination;
     } catch (error) {
       console.error(error);
       return false;
@@ -468,7 +468,7 @@ const App: React.FC = () => {
           {/* Plates Visualization */}
           {isProcessed && randomizedPlates.length > 0 && (
             <>
-              <div style={styles.viewControls}>
+              <div style={styles.viewQcs}>
                 {metrics && (
                   <button
                     onClick={toggleMetrics}
@@ -501,14 +501,14 @@ const App: React.FC = () => {
 
                 <button
                   onClick={() => setCompactView(!compactView)}
-                  style={styles.controlButton}
+                  style={styles.qcButton}
                 >
                   {compactView ? 'Full Size View' : 'Compact View'}
                 </button>
 
                 <button
                   onClick={handleReRandomize}
-                  style={styles.controlButton}
+                  style={styles.qcButton}
                   title="Generate new randomization"
                 >
                   Re-randomize
@@ -675,7 +675,7 @@ const styles = {
     backgroundColor: '#ccc',
     cursor: 'not-allowed',
   },
-  viewControls: {
+  viewQcs: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -683,7 +683,7 @@ const styles = {
     marginBottom: '25px',
     flexWrap: 'wrap' as const,
   },
-  controlButton: {
+  qcButton: {
     padding: '8px 16px',
     backgroundColor: '#f8f9fa',
     border: '1px solid #dee2e6',

@@ -1,6 +1,6 @@
 import { distributeToBlocks, calculateExpectedMinimums } from '../algorithms/balancedRandomization';
 import { SearchData, BlockType } from '../utils/types';
-import { groupByCovariates, getCovariateKey } from '../utils/utils';
+import { groupByCovariates, buildCovariateKey } from '../utils/utils';
 
 describe('distributeToBlocks - Plate-Level Distribution', () => {
   // Helper function to create mock samples with specific covariate values
@@ -16,7 +16,7 @@ describe('distributeToBlocks - Plate-Level Distribution', () => {
 
     result.forEach((samples, blockIndex) => {
       samples.forEach(sample => {
-        const groupKey = getCovariateKey(sample, { selectedCovariates } );
+        const groupKey = buildCovariateKey(sample, { selectedCovariates } );
         if (!groupCounts.has(groupKey)) {
           groupCounts.set(groupKey, new Map());
         }

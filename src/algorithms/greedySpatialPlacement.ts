@@ -2,7 +2,7 @@ import { SearchData } from '../utils/types';
 import { shuffleArray } from '../utils/utils';
 
 /**
- * Helper to safely get treatment key from a sample
+ * Local helper to safely get covariate key from a sample (handles undefined)
  */
 function getTreatmentKey(sample: SearchData | undefined): string | undefined {
   return sample?.covariateKey;

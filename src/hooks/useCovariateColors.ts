@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { SearchData, SummaryItem, CovariateColorInfo } from '../utils/types';
-import { getTextColorForBackground, sortCombinationsByCountAndName, getTreatmentKey } from '../utils/utils';
+import { getTextColorForBackground, sortCombinationsByCountAndName, getCovariateKey } from '../utils/utils';
 import { BRIGHT_COLOR_PALETTE, QC_COLOR_PALETTE } from '../utils/configs';
 
 /**
@@ -29,7 +29,7 @@ export function useCovariateColors() {
       // treatmentKey should always be set by prepareSearches
       const combinationCounts = new Map<string, number>();
       searches.forEach((search) => {
-        const combination = getTreatmentKey(search);
+        const combination = getCovariateKey(search);
         combinationCounts.set(combination, (combinationCounts.get(combination) || 0) + 1);
       });
 
@@ -109,8 +109,8 @@ export function useCovariateColors() {
           covariateValues[covariate] = search.metadata[covariate] || 'N/A';
         });
 
-        // treatmentKey should always be set
-        const combinationKey = getTreatmentKey(search);
+        // covariateKey should always be set
+        const combinationKey = getCovariateKey(search);
 
         if (combinationsMap.has(combinationKey)) {
           const existing = combinationsMap.get(combinationKey)!;

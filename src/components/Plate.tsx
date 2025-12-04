@@ -18,7 +18,7 @@
 import React, { DragEvent, useMemo, useCallback } from 'react';
 import { SearchData, CovariateColorInfo, PlateQualityScore } from '../utils/types';
 import { QUALITY_DISPLAY_CONFIG } from '../utils/configs';
-import { getTreatmentKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
+import { getCovariateKey, getQualityColor, getCompactQualityLevel, formatScore } from '../utils/utils';
 
 // Constants
 const DIMENSIONS = {
@@ -139,7 +139,7 @@ const Plate: React.FC<PlateProps> = ({
   // Optimized cell renderers
   const renderCompactCell = useCallback((search: SearchData, isHighlighted: boolean) => {
     try {
-      const colorInfo = covariateColors[getTreatmentKey(search)] || DEFAULT_COLOR_INFO;
+      const colorInfo = covariateColors[getCovariateKey(search)] || DEFAULT_COLOR_INFO;
       const cellStyle = createSearchCellStyle(colorInfo, isHighlighted);
 
       return (

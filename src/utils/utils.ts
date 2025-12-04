@@ -21,19 +21,19 @@ export function shuffleArray<T>(array: T[]): T[] {
  * @returns Covariate key string (e.g., "QC|Balb_cJ|Control|0" or "Balb_cJ|Control|0")
  */
 /**
- * Get the treatment key for a sample, throwing an error if not set
+ * Get the covariate key for a sample, throwing an error if not set
  * @param sample - The search sample
- * @returns The treatment key
- * @throws Error if treatmentKey is not set
+ * @returns The covariate key (includes QC prefix if applicable)
+ * @throws Error if covariateKey is not set
  */
-export function getTreatmentKey(sample: SearchData): string {
+export function getCovariateKey(sample: SearchData): string {
   if (!sample.covariateKey) {
-    throw new Error(`treatmentKey not set for sample: ${sample.name}`);
+    throw new Error(`covariateKey not set for sample: ${sample.name}`);
   }
   return sample.covariateKey;
 }
 
-export function getCovariateKey(
+export function buildCovariateKey(
   search: SearchData,
   config: CovariateConfig
 ): string {

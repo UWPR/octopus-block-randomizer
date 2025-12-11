@@ -22,7 +22,7 @@ export function distributeToBlocks(
   const numBlocks = blockCapacities.length;
   const [blockAssignments, blockCounts] = initializeBlockAssignments(numBlocks);
 
-  console.log(`Distributing samples across ${numBlocks} ${blockType.toLowerCase()} with capacities: ${blockCapacities.join(', ')}`);
+  console.log(`Distributing samples across ${numBlocks} ${blockType.toLowerCase()}s with capacities: ${blockCapacities.join(', ')}`);
 
   // PHASE 1: Place samples proportionately
   const [unplacedGroupsMap, remainingSamplesMap] = placeProportionalSamples(
@@ -168,9 +168,9 @@ export function calculateExpectedMinimums(
 // Exported for testing purposes
 export function assignBlockCapacities(
   totalSamples: number,
-  actualBlocksNeeded: number,
-  keepEmptyInLastBlock: boolean,
   blockSize: number,
+  keepEmptyInLastBlock: boolean,
+  maxBlocks: number,
   blockName: BlockType
 ): number[] {
 
@@ -178,8 +178,12 @@ export function assignBlockCapacities(
     return [0];
   }
 
-  if (totalSamples > actualBlocksNeeded * blockSize) {
-    console.error(`Total samples (${totalSamples}) exceed total block capacity (${actualBlocksNeeded * blockSize}).`);
+  // Calculate minimum blocks needed
+  const minBlocksNeeded = Math.ceil(totalSamples / blockSize);
+
+  // Check if we have enough blocks available
+  if (minBlocksNeeded > maxBlocks) {
+    console.error(`Insufficient blocks: need ${minBlocksNeeded} blocks but only ${maxBlocks} available.`);
     return [0];
   }
 
@@ -200,22 +204,27 @@ export function assignBlockCapacities(
     console.log(`Keep empty in last ${blockName}: ${totalSamples} samples across ${blockCapacities.length} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   } else {
 
-    // Distribute empty spots randomly across all blocks
-    const baseSamplesPerBlock = Math.floor(totalSamples / actualBlocksNeeded);
-    const extraSamples = totalSamples % actualBlocksNeeded;
-    console.log(`Calculating ${blockName} capacities with keepEmptyInLastBlock=false: ${totalSamples} samples, ${actualBlocksNeeded} ${blockName}s, base samples per ${blockName}: ${baseSamplesPerBlock}, extra samples: ${extraSamples}`);
+    // Distribute samples across all available blocks
+    const actualBlocksToUse = maxBlocks;
+    const baseSamplesPerBlock = Math.floor(totalSamples / actualBlocksToUse);
+    const extraSamples = totalSamples % actualBlocksToUse;
 
-    blockCapacities = Array(actualBlocksNeeded).fill(baseSamplesPerBlock);
+    // Calculate values for logging only
+    const totalCapacity = actualBlocksToUse * blockSize;
+    const totalEmptySpots = totalCapacity - totalSamples;
+    console.log(`Calculating ${blockName} capacities with keepEmptyInLastBlock=false: ${totalSamples} samples, ${actualBlocksToUse} ${blockName}s, ${totalEmptySpots} empty spots to distribute`);
+
+    blockCapacities = Array(actualBlocksToUse).fill(baseSamplesPerBlock);
 
     // Randomly assign extra samples to blocks instead of always using the first ones
-    const blockIndices = Array.from({ length: actualBlocksNeeded }, (_, i) => i);
+    const blockIndices = Array.from({ length: actualBlocksToUse }, (_, i) => i);
     const shuffledIndices = shuffleArray(blockIndices);
 
     for (let i = 0; i < extraSamples; i++) {
       blockCapacities[shuffledIndices[i]]++;
     }
 
-    console.log(`Random distribution of empty spots: ${totalSamples} samples across ${actualBlocksNeeded} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
+    console.log(`Random distribution of empty spots: ${totalSamples} samples across ${actualBlocksToUse} ${blockName}s with capacities: ${blockCapacities.join(', ')}`);
   }
 
   return blockCapacities;
@@ -555,10 +564,10 @@ function doBalancedRandomization(
   const plateSize = numRows * numColumns;
   console.log(`Starting balanced randomization for ${totalSamples} samples with plate size ${plateSize} (${numRows} rows x ${numColumns} columns)`);
 
-  // Calculate number of plates needed (same regardless of keepEmptyInLastPlate)
+  // Calculate number of plates needed
   const actualPlatesNeeded = Math.ceil(totalSamples / plateSize);
-  console.log(`Calculated plates needed: ${actualPlatesNeeded}`);
-  const plateCapacities = assignBlockCapacities(totalSamples, actualPlatesNeeded, keepEmptyInLastPlate, plateSize, BlockType.PLATE);
+  console.log(`Plates needed: ${actualPlatesNeeded}`);
+  const plateCapacities = assignBlockCapacities(totalSamples, plateSize, keepEmptyInLastPlate, actualPlatesNeeded, BlockType.PLATE);
 
   const plates = Array.from({ length: actualPlatesNeeded }, () =>
     Array.from({ length: numRows }, () => new Array(numColumns).fill(undefined))
@@ -606,16 +615,15 @@ function doBalancedRandomization(
     // Group samples by covariates for this plate
     const plateGroups = groupByCovariates(shuffledPlateSamples, selectedCovariates);
 
-    // Calculate how many rows we need
-    const totalPlateSamples = plateSamples.length;
-    const rowsNeeded = Math.ceil(totalPlateSamples / numColumns);
-    const actualRowsToUse = Math.min(rowsNeeded, numRows);
-    console.log(`Plate ${plateIdx + 1} has ${totalPlateSamples} samples, needs ${rowsNeeded} rows, using ${actualRowsToUse} rows`);
-
     // Calculate row capacities based on keepEmptyInLastPlate setting
-    // If keepEmptyInLastPlate is true, fill rows sequentially (empty cells in last row)
+    const totalPlateSamples = plateSamples.length;
+    const plateCapacity = plateCapacities[plateIdx];
+    console.log(`Plate ${plateIdx + 1} has ${totalPlateSamples} samples, capacity ${plateCapacity}, max rows available: ${numRows}`);
+
+    // assignBlockCapacities will determine how many rows to use based on keepEmptyInLastPlate
+    // If keepEmptyInLastPlate is true, fill rows sequentially (empty cells in last rows)
     // If keepEmptyInLastPlate is false, distribute empty cells randomly across rows
-    const rowCapacities = assignBlockCapacities(totalPlateSamples, actualRowsToUse, keepEmptyInLastPlate, numColumns, BlockType.ROW);
+    const rowCapacities = assignBlockCapacities(plateCapacity, numColumns, keepEmptyInLastPlate, numRows, BlockType.ROW);
 
     // Calculate expected minimums per row
     const expectedRowMinimums = calculateExpectedMinimums(
